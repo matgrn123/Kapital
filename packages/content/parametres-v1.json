@@ -1,0 +1,86 @@
+{
+  "smic_horaire_brut": {
+    "valeur": 1231,
+    "unite": "centimes_par_heure",
+    "source": "https://www.urssaf.fr/accueil/outils-documentation/taux-baremes/montant-smic.html",
+    "date": "2026-06-01"
+  },
+  "smic_mensuel_brut": {
+    "valeur": 186702,
+    "unite": "centimes_par_mois",
+    "source": "https://www.urssaf.fr/accueil/outils-documentation/taux-baremes/montant-smic.html",
+    "date": "2026-06-01"
+  },
+  "cout_employeur_smic_mensuel": {
+    "valeur": 193300,
+    "unite": "centimes_par_mois",
+    "source": "https://staffmatch.com/blog/fr/charges-patronales-smic/",
+    "date": "2026-11-01"
+  },
+  "taux_cotisations_au_dela_1_6_smic": {
+    "valeur": 0.40,
+    "unite": "ratio",
+    "source": "https://www.expert-comptable-tpe.fr/articles/cout-reel-travail-employe-smic-declare-en-france/",
+    "date": "2026-11-01"
+  },
+  "heures_mensuelles_legales": {
+    "valeur": 151.67,
+    "unite": "heures_par_mois",
+    "source": "docs/referentiel-couts.md section 6 (35 h x 52 / 12)",
+    "date": "2026-11-01"
+  },
+  "rendement_atelier_min": {
+    "valeur": 0.40,
+    "unite": "ratio",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (rendement)",
+    "date": "2026-11-01"
+  },
+  "rendement_atelier_max": {
+    "valeur": 0.75,
+    "unite": "ratio",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (rendement)",
+    "date": "2026-11-01"
+  },
+  "rendement_tau_mois": {
+    "valeur": 6,
+    "unite": "mois",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (tau d'apprentissage)",
+    "date": "2026-11-01"
+  },
+  "taux_chute_matiere_defaut": {
+    "valeur": 0.15,
+    "unite": "ratio",
+    "source": "docs/referentiel-couts.md section 2 (10 a 20 pourcent, milieu de fourchette)",
+    "date": "2026-11-01"
+  },
+  "taux_retour_vente_en_ligne": {
+    "valeur": 0.19,
+    "unite": "ratio",
+    "source": "https://www.campioni.fr/gestion-retours-terrain-jeu-cache-marge-ecommerce/",
+    "date": "2026-11-01"
+  },
+  "cout_traitement_retour": {
+    "valeur": 1750,
+    "unite": "centimes_par_article",
+    "source": "https://www.campioni.fr/gestion-retours-terrain-jeu-cache-marge-ecommerce/ (15 a 20 euros, milieu de fourchette)",
+    "date": "2026-11-01"
+  },
+  "prix_electricite_pro": {
+    "valeur": 16,
+    "unite": "centimes_par_kwh",
+    "source": "https://capitole-energie.com/2026/02/26/tarif-electricite-professionnel/",
+    "date": "2026-11-01"
+  },
+  "decroissance_notoriete_mois": {
+    "valeur": 0.05,
+    "unite": "ratio_par_mois",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (marque)",
+    "date": "2026-11-01"
+  },
+  "decroissance_desirabilite_mois": {
+    "valeur": 0.02,
+    "unite": "ratio_par_mois",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (marque)",
+    "date": "2026-11-01"
+  }
+}
