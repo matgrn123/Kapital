@@ -1,0 +1,20 @@
+{
+  "name": "kapital",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Kapital — jeu de gestion d'entreprise multijoueur",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tools/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}
