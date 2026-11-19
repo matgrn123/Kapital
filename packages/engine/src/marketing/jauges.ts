@@ -61,7 +61,7 @@ export function moisDeMarque(
   };
 }
 
-export function coefficientsDepuisParametres(
+export function coefficientsMarketingDepuisParametres(
   params: Parametres,
 ): CoefficientsMarketing {
   const lire = (cle: string): number => {

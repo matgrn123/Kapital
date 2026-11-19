@@ -8,3 +8,4 @@ export * from "./faconniers/index.js";
 export * from "./marche/index.js";
 export * from "./marketing/index.js";
 export * from "./ventes/index.js";
+export * from "./salaires/index.js";
