@@ -82,5 +82,95 @@
     "unite": "ratio_par_mois",
     "source": "docs/cahier-des-charges-v1.md section 6.2 (marque)",
     "date": "2026-11-01"
+  },
+  "attraction_entree_qualite": {
+    "valeur": 0.5,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (entree : prix pese lourd) - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_entree_notoriete": {
+    "valeur": 0.3,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_entree_desirabilite": {
+    "valeur": 0.2,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_entree_presence_revendeur": {
+    "valeur": 0.4,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_entree_prix": {
+    "valeur": 3.0,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (entree : prix pese lourd, coefficient fort) - a regler T14",
+    "date": "2026-11-01"
+  },
+  "attraction_milieu_qualite": {
+    "valeur": 0.8,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_milieu_notoriete": {
+    "valeur": 0.6,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_milieu_desirabilite": {
+    "valeur": 0.5,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_milieu_presence_revendeur": {
+    "valeur": 0.3,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_milieu_prix": {
+    "valeur": 2.0,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_haut_qualite": {
+    "valeur": 1.0,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_haut_notoriete": {
+    "valeur": 1.0,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_haut_desirabilite": {
+    "valeur": 1.5,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (haut : desirabilite compte plus) - a regler T14",
+    "date": "2026-11-01"
+  },
+  "attraction_haut_presence_revendeur": {
+    "valeur": 0.1,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - a regler au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "attraction_haut_prix": {
+    "valeur": 1.0,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (haut : baisse prix pese moins) - a regler T14",
+    "date": "2026-11-01"
   }
 }
