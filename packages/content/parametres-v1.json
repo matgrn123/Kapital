@@ -226,5 +226,23 @@
     "unite": "multiplicateur_smic",
     "source": "https://www.expert-comptable-tpe.fr/articles/cout-reel-travail-employe-smic-declare-en-france/ (fin de l'allegement general a 1,6 SMIC)",
     "date": "2026-11-01"
+  },
+  "is_taux_reduit": {
+    "valeur": 0.15,
+    "unite": "ratio",
+    "source": "https://www.impots.gouv.fr/professionnel/limpot-sur-les-societes-is (taux reduit PME sur les 42500 premiers euros de benefice)",
+    "date": "2026-11-01"
+  },
+  "is_plafond_reduit": {
+    "valeur": 4250000,
+    "unite": "centimes",
+    "source": "https://www.impots.gouv.fr/professionnel/limpot-sur-les-societes-is (plafond 42500 euros)",
+    "date": "2026-11-01"
+  },
+  "is_taux_plein": {
+    "valeur": 0.25,
+    "unite": "ratio",
+    "source": "https://www.impots.gouv.fr/professionnel/limpot-sur-les-societes-is (taux plein)",
+    "date": "2026-11-01"
   }
 }
