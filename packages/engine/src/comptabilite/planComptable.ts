@@ -40,6 +40,21 @@ export const PLAN_COMPTABLE_V1: readonly Compte[] = [
     libelle: "Sécurité sociale (URSSAF)",
     type: "passif",
   },
+  {
+    numero: "444",
+    libelle: "État - impôts sur les bénéfices",
+    type: "passif",
+  },
+  {
+    numero: "661",
+    libelle: "Charges d'intérêts",
+    type: "charges",
+  },
+  {
+    numero: "695",
+    libelle: "Impôt sur les bénéfices",
+    type: "charges",
+  },
   { numero: "707", libelle: "Ventes de produits finis", type: "produits" },
   {
     numero: "7135",
