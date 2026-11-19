@@ -214,5 +214,17 @@
     "unite": "ratio",
     "source": "https://www.service-public.fr/professionnels-entreprises/vosdroits/F23567 (TVA taux normal 20 pourcent)",
     "date": "2026-11-01"
+  },
+  "taux_cotisations_au_smic": {
+    "valeur": 0.0354,
+    "unite": "ratio",
+    "source": "docs/referentiel-couts.md section 5 (cout employeur SMIC 1933 euros / SMIC 1867,02 = 3,54 pourcent de cotisations residuelles apres allegement general)",
+    "date": "2026-11-01"
+  },
+  "seuil_cotisations_pleines_en_smic": {
+    "valeur": 1.6,
+    "unite": "multiplicateur_smic",
+    "source": "https://www.expert-comptable-tpe.fr/articles/cout-reel-travail-employe-smic-declare-en-france/ (fin de l'allegement general a 1,6 SMIC)",
+    "date": "2026-11-01"
   }
 }

@@ -2,13 +2,13 @@ import { chargerParametresV1 } from "@kapital/content";
 import { describe, expect, it } from "vitest";
 import { centimes } from "../types/primitifs.js";
 import {
-  coefficientsDepuisParametres,
+  coefficientsMarketingDepuisParametres,
   effetAction,
   moisDeMarque,
 } from "./jauges.js";
 
 function coeffs() {
-  return coefficientsDepuisParametres(chargerParametresV1());
+  return coefficientsMarketingDepuisParametres(chargerParametresV1());
 }
 
 describe("décroissance mensuelle", () => {

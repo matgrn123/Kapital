@@ -25,6 +25,21 @@ export const PLAN_COMPTABLE_V1: readonly Compte[] = [
     libelle: "Rémunérations du personnel",
     type: "charges",
   },
+  {
+    numero: "645",
+    libelle: "Charges de sécurité sociale et de prévoyance",
+    type: "charges",
+  },
+  {
+    numero: "421",
+    libelle: "Personnel - rémunérations dues",
+    type: "passif",
+  },
+  {
+    numero: "431",
+    libelle: "Sécurité sociale (URSSAF)",
+    type: "passif",
+  },
   { numero: "707", libelle: "Ventes de produits finis", type: "produits" },
   {
     numero: "7135",
