@@ -26,6 +26,16 @@ export const PLAN_COMPTABLE_V1: readonly Compte[] = [
     type: "charges",
   },
   { numero: "707", libelle: "Ventes de produits finis", type: "produits" },
+  {
+    numero: "7135",
+    libelle: "Variation des stocks de produits finis",
+    type: "produits",
+  },
+  {
+    numero: "6228",
+    libelle: "Charges externes diverses (retours, logistique)",
+    type: "charges",
+  },
 ];
 
 export function planComptableV1(): GrandLivre {
