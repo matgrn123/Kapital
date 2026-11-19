@@ -172,5 +172,41 @@
     "unite": "coefficient",
     "source": "docs/cahier-des-charges-v1.md section 6.2 (haut : baisse prix pese moins) - a regler T14",
     "date": "2026-11-01"
+  },
+  "marketing_k_notoriete_publicite": {
+    "valeur": 2.0,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (k_n) - calibre pour campagne 1000 euros donnant environ +14 points noto",
+    "date": "2026-11-01"
+  },
+  "marketing_k_desirabilite_image": {
+    "valeur": 2.0,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (k_d) - calibre pour campagne 1000 euros donnant environ +14 points desirabilite",
+    "date": "2026-11-01"
+  },
+  "marketing_k_notoriete_promotion": {
+    "valeur": 1.0,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - promotion fait monter la noto moins fort qu'une vraie pub",
+    "date": "2026-11-01"
+  },
+  "marketing_k_desirabilite_promotion_negatif": {
+    "valeur": 1.5,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 (effet des soldes) - la promotion abime la desirabilite",
+    "date": "2026-11-01"
+  },
+  "marketing_k_notoriete_rp": {
+    "valeur": 1.5,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - les relations presse jouent sur les deux jauges",
+    "date": "2026-11-01"
+  },
+  "marketing_k_desirabilite_rp": {
+    "valeur": 1.5,
+    "unite": "coefficient",
+    "source": "docs/cahier-des-charges-v1.md section 6.2 - les relations presse jouent sur les deux jauges",
+    "date": "2026-11-01"
   }
 }
