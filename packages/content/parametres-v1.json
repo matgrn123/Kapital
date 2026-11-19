@@ -244,5 +244,23 @@
     "unite": "ratio",
     "source": "https://www.impots.gouv.fr/professionnel/limpot-sur-les-societes-is (taux plein)",
     "date": "2026-11-01"
+  },
+  "poids_frange_entree": {
+    "valeur": 5.0,
+    "unite": "multiplicateur",
+    "source": "docs/cahier-des-charges-v1.md section 7 (la frange represente l'ensemble du marche hors joueurs : poids superieur a un joueur individuel) - calibre au banc d'essai T14 pour 20 PNJ",
+    "date": "2026-11-01"
+  },
+  "poids_frange_milieu": {
+    "valeur": 5.0,
+    "unite": "multiplicateur",
+    "source": "docs/cahier-des-charges-v1.md section 7 - calibre au banc d'essai T14",
+    "date": "2026-11-01"
+  },
+  "poids_frange_haut": {
+    "valeur": 5.0,
+    "unite": "multiplicateur",
+    "source": "docs/cahier-des-charges-v1.md section 7 - calibre au banc d'essai T14",
+    "date": "2026-11-01"
   }
 }

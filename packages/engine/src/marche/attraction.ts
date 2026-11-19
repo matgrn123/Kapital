@@ -73,7 +73,7 @@ export function partsDeMarche(
     id: o.entreprise,
     att: attraitOffreEntreprise(o, segment),
   }));
-  const expFrange = Math.exp(attraitFrange);
+  const expFrange = segment.poidsFrange * Math.exp(attraitFrange);
   const expFirmes = attraitsFirmes.map((a) => Math.exp(a.att));
   const total = expFrange + expFirmes.reduce((s, x) => s + x, 0);
   const parts: Record<string, number> = {};
@@ -124,10 +124,12 @@ export function segmentDepuisParametres(
   prixReferenceCentimes: number,
 ): SegmentAttraction {
   const prixRef = centimes(prixReferenceCentimes);
+  const poidsParam = params[`poids_frange_${gamme}`];
   return {
     gamme,
     prixReference: prixRef,
     coefficients: coefficientsPourGamme(params, gamme),
     frange: frangeStandard(prixRef),
+    poidsFrange: poidsParam?.valeur ?? 1,
   };
 }
