@@ -11,3 +11,4 @@ export * from "./ventes/index.js";
 export * from "./salaires/index.js";
 export * from "./prets/index.js";
 export * from "./impots/index.js";
+export * from "./moteur/index.js";
