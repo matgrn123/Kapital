@@ -31,6 +31,7 @@ export type SegmentAttraction = {
   readonly prixReference: Centimes;
   readonly coefficients: CoefficientsAttraction;
   readonly frange: OffreFrange;
+  readonly poidsFrange: number;
 };
 
 export type PartsSegment = {
