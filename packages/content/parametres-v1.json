@@ -208,5 +208,11 @@
     "unite": "coefficient",
     "source": "docs/cahier-des-charges-v1.md section 6.2 - les relations presse jouent sur les deux jauges",
     "date": "2026-11-01"
+  },
+  "tva_standard": {
+    "valeur": 0.20,
+    "unite": "ratio",
+    "source": "https://www.service-public.fr/professionnels-entreprises/vosdroits/F23567 (TVA taux normal 20 pourcent)",
+    "date": "2026-11-01"
   }
 }

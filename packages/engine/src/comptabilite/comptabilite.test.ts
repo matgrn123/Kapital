@@ -35,9 +35,11 @@ describe("grand livre vide", () => {
     expect(enEquilibre(gl)).toBe(true);
   });
 
-  it("le plan comptable V1 a 12 comptes", () => {
+  it("le plan comptable V1 contient au moins les comptes essentiels", () => {
     const gl = planComptableV1();
-    expect(Object.keys(gl.comptes)).toHaveLength(12);
+    for (const numero of ["101", "164", "31", "35", "401", "411", "512", "707", "601", "641", "44566", "44571"]) {
+      expect(gl.comptes[numero], `compte ${numero} absent`).toBeDefined();
+    }
     expect(gl.comptes["512"]?.libelle).toBe("Banque");
   });
 
