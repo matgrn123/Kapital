@@ -5,3 +5,4 @@ export * from "./comptabilite/index.js";
 export * from "./achats/index.js";
 export * from "./atelier/index.js";
 export * from "./faconniers/index.js";
+export * from "./marche/index.js";
