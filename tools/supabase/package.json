@@ -4,10 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "migrate": "node --env-file=../../.env.local --experimental-strip-types migrate.ts",
-    "rls-test": "node --env-file=../../.env.local --experimental-strip-types rls-test.ts"
+    "migrate": "tsx --env-file=../../.env.local migrate.ts",
+    "rls-test": "tsx --env-file=../../.env.local rls-test.ts",
+    "seed-market-data": "tsx --env-file=../../.env.local seed-market-data.ts",
+    "import-estr": "tsx --env-file=../../.env.local import-estr.ts",
+    "test-market-data": "tsx --env-file=../../.env.local test-market-data.ts"
   },
   "dependencies": {
+    "@kapital/content": "*",
     "@supabase/supabase-js": "^2.119.2",
     "pg": "^8.23.1"
   },
