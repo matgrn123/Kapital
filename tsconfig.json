@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/engine" },
     { "path": "packages/content" },
+    { "path": "packages/server" },
     { "path": "tools/supabase" }
   ]
 }
