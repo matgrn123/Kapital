@@ -1,0 +1,17 @@
+{
+  "name": "@kapital/tool-supabase",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "migrate": "node --env-file=../../.env.local --experimental-strip-types migrate.ts",
+    "rls-test": "node --env-file=../../.env.local --experimental-strip-types rls-test.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
+}

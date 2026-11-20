@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "packages/engine" },
-    { "path": "packages/content" }
+    { "path": "packages/content" },
+    { "path": "tools/supabase" }
   ]
 }
