@@ -13,3 +13,4 @@ export * from "./prets/index.js";
 export * from "./impots/index.js";
 export * from "./moteur/index.js";
 export * from "./pnj/index.js";
+export * from "./evenements/index.js";
