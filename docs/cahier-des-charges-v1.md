@@ -36,7 +36,7 @@ Le joueur doit apprendre trois choses : calculer un coût de revient et une marg
 
 | Sujet | Décision |
 | --- | --- |
-| Rythme | 1 jour réel = 1 mois de jeu ; trimestre tous les 3 jours, année tous les 12 jours |
+| Rythme | **Monde persistant asynchrone**. Ratio : 1 jour réel = 1 mois de jeu. Les flux (ventes, production, charges) avancent au prorata du temps réel. Les événements datés (livraisons, échéances, missions) se déclenchent à leur horodatage. Parts de marché recalculées **toutes les 30 min réelles**. Négociations entre joueurs : deadlines en temps réel, **48 h par défaut**. |
 | Monde | Partagé et persistant dès la V1, sans remise à zéro des fortunes |
 | Support | Ordinateur (écran de 1 280 px et plus) ; sur mobile, consultation seule |
 | Accès | Compte obligatoire (email ou Google) |
@@ -48,19 +48,32 @@ Le joueur doit apprendre trois choses : calculer un coût de revient et une marg
 ## 3. Le parcours du joueur
 
 1. **Inscription** : email ou Google, pseudonyme public, acceptation des conditions et de la politique de confidentialité.
-2. **Création de l'entreprise** : nom de la marque, gamme visée (entrée, milieu, haut de gamme), capital de départ fixe (par exemple 20 000 € d'apport). Le joueur entre dans le monde au mois en cours.
+2. **Création de l'entreprise** : nom de la marque, gamme visée (entrée, milieu, haut de gamme), capital de départ fixe (par exemple 20 000 € d'apport). Le joueur entre dans le monde à l'instant courant.
 3. **Tutoriel** : la mission 1 le guide pour sa première commande de matière, sa première production et sa première mise en vente.
-4. **Chaque jour réel** : il consulte les résultats du mois écoulé et une explication courte, puis modifie ses décisions pour le mois suivant.
-5. **Clôture quotidienne** : à heure fixe, le moteur calcule le mois pour tout le monde en même temps.
-6. **Si le joueur ne se connecte pas** : ses décisions permanentes continuent (prix, production récurrente, salariés). Ses charges continuent aussi : c'est un monde persistant.
+4. **Chaque connexion** : il consulte ce qui s'est passé depuis sa dernière visite (ventes accumulées, livraisons reçues, échéances payées, offres reçues avec deadline), lit les explications, puis ajuste ses décisions. Il peut se connecter 1 fois ou 10 fois par jour — son entreprise tourne toujours.
+5. **Entre deux connexions** : le monde avance en continu. Les flux (ventes, production, charges) coulent au prorata du temps. Les événements programmés (livraison tissu, échéance de prêt, clôture trimestrielle, expiration d'offre) se déclenchent à leur horodatage.
+6. **Si le joueur ne se connecte pas plusieurs jours** : ses décisions permanentes continuent (prix, production récurrente, salariés), ses charges courent, ses stocks s'écoulent au rythme du marché. Les seules choses qui lui échappent sont les **négociations à minuterie** qu'il aurait acceptées (offre de rachat à répondre sous 48 h, par exemple).
 
 ## 4. Le temps
 
-- **Un tour = un mois de jeu = un jour réel.** La clôture est lancée par `pg_cron`, qui appelle une fonction serveur.
-- **Les décisions sont de deux sortes.** Permanentes (prix, effectif, production mensuelle) : elles restent en place tant que le joueur ne les change pas. Ponctuelles (une commande de matière, une campagne) : elles valent pour le mois suivant.
-- **Trimestre** (tous les 3 tours) : comptes trimestriels, échéances du prêt, contrôle du covenant si le prêt en a un.
-- **Année** (tous les 12 tours) : bilan annuel, impôt sur les sociétés, revalorisation du SMIC si le réel a changé, classement annuel.
-- **Délais.** Ils se comptent en mois de jeu. Une commande de tissu arrive le mois suivant ; une production chez un façonnier prend 1 à 2 mois.
+**Le monde avance en continu, pas par tours.** Les grandeurs qui coulent (ventes, production, charges fixes, décroissance de la marque) progressent au prorata du temps réel écoulé, au ratio **1 jour réel = 1 mois de jeu**. Les joueurs ne sont jamais obligés d'être connectés : quand ils reviennent, leur entreprise a avancé toute seule.
+
+**Les décisions sont de deux sortes.** Permanentes (prix, effectif, production récurrente) : elles restent en place tant que le joueur ne les change pas. Ponctuelles (une commande, une campagne, une embauche) : elles génèrent un **événement daté** qui se réalisera à son échéance (commande France : livraison dans 24 h réelles = 1 mois jeu ; Portugal : 48 h = 2 mois).
+
+**Événements datés.** Chaque action ponctuelle crée un événement dans la file avec un horodatage de réalisation. Au moment prévu, l'événement s'exécute : le stock bouge, l'écriture comptable passe, le joueur reçoit une notification. Catégories d'événements :
+- Livraisons de matières (délai fournisseur en mois → en heures réelles au ratio 24:1)
+- Fins de production façonnier (même conversion)
+- Échéances de prêt (tous les 30 jours → toutes les 24 h)
+- Clôtures comptables trimestrielles (90 jours → 3 jours)
+- Clôtures annuelles (365 jours → 12 jours)
+- Expiration d'offres entre joueurs (48 h par défaut, en temps réel, pas en jeu)
+- En V2 : livrables des missions d'avocat, sorties de LBO
+
+**Rafraîchissement du marché.** Les parts de marché et les ventes qui en découlent sont recalculées **toutes les 30 minutes réelles** (≈ 15 heures jeu). Assez fin pour que le marché vive visiblement, assez espacé pour que les joueurs non connectés ne soient pas désavantagés.
+
+**Délais.** Ils se mesurent en mois de jeu dans les règles et se convertissent en temps réel au ratio 24:1 : une commande de tissu arrive 1 à 2 jours réels après ; une production façonnier prend 1 à 2 jours. Les minuteries liées aux négociations entre joueurs restent en **temps réel absolu** (indépendamment du ratio) : une offre est valable 48 h réelles, point.
+
+**Déterminisme et audit.** L'état du monde à n'importe quel instant est reconstructible à partir de la suite des décisions et des événements avec leurs horodatages. Rejouer un intervalle donne exactement le même résultat (critère T13).
 
 ## 5. Modèle de données
 
@@ -92,22 +105,30 @@ Tables Supabase, toutes rattachées à un `world_id`. Les montants sont stockés
 
 ## 6. Le moteur
 
-Le moteur vit dans `packages/engine`. C'est une **fonction pure** : elle prend l'état du monde, les décisions, les données réelles du mois et une graine aléatoire, et rend le nouvel état. Elle ne lit ni n'écrit la base de données. Ce que ça change : on peut rejouer n'importe quel mois et obtenir exactement le même résultat, ce qui permet de tester et de corriger.
+Le moteur vit dans `packages/engine`. C'est une **fonction pure** : elle prend l'état du monde à un instant t, la file d'événements, les décisions courantes, les données réelles et une graine aléatoire, et rend le nouvel état à un instant t+Δ. Elle ne lit ni n'écrit la base de données. On peut rejouer n'importe quel intervalle et obtenir exactement le même résultat, ce qui permet de tester et de corriger.
 
-`simulateMonth(world, decisions, marketInputs, seed) → { newWorld, results, explanations }`
+`simulerDepuis(etat, decisions, evenements, marketInputs, instantDebut, instantFin, seed) → { nouvelEtat, resultats, explications }`
 
-### 6.1 Ordre de calcul d'un mois
+### 6.1 Ordre de calcul d'une avance de t à t+Δ
 
-1. Charger les données réelles du mois et mettre à jour les prix des matières.
-2. Livrer les commandes de matière arrivées à échéance.
-3. Produire : atelier dans la limite de sa capacité, façonniers selon leurs délais.
-4. Appliquer le marketing aux deux jauges de marque.
-5. Calculer la demande de chaque segment de marché, puis la part de chaque entreprise.
-6. Vendre dans la limite du stock ; appliquer les retours.
-7. Payer salaires, loyer, énergie, fournisseurs échus, échéances de prêt.
-8. Passer toutes les écritures comptables.
-9. Contrôler la trésorerie : sous zéro, découvert facturé ; trois mois de suite sous la limite, l'entreprise passe en difficulté.
-10. Calculer les indicateurs et rédiger les explications (« Votre trésorerie baisse parce que 62 % de votre argent est bloqué en stock »).
+1. Charger les données réelles qui ont changé entre t et t+Δ (SMIC, €STR, cours du coton, inflation) et mettre à jour les prix des matières.
+2. **Pour chaque événement daté dans la file dont l'horodatage tombe entre t et t+Δ** (triés par horodatage) :
+   - Livraison de matière → stock + dette fournisseur
+   - Fin de production façonnier → stock produits finis + dette façonnier
+   - Échéance de prêt → amortissement + intérêts
+   - Clôture trimestrielle TVA → écriture de déclaration
+   - Clôture annuelle → impôt sur les sociétés
+   - Expiration d'offre entre joueurs → annulation
+3. **Entre deux événements**, les flux continus s'appliquent au prorata du Δ écoulé :
+   - Production atelier : capacité mensuelle × (Δ / durée-mois)
+   - Ventes : demande du segment × part de marché × (Δ / durée-mois), limitée par le stock
+   - Décroissance exponentielle des jauges de marque
+   - Charges fixes : loyer, salaires, énergie au prorata
+   - Dépenses marketing en cours
+4. Les parts de marché sont recalculées quand Δ franchit un multiple de 30 min réelles.
+5. Toutes les écritures comptables sont passées (partie double).
+6. Contrôle de trésorerie : sous zéro, découvert facturé ; trois mois cumulés sous la limite, entreprise en difficulté.
+7. Indicateurs et explications mis à jour.
 
 ### 6.2 Formules
 
@@ -196,8 +217,8 @@ Chaque mission se termine par une fiche courte : la notion, puis ce qu'elle a ch
 - **Scénarios de référence** : l'exemple du t-shirt du référentiel doit redonner environ 20 € en atelier français et 8 à 11 € chez un façonnier portugais.
 - **Banc d'essai** (`tools/sim`) : faire tourner 120 mois avec 20 PNJ sans joueur, et vérifier que le marché reste stable (pas de prix négatif, pas de monopole automatique, la frange garde entre 20 et 95 % du marché).
 - **Déterminisme** : même état et même graine donnent exactement le même résultat.
-- **Comptabilité** : après chaque mois, l'actif égale le passif pour chaque entreprise, à l'euro près.
-- **Tests de bout en bout** (Playwright) : inscription, création d'entreprise, première commande, clôture, lecture du résultat.
+- **Comptabilité** : à tout instant, l'actif égale le passif pour chaque entreprise, à l'euro près.
+- **Tests de bout en bout** (Playwright) : inscription, création d'entreprise, première commande, livraison, lecture du résultat.
 
 ## 13. Les tickets, dans l'ordre
 
@@ -215,25 +236,26 @@ Chaque mission se termine par une fiche courte : la notion, puis ce qu'elle a ch
 | T10 | Ventes, canaux, retours | La marge en revendeurs est inférieure à la vente directe |
 | T11 | Salariés, salaires, cotisations | Le coût d'un salarié au SMIC ≈ 1 933 € par mois |
 | T12 | Prêt bancaire et impôts | Échéancier exact ; TVA et impôt passent en comptabilité |
-| T13 | `simulateMonth` complet et explications | Test de déterminisme |
-| T14 | PNJ et banc d'essai sur 120 mois | Critères de stabilité de la section 12 |
+| T13 | `simulerDepuis(etat, ..., instantDebut, instantFin, seed)` et explications | Test de déterminisme sur un intervalle |
+| T14 | PNJ et banc d'essai sur l'équivalent 120 mois | Critères de stabilité de la section 12 |
 | T15 | Base Supabase : tables, RLS, migrations | Un joueur ne peut pas lire l'entreprise d'un autre |
 | T16 | Fonctions serveur de décision | Une décision impossible est refusée avec un message clair |
-| T17 | Clôture quotidienne par `pg_cron` | La clôture d'un monde de test tourne et peut être rejouée |
-| T18 | Données réelles et page d'administration | €STR importé ; une donnée manquante ne bloque pas la clôture |
+| T17 | Processeur d'événements et avance continue du temps | Deux connexions séparées voient la même évolution ; les événements fire à leur horodatage |
+| T18 | Données réelles et page d'administration | €STR importé ; une donnée manquante ne bloque pas l'avance du temps |
 | T19 | Inscription, connexion, création d'entreprise | Test de bout en bout du parcours |
-| T20 | Tableau de bord et pages de décision | Un joueur peut jouer un mois complet sans aide |
+| T20 | Tableau de bord et pages de décision | Un joueur peut piloter sa marque sans aide |
 | T21 | Finances et bulles d'aide | Les trois documents s'affichent et concordent |
 | T22 | Missions et tutoriel | Les trois missions se valident |
-| T23 | Classement | Classement par valeur d'entreprise, mis à jour à chaque clôture |
+| T23 | Classement | Classement par valeur d'entreprise, recalculé toutes les 30 min |
 | T24 | Recette générale avec 5 à 10 testeurs pendant 2 semaines | Pas de bug bloquant, retours notés |
 
 Les tickets T01 à T14 ne touchent ni la base ni l'interface : le cœur du jeu est testé avant d'être affiché.
 
 ## 14. Points encore ouverts
 
-- **Heure de clôture quotidienne** : proposition 6 h, heure de Paris, pour que les résultats soient prêts le matin.
 - **Joueur absent longtemps** : son entreprise continue de payer ses charges. Faut-il un mode « mise en sommeil » (activité suspendue, charges réduites) ?
 - **Faillite** : en V1, une entreprise liquidée laisse le joueur recommencer avec le capital de départ, son historique restant visible au classement.
 - **Nom de domaine, conditions d'utilisation, politique de confidentialité** : à rédiger avant l'ouverture publique.
 - **Coefficients du modèle d'attraction et taille des segments** : réglés au banc d'essai (T08 et T14).
+- **Durées des négociations entre joueurs** : 48 h par défaut acté. Les cas spéciaux (LBO, levée de fonds) seront tranchés plus tard, probablement 7 j.
+- **Ratio temps** : 1 jour réel = 1 mois de jeu acté. Possibilité d'un « événement saison » accéléré (1 h = 1 mois le temps d'un weekend) à étudier plus tard.
