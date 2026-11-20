@@ -12,16 +12,16 @@ function coeffs() {
 }
 
 describe("décroissance mensuelle", () => {
-  it("notoriété décroît de 5 % par mois sans action", () => {
+  it("notoriété décroît selon exp(-0,05 × durée) par mois sans action", () => {
     const c = coeffs();
     const apres = moisDeMarque({ notoriete: 50, desirabilite: 50 }, [], c);
-    expect(apres.notoriete).toBeCloseTo(50 * 0.95, 5);
+    expect(apres.notoriete).toBeCloseTo(50 * Math.exp(-0.05), 5);
   });
 
-  it("désirabilité décroît de 2 % par mois sans action", () => {
+  it("désirabilité décroît selon exp(-0,02 × durée) par mois sans action", () => {
     const c = coeffs();
     const apres = moisDeMarque({ notoriete: 50, desirabilite: 50 }, [], c);
-    expect(apres.desirabilite).toBeCloseTo(50 * 0.98, 5);
+    expect(apres.desirabilite).toBeCloseTo(50 * Math.exp(-0.02), 5);
   });
 });
 

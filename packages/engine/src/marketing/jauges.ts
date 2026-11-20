@@ -48,8 +48,22 @@ export function moisDeMarque(
   depenses: readonly DepenseMarketing[],
   c: CoefficientsMarketing,
 ): EtatJauges {
-  let noto = etatPrecedent.notoriete * (1 - c.decroissanceNotoriete);
-  let desi = etatPrecedent.desirabilite * (1 - c.decroissanceDesirabilite);
+  return fluxMarque(etatPrecedent, 1, depenses, c);
+}
+
+// Version continue : applique la décroissance exponentielle sur `dureeMois`
+// (peut être fractionnaire) puis les effets ponctuels des dépenses.
+export function fluxMarque(
+  etatPrecedent: EtatJauges,
+  dureeMois: number,
+  depenses: readonly DepenseMarketing[],
+  c: CoefficientsMarketing,
+): EtatJauges {
+  if (dureeMois < 0) {
+    throw new Error(`dureeMois doit être >= 0, reçu ${dureeMois}.`);
+  }
+  let noto = etatPrecedent.notoriete * Math.exp(-c.decroissanceNotoriete * dureeMois);
+  let desi = etatPrecedent.desirabilite * Math.exp(-c.decroissanceDesirabilite * dureeMois);
   for (const d of depenses) {
     const e = effetAction(d, c);
     noto += e.deltaNotoriete;

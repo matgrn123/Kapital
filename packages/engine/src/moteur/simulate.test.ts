@@ -8,11 +8,13 @@ import {
   centimes,
   graine,
   idEntreprise,
+  instantJeu,
+  MINUTES_PAR_MOIS_JEU,
   moisJeu,
   type Graine,
 } from "../types/primitifs.js";
 import { creerRng } from "./rng.js";
-import { simulateMonth } from "./simulate.js";
+import { simulateMonth, simulerDepuis } from "./simulate.js";
 
 function entrepriseTest(nom: string, noto = 40, desi = 40): Entreprise {
   return {
@@ -141,8 +143,8 @@ describe("simulateMonth — marque", () => {
       graine: graine(1),
     });
     const entA = r.nouveauMonde.entreprises.find((e) => e.nom === "A")!;
-    expect(entA.marque.notoriete).toBeCloseTo(40 * 0.95, 5);
-    expect(entA.marque.desirabilite).toBeCloseTo(40 * 0.98, 5);
+    expect(entA.marque.notoriete).toBeCloseTo(40 * Math.exp(-0.05), 5);
+    expect(entA.marque.desirabilite).toBeCloseTo(40 * Math.exp(-0.02), 5);
   });
 
   it("entreprise avec promotion : notoriété monte, désirabilité descend", () => {
@@ -180,6 +182,107 @@ describe("simulateMonth — marque", () => {
     for (const res of r.resultatsParEntreprise) {
       expect(res.explications.length).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+describe("simulerDepuis — nouvelle API, intervalles arbitraires", () => {
+  function executerIntervalle(minutesReelles: number) {
+    return simulerDepuis({
+      monde: mondeTest(),
+      decisions: [],
+      marketInputs: inputsTest(),
+      params: chargerParametresV1(),
+      instantDebut: instantJeu(0),
+      instantFin: instantJeu(minutesReelles),
+      graine: graine(42),
+    });
+  }
+
+  it("avance d'une heure réelle (≈ 1/24 mois) : décroissance proportionnelle", () => {
+    const r = executerIntervalle(60);
+    const entA = r.nouveauMonde.entreprises.find((e) => e.nom === "A")!;
+    const attendu = 40 * Math.exp(-0.05 * (60 / MINUTES_PAR_MOIS_JEU));
+    expect(entA.marque.notoriete).toBeCloseTo(attendu, 5);
+  });
+
+  it("avance de 30 min = cadence de rafraîchissement du marché", () => {
+    const r = executerIntervalle(30);
+    expect(r.nouveauMonde.moisCourant).toBe(0);
+  });
+
+  it("avance d'un mois complet : équivalent à simulateMonth sur l'entrée", () => {
+    const parSimuler = executerIntervalle(MINUTES_PAR_MOIS_JEU);
+    const parWrapper = simulateMonth({
+      monde: mondeTest(),
+      decisions: [],
+      marketInputs: inputsTest(),
+      params: chargerParametresV1(),
+      graine: graine(42),
+    });
+    const entA1 = parSimuler.nouveauMonde.entreprises.find((e) => e.nom === "A")!;
+    const entA2 = parWrapper.nouveauMonde.entreprises.find((e) => e.nom === "A")!;
+    expect(entA1.marque).toEqual(entA2.marque);
+  });
+
+  it("avance de 3 mois : noto × exp(-0,05 × 3)", () => {
+    const r = executerIntervalle(3 * MINUTES_PAR_MOIS_JEU);
+    const entA = r.nouveauMonde.entreprises.find((e) => e.nom === "A")!;
+    expect(entA.marque.notoriete).toBeCloseTo(40 * Math.exp(-0.15), 5);
+    expect(r.nouveauMonde.moisCourant).toBe(3);
+  });
+
+  it("déterminisme sur un intervalle : deux appels identiques → même résultat", () => {
+    const r1 = executerIntervalle(90);
+    const r2 = executerIntervalle(90);
+    expect(r1).toEqual(r2);
+  });
+
+  it("additivité partielle : avance(0 → 2h) proche de avance(0 → 1h) puis avance(1h → 2h)", () => {
+    const params = chargerParametresV1();
+    const direct = simulerDepuis({
+      monde: mondeTest(),
+      decisions: [],
+      marketInputs: inputsTest(),
+      params,
+      instantDebut: instantJeu(0),
+      instantFin: instantJeu(120),
+      graine: graine(1),
+    });
+    const pas1 = simulerDepuis({
+      monde: mondeTest(),
+      decisions: [],
+      marketInputs: inputsTest(),
+      params,
+      instantDebut: instantJeu(0),
+      instantFin: instantJeu(60),
+      graine: graine(1),
+    });
+    const pas2 = simulerDepuis({
+      monde: pas1.nouveauMonde,
+      decisions: [],
+      marketInputs: inputsTest(),
+      params,
+      instantDebut: instantJeu(60),
+      instantFin: instantJeu(120),
+      graine: graine(1),
+    });
+    const notoDirect = direct.nouveauMonde.entreprises.find((e) => e.nom === "A")!.marque.notoriete;
+    const notoPas = pas2.nouveauMonde.entreprises.find((e) => e.nom === "A")!.marque.notoriete;
+    expect(notoDirect).toBeCloseTo(notoPas, 10);
+  });
+
+  it("refuse un intervalle inversé (fin < debut)", () => {
+    expect(() =>
+      simulerDepuis({
+        monde: mondeTest(),
+        decisions: [],
+        marketInputs: inputsTest(),
+        params: chargerParametresV1(),
+        instantDebut: instantJeu(100),
+        instantFin: instantJeu(50),
+        graine: graine(1),
+      }),
+    ).toThrow();
   });
 });
 

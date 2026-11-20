@@ -1,7 +1,7 @@
 import type { Parametres } from "@kapital/content";
 import {
   coefficientsMarketingDepuisParametres,
-  moisDeMarque,
+  fluxMarque,
   type DepenseMarketing,
 } from "../marketing/index.js";
 import type { DecisionsEntreprise } from "../types/decision.js";
@@ -10,18 +10,23 @@ import type { MarketInputs } from "../types/marketInputs.js";
 import type { Monde } from "../types/monde.js";
 import {
   centimes,
+  dureeMoisEntre,
+  moisCourantDepuisInstant,
   moisJeu,
   type Graine,
   type IdEntreprise,
+  type InstantJeu,
 } from "../types/primitifs.js";
 import type { ResultatMoisEntreprise } from "../types/resultatMois.js";
 import { creerRng, type Rng } from "./rng.js";
 
-export type EntreesSimulateMonth = {
+export type EntreesSimulerDepuis = {
   readonly monde: Monde;
   readonly decisions: readonly DecisionsEntreprise[];
   readonly marketInputs: MarketInputs;
   readonly params: Parametres;
+  readonly instantDebut: InstantJeu;
+  readonly instantFin: InstantJeu;
   readonly graine: Graine;
 };
 
@@ -51,8 +56,9 @@ function depensesMarketing(
   return out;
 }
 
-function appliquerMarqueMensuelle(
+function appliquerFluxMarque(
   entreprises: readonly Entreprise[],
+  dureeMois: number,
   decisionsPar: ReadonlyMap<IdEntreprise, DecisionsEntreprise>,
   params: Parametres,
 ): readonly Entreprise[] {
@@ -60,7 +66,7 @@ function appliquerMarqueMensuelle(
   return entreprises.map((ent) => {
     const dec = decisionsPar.get(ent.id);
     const depenses = depensesMarketing(dec);
-    const nouvelleMarque = moisDeMarque(ent.marque, depenses, coeffs);
+    const nouvelleMarque = fluxMarque(ent.marque, dureeMois, depenses, coeffs);
     return { ...ent, marque: nouvelleMarque };
   });
 }
@@ -95,34 +101,54 @@ function construireResultats(
   });
 }
 
-export function simulateMonth(e: EntreesSimulateMonth): ResultatSimulation {
-  // Le RNG est préparé pour les futurs étages (PNJ en T14, retours stochastiques, etc.)
-  // Il n'est pas utilisé ici mais sa création est déterministe.
+export function simulerDepuis(e: EntreesSimulerDepuis): ResultatSimulation {
+  // Le RNG est préparé pour les futurs étages (PNJ, retours stochastiques, etc.)
+  // Création déterministe à partir de la graine.
   const rng: Rng = creerRng(e.graine);
   void rng;
 
+  const duree = dureeMoisEntre(e.instantDebut, e.instantFin);
+
   const decMap = decisionsParIdEntreprise(e.decisions);
   const entreprisesAvant = e.monde.entreprises;
-  const entreprisesApres = appliquerMarqueMensuelle(
+  const entreprisesApres = appliquerFluxMarque(
     entreprisesAvant,
+    duree,
     decMap,
     e.params,
   );
 
+  const nouveauMoisCourant = moisCourantDepuisInstant(e.instantFin);
   const nouveauMonde: Monde = {
     ...e.monde,
-    moisCourant: moisJeu(e.monde.moisCourant + 1),
+    moisCourant: nouveauMoisCourant,
     entreprises: entreprisesApres,
   };
 
   const resultats = construireResultats(
     entreprisesAvant,
     entreprisesApres,
-    e.monde.moisCourant,
+    nouveauMoisCourant,
   );
 
   return {
     nouveauMonde,
     resultatsParEntreprise: resultats,
   };
+}
+
+// Wrapper historique : avance d'exactement un mois jeu depuis le mois courant.
+// À retirer quand T17 (processeur d'événements) sera en place.
+export type EntreesSimulateMonth = {
+  readonly monde: Monde;
+  readonly decisions: readonly DecisionsEntreprise[];
+  readonly marketInputs: MarketInputs;
+  readonly params: Parametres;
+  readonly graine: Graine;
+};
+
+export function simulateMonth(e: EntreesSimulateMonth): ResultatSimulation {
+  const instantDebut = (e.monde.moisCourant * 1440) as InstantJeu;
+  const instantFin = ((e.monde.moisCourant + 1) * 1440) as InstantJeu;
+  return simulerDepuis({ ...e, instantDebut, instantFin });
 }
