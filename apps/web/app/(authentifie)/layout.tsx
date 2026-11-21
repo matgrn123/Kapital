@@ -43,6 +43,16 @@ export default async function LayoutAuthentifie({
             {profil?.pseudo ?? user.email}
           </p>
           <FormulaireDeconnexion />
+          {process.env.NEXT_PUBLIC_RETOUR_URL && (
+            <a
+              href={process.env.NEXT_PUBLIC_RETOUR_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 block text-[color:var(--color-g-500)] underline hover:text-[color:var(--color-noir)]"
+            >
+              Signaler un problème
+            </a>
+          )}
         </div>
       </aside>
       <main className="flex-1 bg-[color:var(--color-blanc)]">{children}</main>
