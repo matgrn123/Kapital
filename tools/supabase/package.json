@@ -7,6 +7,7 @@
     "migrate": "tsx --env-file=../../.env.local migrate.ts",
     "rls-test": "tsx --env-file=../../.env.local rls-test.ts",
     "seed-market-data": "tsx --env-file=../../.env.local seed-market-data.ts",
+    "seed-world": "tsx --env-file=../../.env.local seed-world.ts",
     "import-estr": "tsx --env-file=../../.env.local import-estr.ts",
     "test-market-data": "tsx --env-file=../../.env.local test-market-data.ts"
   },
