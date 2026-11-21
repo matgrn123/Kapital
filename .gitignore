@@ -5,6 +5,17 @@ dist/
 coverage/
 .vitest/
 
+# Next.js
+.next/
+next-env.d.ts
+.vercel/
+.turbo/
+
+# Playwright
+test-results/
+playwright-report/
+.playwright/
+
 .env
 .env.local
 .env.*.local
