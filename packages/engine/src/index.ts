@@ -15,3 +15,4 @@ export * from "./moteur/index.js";
 export * from "./pnj/index.js";
 export * from "./evenements/index.js";
 export * from "./missions/index.js";
+export * from "./classement/index.js";
