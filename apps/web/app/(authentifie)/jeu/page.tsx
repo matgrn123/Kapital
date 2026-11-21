@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
+import { chargerProgressionMissions } from "../../../lib/missions";
+import { DEFINITIONS_MISSIONS } from "@kapital/engine";
 
 type Ecriture = {
   id: string;
@@ -29,6 +32,13 @@ export default async function PageJeu() {
     .limit(10);
 
   const dernieres = (ecritures ?? []) as Ecriture[];
+
+  const progressions = (await chargerProgressionMissions(supabase, entreprise.id)) ?? [];
+  const missionACourante =
+    progressions.find((p) => p.etat !== "validee") ?? progressions[0];
+  const defACourante = DEFINITIONS_MISSIONS.find(
+    (d) => d.id === missionACourante?.id,
+  );
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-10">
@@ -122,15 +132,26 @@ export default async function PageJeu() {
               Pas de livraison ni d'échéance planifiée.
             </p>
           </div>
-          <div className="rounded-md border border-dashed border-[color:var(--color-g-300)] p-5">
-            <h3 className="text-sm font-semibold">Mission 1</h3>
-            <p className="mt-2 text-sm text-[color:var(--color-g-700)]">
-              Vendre vos 50 premières pièces avec une marge brute positive.
-            </p>
-            <p className="chiffre mt-3 text-xs text-[color:var(--color-g-500)]">
-              T22 — le détail des missions arrive bientôt
-            </p>
-          </div>
+          {defACourante && missionACourante && (
+            <Link
+              href="/missions"
+              className="block rounded-md border border-dashed border-[color:var(--color-g-300)] p-5 transition hover:border-[color:var(--color-g-500)] hover:bg-[color:var(--color-g-100)]"
+            >
+              <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
+                Mission {defACourante.numero}
+                {missionACourante.etat === "validee" ? " — validée" : ""}
+              </p>
+              <h3 className="mt-1 text-sm font-semibold">{defACourante.titre}</h3>
+              <p className="mt-2 text-sm text-[color:var(--color-g-700)]">
+                {defACourante.objectif}
+              </p>
+              <p className="chiffre mt-3 text-xs text-[color:var(--color-g-500)]">
+                {missionACourante.cible > 0
+                  ? `${missionACourante.actuel} / ${missionACourante.cible}`
+                  : "voir le détail →"}
+              </p>
+            </Link>
+          )}
         </aside>
       </section>
     </div>
