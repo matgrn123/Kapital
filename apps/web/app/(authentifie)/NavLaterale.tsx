@@ -11,6 +11,7 @@ const LIENS = [
   { href: "/salaries", libelle: "Salariés" },
   { href: "/marketing", libelle: "Marketing" },
   { href: "/banque", libelle: "Banque" },
+  { href: "/finances", libelle: "Finances" },
 ] as const;
 
 export function NavLaterale() {
