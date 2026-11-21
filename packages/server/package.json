@@ -8,6 +8,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@kapital/engine": "*"
+    "@kapital/engine": "*",
+    "@kapital/content": "*",
+    "@supabase/supabase-js": "^2.119.2"
   }
 }

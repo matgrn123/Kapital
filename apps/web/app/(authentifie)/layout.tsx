@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { creerClientServeur } from "../../lib/supabase/server";
 import { NavLaterale } from "./NavLaterale";
@@ -16,7 +17,7 @@ export default async function LayoutAuthentifie({
 
   const { data: profil } = await supabase
     .from("profiles")
-    .select("pseudo")
+    .select("pseudo, role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -43,6 +44,14 @@ export default async function LayoutAuthentifie({
             {profil?.pseudo ?? user.email}
           </p>
           <FormulaireDeconnexion />
+          {profil?.role === "admin" && (
+            <Link
+              href="/admin"
+              className="mt-2 block text-[color:var(--color-g-500)] underline hover:text-[color:var(--color-noir)]"
+            >
+              Administration
+            </Link>
+          )}
           {process.env.NEXT_PUBLIC_RETOUR_URL && (
             <a
               href={process.env.NEXT_PUBLIC_RETOUR_URL}
