@@ -19,22 +19,19 @@ export default function PageInscription() {
     setEnCours(true);
     try {
       const supabase = creerClientNavigateur();
-      const { data, error } = await supabase.auth.signUp({ email, password: motDePasse });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: motDePasse,
+        options: { data: { pseudo: pseudo.trim() } },
+      });
       if (error) {
         setErreur(error.message);
         return;
       }
-      if (!data.user) {
-        setErreur("Compte créé, vérifiez votre email pour la confirmation.");
-        return;
-      }
-      // Création du profil immédiatement
-      const { error: errProfile } = await supabase.from("profiles").insert({
-        id: data.user.id,
-        pseudo: pseudo.trim(),
-      });
-      if (errProfile) {
-        setErreur(`Compte créé mais profil non enregistré : ${errProfile.message}`);
+      if (!data.session) {
+        setErreur(
+          "Compte créé. Vérifiez votre email pour confirmer votre inscription, puis connectez-vous.",
+        );
         return;
       }
       router.push("/creer-entreprise");
