@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation";
 
 const LIENS = [
   { href: "/jeu", libelle: "Tableau de bord" },
+  { href: "/vue-3d", libelle: "Vue 3D" },
   { href: "/produits", libelle: "Produits et prix" },
   { href: "/achats", libelle: "Achats" },
   { href: "/atelier", libelle: "Atelier" },
+  { href: "/atelier-3d", libelle: "Atelier 3D" },
   { href: "/salaries", libelle: "Salariés" },
   { href: "/marketing", libelle: "Marketing" },
   { href: "/banque", libelle: "Banque" },

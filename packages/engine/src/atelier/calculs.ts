@@ -22,13 +22,19 @@ export function rendement(
 
 export function capaciteMinutes(
   nombreArtisans: number,
+  nombrePostesEquipes: number,
   heuresMensuelles: number,
   rendementEffectif: number,
 ): Minutes {
   if (nombreArtisans < 0) {
     throw new Error("nombre d'artisans doit être >= 0");
   }
-  const brut = nombreArtisans * heuresMensuelles * 60 * rendementEffectif;
+  if (nombrePostesEquipes < 0) {
+    throw new Error("nombre de postes équipés doit être >= 0");
+  }
+  // Un artisan sans poste équipé ne produit pas (formule du plan d'aménagement 3D)
+  const actifs = Math.min(nombreArtisans, nombrePostesEquipes);
+  const brut = actifs * heuresMensuelles * 60 * rendementEffectif;
   return minutes(Math.floor(brut));
 }
 

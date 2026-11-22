@@ -1,0 +1,122 @@
+[
+  {
+    "id": "poste_couture_base",
+    "nom": "Poste de couture (piqueuse plate)",
+    "largeur_grille": 2,
+    "hauteur_grille": 2,
+    "peut_pivoter": true,
+    "prix_centimes": 130000,
+    "amortissement_mois": 60,
+    "effet": { "type": "poste_artisan" },
+    "source_prix": "docs/referentiel-couts.md section 7 — piqueuse plate industrielle 840–1 750 € HT, Atelier Machine à Coudre / Glasman ; milieu de fourchette",
+    "modele_path": null,
+    "modele_licence": null
+  },
+  {
+    "id": "poste_couture_surjeteuse",
+    "nom": "Poste de couture spécialisée (surjeteuse)",
+    "largeur_grille": 2,
+    "hauteur_grille": 2,
+    "peut_pivoter": true,
+    "prix_centimes": 150000,
+    "amortissement_mois": 60,
+    "effet": {
+      "type": "poste_artisan_specialise",
+      "produits_autorises": ["t_shirt", "chemise", "sac_toile"]
+    },
+    "source_prix": "docs/referentiel-couts.md section 7 — machines industrielles spécialisées 800–9 000 € HT, Hellopro ; estimation basse-gamme pour surjeteuse industrielle",
+    "modele_path": null,
+    "modele_licence": null
+  },
+  {
+    "id": "table_coupe_simple",
+    "nom": "Table de coupe",
+    "largeur_grille": 2,
+    "hauteur_grille": 3,
+    "peut_pivoter": true,
+    "prix_centimes": 120000,
+    "amortissement_mois": 120,
+    "effet": {
+      "type": "table_coupe",
+      "max_m2_par_mois": 500,
+      "reduction_chute_pct": 5
+    },
+    "source_prix": "docs/referentiel-couts.md section 7 — machines industrielles spécialisées, estimation table de coupe professionnelle 800–1 500 €",
+    "modele_path": null,
+    "modele_licence": null
+  },
+  {
+    "id": "zone_stockage_etageres",
+    "nom": "Zone de stockage (étagères)",
+    "largeur_grille": 1,
+    "hauteur_grille": 2,
+    "peut_pivoter": false,
+    "prix_centimes": 40000,
+    "amortissement_mois": 36,
+    "effet": {
+      "type": "stockage",
+      "capacite_m3": 10
+    },
+    "source_prix": "estimation mobilier industriel de stockage 300–500 € l'unité",
+    "modele_path": null,
+    "modele_licence": null
+  },
+  {
+    "id": "bureau_simple",
+    "nom": "Bureau (open space)",
+    "largeur_grille": 2,
+    "hauteur_grille": 2,
+    "peut_pivoter": true,
+    "prix_centimes": 50000,
+    "amortissement_mois": 36,
+    "effet": { "type": "bureau" },
+    "source_prix": "estimation poste de travail bureau 400–600 € (bureau + chaise + rangement)",
+    "modele_path": null,
+    "modele_licence": null
+  },
+  {
+    "id": "salle_reunion_petite",
+    "nom": "Salle de réunion",
+    "largeur_grille": 3,
+    "hauteur_grille": 4,
+    "peut_pivoter": false,
+    "prix_centimes": 250000,
+    "amortissement_mois": 36,
+    "effet": { "type": "salle_reunion" },
+    "source_prix": "estimation mobilier salle de réunion 4 personnes 2 000–3 000 €",
+    "modele_path": null,
+    "modele_licence": null
+  },
+  {
+    "id": "showroom_compact",
+    "nom": "Showroom / accueil revendeurs",
+    "largeur_grille": 3,
+    "hauteur_grille": 3,
+    "peut_pivoter": false,
+    "prix_centimes": 500000,
+    "amortissement_mois": 60,
+    "effet": {
+      "type": "showroom",
+      "bonus_conversion_revendeur_pct": 15
+    },
+    "source_prix": "estimation aménagement showroom professionnel textile 3 000–8 000 € ; milieu de fourchette",
+    "modele_path": null,
+    "modele_licence": null
+  },
+  {
+    "id": "salle_pause",
+    "nom": "Salle de pause",
+    "largeur_grille": 2,
+    "hauteur_grille": 3,
+    "peut_pivoter": false,
+    "prix_centimes": 150000,
+    "amortissement_mois": 36,
+    "effet": {
+      "type": "pause",
+      "bonus_motivation_max_pct": 5
+    },
+    "source_prix": "estimation mobilier salle de pause 1 000–2 000 € (réfrigérateur, table, chaises, micro-ondes)",
+    "modele_path": null,
+    "modele_licence": null
+  }
+]

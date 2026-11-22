@@ -24,6 +24,15 @@ export async function raffraichirSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user && process.env.NODE_ENV === "development") {
+    const devEmail = process.env.DEV_EMAIL;
+    const devPassword = process.env.DEV_PASSWORD;
+    if (devEmail && devPassword) {
+      await supabase.auth.signInWithPassword({ email: devEmail, password: devPassword });
+    }
+  }
+
   return response;
 }
