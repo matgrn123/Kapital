@@ -1,0 +1,47 @@
+[
+  {
+    "id": "petit_atelier",
+    "nom": "Petit atelier",
+    "categorie": "atelier",
+    "surface_m2": 150,
+    "nb_etages": 1,
+    "zones_amenageables": ["atelier", "stockage", "bureau"],
+    "prix_achat_centimes": 42857000,
+    "loyer_mensuel_centimes": 250000,
+    "charges_mensuelles_centimes": 105000,
+    "etape_debloquee": 0,
+    "source_prix": "docs/referentiel-couts.md section 7 — local d'activité IDF 200 €/m²/an, Arthur Loyd / SeLoger Bureaux & Commerces ; achat estimé au taux de capitalisation 7 % sur loyer annuel",
+    "modele_path": "/models/Building_Small_1.gltf",
+    "modele_licence": "CC0 - Quaternius Downtown City MegaKit (https://quaternius.com/packs/downtowncitymegakit.html)"
+  },
+  {
+    "id": "atelier_specialise",
+    "nom": "Atelier spécialisé",
+    "categorie": "atelier",
+    "surface_m2": 200,
+    "nb_etages": 2,
+    "zones_amenageables": ["atelier", "stockage", "bureau", "showroom"],
+    "prix_achat_centimes": 51429000,
+    "loyer_mensuel_centimes": 300000,
+    "charges_mensuelles_centimes": 140000,
+    "etape_debloquee": 1,
+    "source_prix": "docs/referentiel-couts.md section 7 — local d'activité IDF 180 €/m²/an, Arthur Loyd / SeLoger Bureaux & Commerces ; achat estimé au taux de capitalisation 7 % sur loyer annuel",
+    "modele_path": "/models/Building_Medium_2_001.gltf",
+    "modele_licence": "CC0 - Quaternius Downtown City MegaKit (https://quaternius.com/packs/downtowncitymegakit.html)"
+  },
+  {
+    "id": "batiment_industriel",
+    "nom": "Bâtiment industriel",
+    "categorie": "atelier",
+    "surface_m2": 320,
+    "nb_etages": 3,
+    "zones_amenageables": ["atelier", "stockage", "bureau", "showroom"],
+    "prix_achat_centimes": 82286000,
+    "loyer_mensuel_centimes": 480000,
+    "charges_mensuelles_centimes": 224000,
+    "etape_debloquee": 2,
+    "source_prix": "docs/referentiel-couts.md section 7 — local d'activité IDF 180 €/m²/an, Arthur Loyd / SeLoger Bureaux & Commerces ; achat estimé au taux de capitalisation 7 % sur loyer annuel",
+    "modele_path": "/models/Building_Large_2.gltf",
+    "modele_licence": "CC0 - Quaternius Downtown City MegaKit (https://quaternius.com/packs/downtowncitymegakit.html)"
+  }
+]

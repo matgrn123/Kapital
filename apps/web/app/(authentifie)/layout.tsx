@@ -30,7 +30,7 @@ export default async function LayoutAuthentifie({
   const entreprise = entreprises[0]!;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <aside className="flex w-56 shrink-0 flex-col border-r border-[color:var(--color-g-200)] bg-[color:var(--color-g-100)]">
         <div className="border-b border-[color:var(--color-g-200)] px-5 py-4">
           <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
@@ -64,7 +64,7 @@ export default async function LayoutAuthentifie({
           )}
         </div>
       </aside>
-      <main className="flex-1 bg-[color:var(--color-blanc)]">{children}</main>
+      <main className="flex flex-col flex-1 overflow-y-auto bg-[color:var(--color-blanc)]">{children}</main>
     </div>
   );
 }

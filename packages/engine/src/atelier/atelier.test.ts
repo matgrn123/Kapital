@@ -39,19 +39,44 @@ describe("rendement", () => {
 
 describe("capaciteMinutes", () => {
   it("1 artisan, 151,67 h, rendement 70 % ≈ 6370 min produites", () => {
-    const m = capaciteMinutes(1, 151.67, 0.7);
+    const m = capaciteMinutes(1, Infinity, 151.67, 0.7);
     expect(m).toBeGreaterThanOrEqual(6369);
     expect(m).toBeLessThanOrEqual(6371);
   });
 
   it("0 artisan produit 0 minute", () => {
-    expect(capaciteMinutes(0, 151.67, 0.7)).toBe(0);
+    expect(capaciteMinutes(0, Infinity, 151.67, 0.7)).toBe(0);
   });
 
-  it("linéaire en nombre d'artisans", () => {
-    const un = capaciteMinutes(1, 151.67, 0.7);
-    const trois = capaciteMinutes(3, 151.67, 0.7);
+  it("linéaire en nombre d'artisans quand les postes ne contraignent pas", () => {
+    const un = capaciteMinutes(1, Infinity, 151.67, 0.7);
+    const trois = capaciteMinutes(3, Infinity, 151.67, 0.7);
     expect(trois).toBe(un * 3);
+  });
+
+  // --- critère d'acceptation 3D-3 ------------------------------------------
+
+  it("embaucher sans poste équipé n'augmente pas la production (critère 3D-3)", () => {
+    const sansPoste = capaciteMinutes(3, 0, 151.67, 0.7);
+    expect(sansPoste).toBe(0);
+  });
+
+  it("1 poste pour 3 artisans : seul 1 artisan produit", () => {
+    const unPoste = capaciteMinutes(3, 1, 151.67, 0.7);
+    const unArtisan = capaciteMinutes(1, Infinity, 151.67, 0.7);
+    expect(unPoste).toBe(unArtisan);
+  });
+
+  it("autant de postes que d'artisans : capacité normale", () => {
+    const avecPlan = capaciteMinutes(3, 3, 151.67, 0.7);
+    const sansPlan = capaciteMinutes(3, Infinity, 151.67, 0.7);
+    expect(avecPlan).toBe(sansPlan);
+  });
+
+  it("plus de postes que d'artisans : c'est le nombre d'artisans qui limite", () => {
+    const avec = capaciteMinutes(2, 10, 151.67, 0.7);
+    const ref = capaciteMinutes(2, Infinity, 151.67, 0.7);
+    expect(avec).toBe(ref);
   });
 });
 
@@ -98,7 +123,7 @@ describe("coutRevient — critère T06 : scénario t-shirt France ≈ 20 €", (
     const tauxChute = params["taux_chute_matiere_defaut"]!.valeur;
 
     const rend = rendement(tau, rMin, rMax, tau);
-    const cap = capaciteMinutes(1, heures, rend);
+    const cap = capaciteMinutes(1, Infinity, heures, rend);
 
     const loyerMensuel = 100_000;
     const amortissementMensuel = 20_000;

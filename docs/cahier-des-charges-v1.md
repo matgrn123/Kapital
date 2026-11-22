@@ -1,6 +1,6 @@
 # Cahier des charges V1 : module Entrepreneur textile
 
-Ce document dit à Claude Code quoi construire pour la première version jouable de Kapital. Il s'appuie sur deux autres documents : les règles du module Entrepreneur et le référentiel des coûts (`docs/referentiel-couts.md`). En cas de contradiction, ce cahier l'emporte pour la V1.
+Ce document dit à Claude Code quoi construire pour la première version jouable de Kapital. Il s'appuie sur trois autres documents : les règles du module Entrepreneur, le référentiel des coûts (`docs/referentiel-couts.md`) et la spécification des bâtiments, de la 3D et du groupe (`docs/batiments-3d-groupe.md`). En cas de contradiction, ce cahier l'emporte pour la V1.
 
 ## 0. Comment s'en servir avec Claude Code
 
@@ -30,7 +30,15 @@ Le joueur doit apprendre trois choses : calculer un coût de revient et une marg
 - Trois missions guidées.
 - Un classement.
 
-**Hors V1** : boutiques en propre, international, maroquinerie cuir, rachat d'entreprises, métiers avocat et fonds, IA conversationnelle, application mobile, paiement.
+**Ajouts du 22 novembre 2026 (3D)**, détaillés dans `docs/batiments-3d-groupe.md` :
+
+- L'atelier du joueur en 3D, en vue isométrique, aménageable avec des modules sur une grille (postes de couture, table de coupe, stockage, bureau, salle de réunion, showroom).
+- L'aménagement fixe la capacité : un artisan sans poste équipé ne produit pas.
+- Les salariés visibles à leur poste.
+- L'écran « Mon Empire » et le profil public du joueur.
+- Un deuxième local, loué ou acheté (atelier plus grand ou petit entrepôt).
+
+**Hors V1** : boutiques en propre, international, maroquinerie cuir, holdings, filiales et rachat d'entreprises (LBO compris), procédures collectives, métiers avocat et fonds, style 3D semi-réaliste, personnages animés, IA conversationnelle, application mobile, paiement.
 
 ## 2. Décisions fixées
 
@@ -44,6 +52,13 @@ Le joueur doit apprendre trois choses : calculer un coût de revient et une marg
 | Langue et droit | Français, droit français |
 | Stack | TypeScript, Next.js sur Vercel, Supabase (Postgres, Auth, RLS, pg_cron), Vitest, Playwright |
 | Développement | Principalement Claude Code, piloté par Mathieu |
+
+| Sujet ajouté le 22 novembre 2026 | Décision |
+| --- | --- |
+| 3D | Three.js avec React Three Fiber dans Next.js, caméra isométrique, modèles glTF (Quaternius, CC0) ; style « maquette d'architecte » en V1 |
+| Règle de conception | Toute la 3D a un effet économique ; la 3D ne décide jamais d'un chiffre |
+| Monde | Pas de ville : « Mon Empire » et profils ; le monde partagé est économique |
+| Formes juridiques | Droit français simplifié (SAS, SARL, SA, société civile immobilière) |
 
 ## 3. Le parcours du joueur
 
@@ -103,6 +118,8 @@ Tables Supabase, toutes rattachées à un `world_id`. Les montants sont stockés
 | `missions`, `mission_progress` | Missions et avancement |
 | `audit_log` | Toute action d'administrateur |
 
+Tables ajoutées pour la 3D et le groupe : `building_types`, `buildings` (propriétaire, exploitant, mode de détention : bail, achat, crédit), `floors`, `layouts` (plan de chaque étage sur la grille), `module_types`, `placed_modules`, `equipment_types`, `shareholdings` (dès la V1, même sans holding jouable), `contracts`, `financial_statements`.
+
 ## 6. Le moteur
 
 Le moteur vit dans `packages/engine`. C'est une **fonction pure** : elle prend l'état du monde à un instant t, la file d'événements, les décisions courantes, les données réelles et une graine aléatoire, et rend le nouvel état à un instant t+Δ. Elle ne lit ni n'écrit la base de données. On peut rejouer n'importe quel intervalle et obtenir exactement le même résultat, ce qui permet de tester et de corriger.
@@ -133,6 +150,8 @@ Le moteur vit dans `packages/engine`. C'est une **fonction pure** : elle prend l
 ### 6.2 Formules
 
 **Capacité de l'atelier**, en minutes par mois : nombre d'artisans × 151,67 h × 60 × rendement.
+
+Avec l'aménagement 3D, la capacité devient : minimum(nombre d'artisans, nombre de postes équipés) × 151,67 h × 60 × rendement. La table de coupe plafonne la matière coupée par mois, la zone de stockage plafonne le stock. Le confort donne au plus 5 % de motivation en plus.
 
 **Rendement**, qui progresse avec l'expérience : rendement = r_min + (r_max − r_min) × (1 − e^(−mois d'expérience / τ)). Départ : r_min = 0,40, r_max = 0,75, τ = 6 mois.
 
@@ -192,6 +211,8 @@ Pages de la V1 : connexion ; création d'entreprise ; tableau de bord ; produits
 - **Simulation avant validation** : quand le joueur change un prix ou une production, il voit le coût de revient et la marge estimés avant d'enregistrer.
 - **Mises à jour sans interruption** : une nouvelle version déployée ne déconnecte personne et ne modifie pas les décisions en attente.
 
+Pages 3D ajoutées : **Mon Empire** (miniatures des bâtiments, filtres) ; **vue bâtiment** (extérieur, intérieur, étages, mode aménagement avec catalogue de modules, aperçu du coût et de la capacité gagnée avant validation) ; **profil public**. Sur mobile, la 3D est remplacée par une vue en plan.
+
 ## 10. Comptes et sécurité
 
 - Authentification Supabase : email avec lien magique ou mot de passe, et Google.
@@ -248,6 +269,20 @@ Chaque mission se termine par une fiche courte : la notion, puis ce qu'elle a ch
 | T22 | Missions et tutoriel | Les trois missions se valident |
 | T23 | Classement | Classement par valeur d'entreprise, recalculé toutes les 30 min |
 | T24 | Recette générale avec 5 à 10 testeurs pendant 2 semaines | Pas de bug bloquant, retours notés |
+
+**Tickets 3D ajoutés le 22 novembre 2026.** Ils portent le préfixe 3D pour ne pas se confondre avec les tickets T25 à T28 déjà réalisés dans le dépôt. Le moteur et la base étant faits, ils peuvent démarrer ; un premier prototype de vue 3D existe déjà (`apps/web/app/(authentifie)/vue-3d`).
+
+| Ticket | Contenu | Critère d'acceptation |
+| --- | --- | --- |
+| 3D-1 | Catalogues de bâtiments, modules et équipements (`packages/content`) | Chaque entrée a dimensions, prix, effet économique et licence du modèle |
+| 3D-2 | Validation d'un plan d'étage sur la grille (`packages/engine`) | Collision, passage bloqué ou module hors zone sont refusés par les tests |
+| 3D-3 | Effet de l'aménagement sur la capacité et les coûts | Embaucher sans poste équipé n'augmente pas la production |
+| 3D-4 | Scène Three.js : atelier en style maquette, caméra isométrique, étages | L'atelier s'affiche de façon fluide sur un ordinateur portable récent |
+| 3D-5 | Mode aménagement : poser, déplacer, pivoter, supprimer, aperçu du coût | Le plan est revalidé et enregistré par le serveur ; il s'applique à la clôture suivante |
+| 3D-6 | Salariés visibles à leur poste, fiche au clic | Chaque salarié recruté apparaît à un poste existant |
+| 3D-7 | Location ou achat d'un deuxième local | Louer et acheter produisent les bonnes écritures (loyer ou immobilisation et dette) |
+| 3D-8 | Écran « Mon Empire » et profil public | Un joueur voit l'extérieur et les comptes annuels d'un autre, jamais ses données privées |
+| 3D-9 | Garde-fou monétaire | Après chaque clôture du banc d'essai, aucune richesse n'apparaît sans contrepartie |
 
 Les tickets T01 à T14 ne touchent ni la base ni l'interface : le cœur du jeu est testé avant d'être affiché.
 

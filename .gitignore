@@ -28,3 +28,6 @@ supabase/.temp/
 supabase/.branches/
 .vercel
 .env*
+
+# Packs 3D téléchargés complets (ne committer que les modèles utilisés)
+apps/web/Downtown City MegaKit*/
