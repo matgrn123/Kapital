@@ -1,12 +1,11 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import parametresBruts from "../parametres-v1.json" with { type: "json" };
 import { validateParametres, type Parametres } from "./validate.js";
 
-const ici = dirname(fileURLToPath(import.meta.url));
-const cheminParametres = resolve(ici, "..", "parametres-v1.json");
+// Import ESM du JSON : le bundler (Next/Vercel) l'embarque dans le code
+// serverless. Avant on utilisait readFileSync + resolve() avec import.meta.url,
+// ce qui marche en dev mais échoue sur Vercel où le JSON n'est pas trace par
+// next-file-tracing.
 
 export function chargerParametresV1(): Parametres {
-  const brut = JSON.parse(readFileSync(cheminParametres, "utf-8"));
-  return validateParametres(brut);
+  return validateParametres(parametresBruts);
 }
