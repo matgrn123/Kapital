@@ -280,5 +280,11 @@
     "unite": "pieces_par_mois",
     "source": "ordre de grandeur INSEE marche textile francais / haut de gamme - a calibrer au banc d'essai T14",
     "date": "2026-11-21"
+  },
+  "prix_facon_moyen_centimes_par_piece": {
+    "valeur": 500,
+    "unite": "centimes_par_piece",
+    "source": "docs/referentiel-couts.md - faconnier Portugal : 300 a 900 centimes selon produit, moyenne pour MVP - sera remplace par le vrai cout minute atelier / prix facon reel avec T27",
+    "date": "2026-11-22"
   }
 }

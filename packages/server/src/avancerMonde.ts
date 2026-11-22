@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { chargerParametresV1 } from "@kapital/content";
+import { chargerParametresV1, type Parametres } from "@kapital/content";
 import {
   calculerVentesMois,
   centimes,
+  coutRevientEstime,
   prixHtDepuisTtc,
   tvaSurPrixTtc,
   type Entreprise,
@@ -112,6 +113,7 @@ function ecrituresPourVente(
   vente: VenteGeneree,
   moisJeu: number,
   ecritureId: string,
+  coutRevientUnitaireCentimes: number,
 ): LigneEcriture[] {
   const totalTtc = vente.prixUnitaireCentimes * vente.quantite;
   const prixHtUnitaire = prixHtDepuisTtc(
@@ -121,6 +123,7 @@ function ecrituresPourVente(
   const totalHt = prixHtUnitaire * vente.quantite;
   const totalTva = tvaSurPrixTtc(vente.prixUnitaireCentimes, TAUX_TVA_TEXTILE) *
     vente.quantite;
+  const totalCout = coutRevientUnitaireCentimes * vente.quantite;
   const libelle = vente.canal === "vente_directe"
     ? `Vente directe ${vente.quantite} ${vente.produit}`
     : `Vente revendeur ${vente.quantite} ${vente.produit}`;
@@ -132,18 +135,69 @@ function ecrituresPourVente(
     libelle,
   };
 
+  // Contreparties de stock communes (sortie de stock au cout de revient estime)
+  const contrepartiesStock: LigneEcriture[] = totalCout > 0
+    ? [
+        { ...base, compte: "7135", sens: "debit", montant_centimes: totalCout },
+        { ...base, compte: "35", sens: "credit", montant_centimes: totalCout },
+      ]
+    : [];
+
   if (vente.canal === "vente_directe") {
     return [
       { ...base, compte: "512", sens: "debit", montant_centimes: totalTtc },
       { ...base, compte: "707", sens: "credit", montant_centimes: totalHt },
       { ...base, compte: "44571", sens: "credit", montant_centimes: totalTva },
+      ...contrepartiesStock,
     ];
   }
   // revendeur : HT, sans TVA sur la vente, creance client
   return [
     { ...base, compte: "411", sens: "debit", montant_centimes: totalHt },
     { ...base, compte: "707", sens: "credit", montant_centimes: totalHt },
+    ...contrepartiesStock,
   ];
+}
+
+type ProduitReference = {
+  readonly id: string;
+  readonly matiere_id: string;
+  readonly consommation_par_piece: number;
+  readonly fournitures_par_piece_centimes: number;
+};
+
+function medianePrixMatiere(
+  lignes: ReadonlyArray<{ material_id: string; prix_centimes: number }>,
+  materialId: string,
+): number {
+  const prixs = lignes
+    .filter((l) => l.material_id === materialId)
+    .map((l) => l.prix_centimes)
+    .sort((a, b) => a - b);
+  if (prixs.length === 0) return 0;
+  const milieu = Math.floor(prixs.length / 2);
+  return prixs[milieu] ?? 0;
+}
+
+function construireCoutsRevient(
+  produitsRef: readonly ProduitReference[],
+  cataloguesFournisseur: ReadonlyArray<{ material_id: string; prix_centimes: number }>,
+  params: Parametres,
+): ReadonlyMap<string, number> {
+  const out = new Map<string, number>();
+  for (const p of produitsRef) {
+    const prixMat = medianePrixMatiere(cataloguesFournisseur, p.matiere_id);
+    const cout = coutRevientEstime(
+      {
+        consommationParPiece: p.consommation_par_piece,
+        fournituresParPieceCentimes: p.fournitures_par_piece_centimes,
+        prixMatiereParUniteCentimes: prixMat,
+      },
+      params,
+    );
+    out.set(p.id, cout);
+  }
+  return out;
 }
 
 export async function avancerMonde(
@@ -161,7 +215,7 @@ export async function avancerMonde(
   const monde = (mondes ?? [])[0] as LigneWorld | undefined;
   if (!monde) throw new Error("Aucun monde actif");
 
-  const [companiesR, produitsR, marquesR] = await Promise.all([
+  const [companiesR, produitsR, marquesR, produitsRefR, cataloguesR] = await Promise.all([
     supabase
       .from("companies")
       .select("id, nom, gamme, etape, statut, tresorerie_centimes, owner_profile_id"),
@@ -171,15 +225,26 @@ export async function avancerMonde(
         "id, company_id, product_id, qualite_visee, prix_vente_directe_centimes, prix_revendeur_centimes, production_mensuelle_cible",
       ),
     supabase.from("brand_state").select("company_id, notoriete, desirabilite"),
+    supabase
+      .from("products")
+      .select("id, matiere_id, consommation_par_piece, fournitures_par_piece_centimes"),
+    supabase.from("supplier_catalogue").select("material_id, prix_centimes"),
   ]);
 
   if (companiesR.error) throw new Error(`companies : ${companiesR.error.message}`);
   if (produitsR.error) throw new Error(`company_products : ${produitsR.error.message}`);
   if (marquesR.error) throw new Error(`brand_state : ${marquesR.error.message}`);
+  if (produitsRefR.error) throw new Error(`products : ${produitsRefR.error.message}`);
+  if (cataloguesR.error) throw new Error(`supplier_catalogue : ${cataloguesR.error.message}`);
 
   const companies = (companiesR.data ?? []) as LigneCompany[];
   const produits = (produitsR.data ?? []) as LigneCompanyProduit[];
   const marques = (marquesR.data ?? []) as LigneBrandState[];
+  const produitsRef = (produitsRefR.data ?? []) as ProduitReference[];
+  const cataloguesFournisseur =
+    (cataloguesR.data ?? []) as Array<{ material_id: string; prix_centimes: number }>;
+
+  const coutsRevient = construireCoutsRevient(produitsRef, cataloguesFournisseur, params);
 
   const produitsParCompany = new Map<string, LigneCompanyProduit[]>();
   for (const p of produits) {
@@ -214,7 +279,8 @@ export async function avancerMonde(
   const ecritures: LigneEcriture[] = [];
   for (const v of ventes) {
     const ecritureId = `vente_${moisFin}_${v.entreprise}_${v.produit}_${v.canal}`;
-    ecritures.push(...ecrituresPourVente(v, moisFin, ecritureId));
+    const coutUnitaire = coutsRevient.get(v.produit) ?? 0;
+    ecritures.push(...ecrituresPourVente(v, moisFin, ecritureId, coutUnitaire));
   }
 
   if (ecritures.length > 0) {
