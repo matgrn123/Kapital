@@ -262,5 +262,23 @@
     "unite": "multiplicateur",
     "source": "docs/cahier-des-charges-v1.md section 7 - calibre au banc d'essai T14",
     "date": "2026-11-01"
+  },
+  "taille_marche_mois_entree": {
+    "valeur": 20000000,
+    "unite": "pieces_par_mois",
+    "source": "ordre de grandeur INSEE marche textile francais / entree de gamme - a calibrer au banc d'essai T14",
+    "date": "2026-11-21"
+  },
+  "taille_marche_mois_milieu": {
+    "valeur": 8000000,
+    "unite": "pieces_par_mois",
+    "source": "ordre de grandeur INSEE marche textile francais / milieu de gamme - a calibrer au banc d'essai T14",
+    "date": "2026-11-21"
+  },
+  "taille_marche_mois_haut": {
+    "valeur": 500000,
+    "unite": "pieces_par_mois",
+    "source": "ordre de grandeur INSEE marche textile francais / haut de gamme - a calibrer au banc d'essai T14",
+    "date": "2026-11-21"
   }
 }

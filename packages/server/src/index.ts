@@ -7,3 +7,4 @@ export { validerActionMarketing } from "./validations/actionMarketing.js";
 export { validerEmbauche } from "./validations/embauche.js";
 export { validerLicenciement } from "./validations/licenciement.js";
 export { validerDemandePret } from "./validations/demandePret.js";
+export { avancerMonde, type ResultatAvancement } from "./avancerMonde.js";
