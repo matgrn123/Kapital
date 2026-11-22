@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/admin/monde/avancer",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/admin/classement/refresh",
-      "schedule": "*/30 * * * *"
+      "schedule": "10 3 * * *"
     }
   ]
 }
