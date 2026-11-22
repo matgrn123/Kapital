@@ -24,6 +24,13 @@ export default async function PageJeu() {
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
+  const { data: monde } = await supabase
+    .from("worlds")
+    .select("mois_courant")
+    .limit(1)
+    .maybeSingle();
+  const moisCourant = monde?.mois_courant ?? 0;
+
   const { data: ecritures } = await supabase
     .from("ledger_entries")
     .select("id, mois_jeu, libelle, compte, sens, montant_centimes, cree_le")
@@ -32,6 +39,46 @@ export default async function PageJeu() {
     .limit(10);
 
   const dernieres = (ecritures ?? []) as Ecriture[];
+
+  // Agregats du mois en cours : CA (707 credit), coût (7135 debit), encaissement (512)
+  const { data: ecrituresMois } = await supabase
+    .from("ledger_entries")
+    .select("compte, sens, montant_centimes")
+    .eq("company_id", entreprise.id)
+    .eq("mois_jeu", moisCourant);
+
+  let caMois = 0;
+  let coutMois = 0;
+  for (const e of (ecrituresMois ?? []) as Array<{
+    compte: string;
+    sens: "debit" | "credit";
+    montant_centimes: number;
+  }>) {
+    if (e.compte === "707") {
+      caMois += e.sens === "credit" ? e.montant_centimes : -e.montant_centimes;
+    }
+    if (e.compte === "7135") {
+      coutMois += e.sens === "debit" ? e.montant_centimes : -e.montant_centimes;
+    }
+  }
+  const margeMois = caMois - coutMois;
+
+  // Stock : est-ce que le joueur a au moins un produit avec du stock ?
+  const { data: stocks } = await supabase
+    .from("product_stock")
+    .select("quantite_pieces")
+    .eq("company_id", entreprise.id);
+  const stockTotal = ((stocks ?? []) as Array<{ quantite_pieces: number }>)
+    .reduce((s, x) => s + x.quantite_pieces, 0);
+
+  // Catalogue : est-ce que le joueur a un produit avec un prix > 0 ?
+  const { data: catalogue } = await supabase
+    .from("company_products")
+    .select("prix_vente_directe_centimes")
+    .eq("company_id", entreprise.id);
+  const aUnProduitEnVente = ((catalogue ?? []) as Array<{
+    prix_vente_directe_centimes: number;
+  }>).some((p) => p.prix_vente_directe_centimes > 0);
 
   const progressions = (await chargerProgressionMissions(supabase, entreprise.id)) ?? [];
   const missionACourante =
@@ -63,16 +110,16 @@ export default async function PageJeu() {
           <span className="chiffre">{formaterEuros(entreprise.tresorerie_centimes)} €</span>
         </Carte>
         <Carte libelle="Chiffre d'affaires">
-          <span className="chiffre">{formaterEuros(0)} €</span>
-          <span className="block text-xs text-[color:var(--color-g-500)]">mois en cours</span>
+          <span className="chiffre">{formaterEuros(caMois)} €</span>
+          <span className="block text-xs text-[color:var(--color-g-500)]">mois {moisCourant}</span>
         </Carte>
         <Carte libelle="Marge brute">
-          <span className="chiffre">{formaterEuros(0)} €</span>
-          <span className="block text-xs text-[color:var(--color-g-500)]">mois en cours</span>
+          <span className="chiffre">{formaterEuros(margeMois)} €</span>
+          <span className="block text-xs text-[color:var(--color-g-500)]">mois {moisCourant}</span>
         </Carte>
-        <Carte libelle="Résultat net">
-          <span className="chiffre">{formaterEuros(0)} €</span>
-          <span className="block text-xs text-[color:var(--color-g-500)]">mois en cours</span>
+        <Carte libelle="Coût de revient">
+          <span className="chiffre">{formaterEuros(coutMois)} €</span>
+          <span className="block text-xs text-[color:var(--color-g-500)]">mois {moisCourant}</span>
         </Carte>
       </section>
 
@@ -122,9 +169,60 @@ export default async function PageJeu() {
         </div>
 
         <aside className="col-span-2 space-y-4">
+          {caMois === 0 && (
+            <div className="rounded-md border border-[color:var(--color-g-900)] bg-[color:var(--color-g-100)] p-5">
+              <h3 className="text-sm font-semibold">Comment vendre ?</h3>
+              <ol className="mt-3 space-y-2 text-sm text-[color:var(--color-g-700)]">
+                <li>
+                  <span className="chiffre mr-2 text-[color:var(--color-g-500)]">1.</span>
+                  {aUnProduitEnVente ? (
+                    <span>
+                      <span className="line-through text-[color:var(--color-g-500)]">
+                        Fixer un prix sur un produit
+                      </span>{" "}
+                      ✓
+                    </span>
+                  ) : (
+                    <>
+                      Ajouter un produit au catalogue et fixer un prix{" "}
+                      <Link href="/produits" className="underline">
+                        (page Produits)
+                      </Link>
+                    </>
+                  )}
+                </li>
+                <li>
+                  <span className="chiffre mr-2 text-[color:var(--color-g-500)]">2.</span>
+                  {stockTotal > 0 ? (
+                    <span>
+                      <span className="line-through text-[color:var(--color-g-500)]">
+                        Avoir du stock disponible
+                      </span>{" "}
+                      ({stockTotal} pièces) ✓
+                    </span>
+                  ) : (
+                    <>
+                      Avoir du stock à vendre : clique{" "}
+                      <Link href="/produits" className="underline">
+                        "+100 (recette)"
+                      </Link>{" "}
+                      sur un produit
+                    </>
+                  )}
+                </li>
+                <li>
+                  <span className="chiffre mr-2 text-[color:var(--color-g-500)]">3.</span>
+                  Attendre qu'un mois s'écoule (ou bouton{" "}
+                  <Link href="/admin" className="underline">Avancer</Link> si admin)
+                </li>
+              </ol>
+            </div>
+          )}
           <div className="rounded-md border border-[color:var(--color-g-200)] p-5">
             <h3 className="text-sm font-semibold">Alertes</h3>
-            <p className="mt-2 text-sm text-[color:var(--color-g-500)]">Aucune alerte pour l'instant.</p>
+            <p className="mt-2 text-sm text-[color:var(--color-g-500)]">
+              {caMois === 0 ? "Pas de vente ce mois-ci." : "Aucune alerte pour l'instant."}
+            </p>
           </div>
           <div className="rounded-md border border-[color:var(--color-g-200)] p-5">
             <h3 className="text-sm font-semibold">Prochain événement</h3>
