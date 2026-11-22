@@ -144,7 +144,6 @@ export default async function PageBanque() {
       <section className="mt-10 space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider">Demander un prêt</h2>
         <FormulairePret
-          companyId={entreprise.id}
           tresorerieActuelle={entreprise.tresorerie_centimes}
           detteActuelle={detteTotale}
         />

@@ -121,7 +121,6 @@ export default async function PageAchats() {
           Passer une commande
         </h2>
         <FormulaireCommande
-          companyId={entreprise.id}
           fournisseurs={fournisseursTab}
           catalogue={catalogueTab}
           materials={Array.from(materialsMap.entries()).map(([id, nom]) => ({ id, nom }))}

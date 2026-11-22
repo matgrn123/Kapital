@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { creerClientNavigateur } from "../../../lib/supabase/client";
 import { formaterEuros } from "../../../lib/formatage";
 
 type Faconnier = {
@@ -21,7 +20,7 @@ type LigneCatalogueFac = {
 
 const HEURES_PAR_MOIS_JEU = 24;
 
-export function LouerAtelierBouton({ companyId }: { companyId: string }) {
+export function LouerAtelierBouton() {
   const router = useRouter();
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -30,15 +29,10 @@ export function LouerAtelierBouton({ companyId }: { companyId: string }) {
     setErreur(null);
     setEnCours(true);
     try {
-      const supabase = creerClientNavigateur();
-      const { error } = await supabase.from("workshops").insert({
-        company_id: companyId,
-        surface_m2: 50,
-        loyer_mensuel_centimes: 100_000,
-        nombre_machines: 2,
-      });
-      if (error) {
-        setErreur(error.message);
+      const reponse = await fetch("/api/actions/louer-atelier", { method: "POST" });
+      const data = (await reponse.json()) as { error?: string };
+      if (data.error) {
+        setErreur(data.error);
         return;
       }
       router.refresh();
@@ -62,13 +56,11 @@ export function LouerAtelierBouton({ companyId }: { companyId: string }) {
 }
 
 export function FormulaireProduction({
-  companyId,
   aUnAtelier,
   faconniers,
   catalogueFaconnier,
   produits,
 }: {
-  companyId: string;
   aUnAtelier: boolean;
   faconniers: readonly Faconnier[];
   catalogueFaconnier: readonly LigneCatalogueFac[];
@@ -113,21 +105,19 @@ export function FormulaireProduction({
     }
     setEnCours(true);
     try {
-      const supabase = creerClientNavigateur();
-      const maintenant = new Date();
-      const livraison = new Date(maintenant.getTime() + delaiMois * HEURES_PAR_MOIS_JEU * 3600 * 1000);
-      const { error } = await supabase.from("production_orders").insert({
-        company_id: companyId,
-        product_id: productId,
-        quantite: quantiteN,
-        lieu_type: lieu,
-        faconnier_id: lieu === "faconnier" ? faconnierId : null,
-        prix_facon_par_piece_centimes: lieu === "faconnier" ? ligne!.prix_par_piece_centimes : null,
-        instant_commande: maintenant.toISOString(),
-        instant_livraison_prevue: livraison.toISOString(),
+      const reponse = await fetch("/api/actions/lancer-production", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          productId,
+          quantite: quantiteN,
+          lieuType: lieu,
+          faconnierId: lieu === "faconnier" ? faconnierId : undefined,
+        }),
       });
-      if (error) {
-        setErreur(error.message);
+      const data = (await reponse.json()) as { error?: string };
+      if (data.error) {
+        setErreur(data.error);
         return;
       }
       setQuantite("100");

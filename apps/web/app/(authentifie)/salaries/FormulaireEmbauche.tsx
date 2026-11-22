@@ -2,15 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { creerClientNavigateur } from "../../../lib/supabase/client";
 
-export function FormulaireEmbauche({
-  companyId,
-  etape,
-}: {
-  companyId: string;
-  etape: number;
-}) {
+export function FormulaireEmbauche({ etape }: { etape: number }) {
   const router = useRouter();
   const [poste, setPoste] = useState<"artisan" | "encadrement">("artisan");
   const [salaire, setSalaire] = useState("1867.02");
@@ -31,14 +24,14 @@ export function FormulaireEmbauche({
     }
     setEnCours(true);
     try {
-      const supabase = creerClientNavigateur();
-      const { error } = await supabase.from("employees").insert({
-        company_id: companyId,
-        poste,
-        salaire_brut_mensuel_centimes: centimes,
+      const reponse = await fetch("/api/actions/embaucher", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ poste, salaireBrutMensuelCentimes: centimes }),
       });
-      if (error) {
-        setErreur(error.message);
+      const data = (await reponse.json()) as { error?: string };
+      if (data.error) {
+        setErreur(data.error);
         return;
       }
       router.refresh();
@@ -123,8 +116,11 @@ export function BoutonLicencier({ id }: { id: string }) {
     if (!confirm("Licencier ce salarié ? Les indemnités ne sont pas encore modélisées.")) return;
     setEnCours(true);
     try {
-      const supabase = creerClientNavigateur();
-      await supabase.from("employees").update({ statut: "licencie" }).eq("id", id);
+      await fetch("/api/actions/licencier", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ employeeId: id }),
+      });
       router.refresh();
     } finally {
       setEnCours(false);

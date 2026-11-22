@@ -91,7 +91,7 @@ export default async function PageProduits() {
                   </p>
                 </div>
                 {!ligne && (
-                  <AjouterProduitBouton companyId={entreprise.id} productId={p.id} />
+                  <AjouterProduitBouton productId={p.id} />
                 )}
               </header>
 
