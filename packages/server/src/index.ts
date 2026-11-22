@@ -8,3 +8,8 @@ export { validerEmbauche } from "./validations/embauche.js";
 export { validerLicenciement } from "./validations/licenciement.js";
 export { validerDemandePret } from "./validations/demandePret.js";
 export { avancerMonde, type ResultatAvancement } from "./avancerMonde.js";
+export {
+  approvisionnerStock,
+  type ParamsApprovisionner,
+  type ResultatApprovisionner,
+} from "./approvisionnerStock.js";
