@@ -26,3 +26,5 @@ playwright-report/
 # Supabase CLI
 supabase/.temp/
 supabase/.branches/
+.vercel
+.env*
