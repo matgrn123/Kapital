@@ -1,6 +1,7 @@
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros } from "../../../lib/formatage";
 import { AjouterProduitBouton, FormulairePrix } from "./FormulairePrix";
+import { BoutonApprovisionner } from "./BoutonApprovisionner";
 
 type Produit = {
   id: string;
@@ -41,9 +42,19 @@ export default async function PageProduits() {
     .select("id, product_id, qualite_visee, prix_vente_directe_centimes, prix_revendeur_centimes, production_mensuelle_cible")
     .eq("company_id", entreprise.id);
 
+  const { data: stocks } = await supabase
+    .from("product_stock")
+    .select("product_id, quantite_pieces")
+    .eq("company_id", entreprise.id);
+
   const produitsRefTab = (produitsRef ?? []) as Produit[];
   const cataMap = new Map<string, CompanyProduit>(
     ((catalogue ?? []) as CompanyProduit[]).map((c) => [c.product_id, c]),
+  );
+  const stockMap = new Map<string, number>(
+    ((stocks ?? []) as Array<{ product_id: string; quantite_pieces: number }>).map(
+      (s) => [s.product_id, s.quantite_pieces],
+    ),
   );
 
   return (
@@ -85,7 +96,14 @@ export default async function PageProduits() {
               </header>
 
               {ligne ? (
-                <div className="px-5 py-4">
+                <div className="px-5 py-4 space-y-4">
+                  <div className="flex items-center justify-between rounded-md bg-[color:var(--color-g-100)] px-4 py-2 text-xs">
+                    <span className="text-[color:var(--color-g-500)]">Stock disponible</span>
+                    <span className="chiffre font-medium">
+                      {stockMap.get(p.id) ?? 0} pièces
+                    </span>
+                    <BoutonApprovisionner productId={p.id} />
+                  </div>
                   <FormulairePrix lignePrix={ligne} />
                 </div>
               ) : (

@@ -58,6 +58,13 @@ type LigneWorld = {
   mois_courant: number;
 };
 
+type LigneStockPF = {
+  company_id: string;
+  product_id: string;
+  quantite_pieces: number;
+  valeur_totale_centimes: number;
+};
+
 export type ResultatAvancement = {
   readonly monde_id: string;
   readonly mois_debut: number;
@@ -215,27 +222,32 @@ export async function avancerMonde(
   const monde = (mondes ?? [])[0] as LigneWorld | undefined;
   if (!monde) throw new Error("Aucun monde actif");
 
-  const [companiesR, produitsR, marquesR, produitsRefR, cataloguesR] = await Promise.all([
-    supabase
-      .from("companies")
-      .select("id, nom, gamme, etape, statut, tresorerie_centimes, owner_profile_id"),
-    supabase
-      .from("company_products")
-      .select(
-        "id, company_id, product_id, qualite_visee, prix_vente_directe_centimes, prix_revendeur_centimes, production_mensuelle_cible",
-      ),
-    supabase.from("brand_state").select("company_id, notoriete, desirabilite"),
-    supabase
-      .from("products")
-      .select("id, matiere_id, consommation_par_piece, fournitures_par_piece_centimes"),
-    supabase.from("supplier_catalogue").select("material_id, prix_centimes"),
-  ]);
+  const [companiesR, produitsR, marquesR, produitsRefR, cataloguesR, stocksR] =
+    await Promise.all([
+      supabase
+        .from("companies")
+        .select("id, nom, gamme, etape, statut, tresorerie_centimes, owner_profile_id"),
+      supabase
+        .from("company_products")
+        .select(
+          "id, company_id, product_id, qualite_visee, prix_vente_directe_centimes, prix_revendeur_centimes, production_mensuelle_cible",
+        ),
+      supabase.from("brand_state").select("company_id, notoriete, desirabilite"),
+      supabase
+        .from("products")
+        .select("id, matiere_id, consommation_par_piece, fournitures_par_piece_centimes"),
+      supabase.from("supplier_catalogue").select("material_id, prix_centimes"),
+      supabase
+        .from("product_stock")
+        .select("company_id, product_id, quantite_pieces, valeur_totale_centimes"),
+    ]);
 
   if (companiesR.error) throw new Error(`companies : ${companiesR.error.message}`);
   if (produitsR.error) throw new Error(`company_products : ${produitsR.error.message}`);
   if (marquesR.error) throw new Error(`brand_state : ${marquesR.error.message}`);
   if (produitsRefR.error) throw new Error(`products : ${produitsRefR.error.message}`);
   if (cataloguesR.error) throw new Error(`supplier_catalogue : ${cataloguesR.error.message}`);
+  if (stocksR.error) throw new Error(`product_stock : ${stocksR.error.message}`);
 
   const companies = (companiesR.data ?? []) as LigneCompany[];
   const produits = (produitsR.data ?? []) as LigneCompanyProduit[];
@@ -243,6 +255,10 @@ export async function avancerMonde(
   const produitsRef = (produitsRefR.data ?? []) as ProduitReference[];
   const cataloguesFournisseur =
     (cataloguesR.data ?? []) as Array<{ material_id: string; prix_centimes: number }>;
+  const stocks = (stocksR.data ?? []) as LigneStockPF[];
+
+  const stockParCle = new Map<string, LigneStockPF>();
+  for (const s of stocks) stockParCle.set(`${s.company_id}:${s.product_id}`, s);
 
   const coutsRevient = construireCoutsRevient(produitsRef, cataloguesFournisseur, params);
 
@@ -273,7 +289,30 @@ export async function avancerMonde(
     evenements: [],
   };
 
-  const ventes = calculerVentesMois(mondeEngine, dureeMois, params);
+  const ventesBrutes = calculerVentesMois(mondeEngine, dureeMois, params);
+
+  // Clamp au stock disponible : si plusieurs canaux veulent le meme produit,
+  // on sert d'abord la vente directe puis le revendeur (part 0.6 vs 0.4).
+  const stockRestantParCle = new Map<string, number>();
+  for (const s of stocks) {
+    stockRestantParCle.set(`${s.company_id}:${s.product_id}`, s.quantite_pieces);
+  }
+  const ventes = ventesBrutes
+    .slice()
+    .sort((a, b) => {
+      if (a.entreprise !== b.entreprise) return a.entreprise.localeCompare(b.entreprise);
+      if (a.produit !== b.produit) return a.produit.localeCompare(b.produit);
+      if (a.canal === b.canal) return 0;
+      return a.canal === "vente_directe" ? -1 : 1;
+    })
+    .map((v) => {
+      const cle = `${v.entreprise}:${v.produit}`;
+      const dispo = stockRestantParCle.get(cle) ?? 0;
+      const quantiteServie = Math.min(v.quantite, dispo);
+      stockRestantParCle.set(cle, dispo - quantiteServie);
+      return { ...v, quantite: quantiteServie };
+    })
+    .filter((v) => v.quantite > 0);
 
   // Construire les ecritures et inserer en bloc
   const ecritures: LigneEcriture[] = [];
@@ -288,6 +327,33 @@ export async function avancerMonde(
       .from("ledger_entries")
       .insert(ecritures);
     if (errInsert) throw new Error(`insert ledger : ${errInsert.message}`);
+  }
+
+  // Mettre a jour le stock produits finis (quantite et valeur)
+  const deductionStockParCle = new Map<string, { quantite: number; valeur: number }>();
+  for (const v of ventes) {
+    const cle = `${v.entreprise}:${v.produit}`;
+    const coutUnitaire = coutsRevient.get(v.produit) ?? 0;
+    const prec = deductionStockParCle.get(cle) ?? { quantite: 0, valeur: 0 };
+    deductionStockParCle.set(cle, {
+      quantite: prec.quantite + v.quantite,
+      valeur: prec.valeur + coutUnitaire * v.quantite,
+    });
+  }
+  for (const [cle, d] of deductionStockParCle) {
+    const stock = stockParCle.get(cle);
+    if (!stock) continue;
+    const qApres = Math.max(0, stock.quantite_pieces - d.quantite);
+    const vApres = Math.max(0, stock.valeur_totale_centimes - d.valeur);
+    await supabase
+      .from("product_stock")
+      .update({
+        quantite_pieces: qApres,
+        valeur_totale_centimes: vApres,
+        mise_a_jour_le: new Date().toISOString(),
+      })
+      .eq("company_id", stock.company_id)
+      .eq("product_id", stock.product_id);
   }
 
   // Mettre a jour tresorerie des entreprises (somme des encaissements vente directe)
