@@ -3,6 +3,7 @@ import {
   chargerContexte,
   ecrireEcritures,
   estErreurAction,
+  refuserSiVerrouille,
 } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
@@ -47,6 +48,8 @@ function genererEcheancier(capital: number, tauxAnnuel: number, dureeMois: numbe
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
   if (estErreurAction(ctx)) return ctx;
+  const verrou = refuserSiVerrouille(ctx, "demande_pret");
+  if (verrou) return verrou;
 
   const body = (await request.json()) as {
     capitalCentimes?: number;

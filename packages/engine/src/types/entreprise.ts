@@ -10,6 +10,17 @@ import type {
 
 export type Gamme = "entree" | "milieu" | "haut";
 export type EtapeEntreprise = 0 | 1 | 2;
+/**
+ * Compteurs depuis la création, mis à jour à chaque clôture : ils servent à
+ * constater le passage d'étape. Absents = 0 (entreprise créée avant AE-2).
+ */
+export type CumulsEtape = {
+  /** Pièces vendues au total, tous canaux. */
+  readonly piecesVendues: number;
+  /** Chiffre d'affaires cumulé hors taxes, en centimes. */
+  readonly chiffreAffairesHt: Centimes;
+};
+
 export type StatutEntreprise = "active" | "en_difficulte" | "liquidee";
 
 export type Proprietaire =
@@ -76,6 +87,8 @@ export type Entreprise = {
   readonly nom: string;
   readonly gamme: Gamme;
   readonly etape: EtapeEntreprise;
+  /** Compteurs de progression (voir CumulsEtape) ; absents = 0. */
+  readonly cumulsEtape?: CumulsEtape;
   readonly proprietaire: Proprietaire;
   readonly statut: StatutEntreprise;
   readonly tresorerie: Centimes;

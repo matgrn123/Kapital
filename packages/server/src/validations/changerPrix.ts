@@ -1,10 +1,15 @@
 import type { DecisionChangerPrix } from "@kapital/engine";
 import { ok, refuse, type ContexteValidation, type Result } from "../types.js";
+import { verifierDeblocage } from "./verrouEtape.js";
 
 export function validerChangerPrix(
   ctx: ContexteValidation,
   d: DecisionChangerPrix,
 ): Result {
+  if (d.canal === "revendeur") {
+    const verrou = verifierDeblocage(ctx, "vente_revendeur");
+    if (!verrou.ok) return verrou;
+  }
   if (d.prix <= 0) {
     return refuse(
       "prix_negatif_ou_nul",

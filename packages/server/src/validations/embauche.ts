@@ -1,20 +1,17 @@
 import type { DecisionEmbauche } from "@kapital/engine";
 import { ok, refuse, type ContexteValidation, type Result } from "../types.js";
+import { verifierDeblocage } from "./verrouEtape.js";
 
 export function validerEmbauche(
   ctx: ContexteValidation,
   d: DecisionEmbauche,
 ): Result {
+  const verrou = verifierDeblocage(ctx, "embauche");
+  if (!verrou.ok) return verrou;
   if (d.salaireBrutMensuel <= 0) {
     return refuse(
       "salaire_invalide",
       `Le salaire brut mensuel doit être strictement positif (reçu ${d.salaireBrutMensuel} centimes).`,
-    );
-  }
-  if (d.poste === "encadrement" && ctx.entreprise.etape < 1) {
-    return refuse(
-      "etape_insuffisante",
-      `Vous ne pouvez pas embaucher d'encadrement avant l'étape 1 (vous êtes à l'étape ${ctx.entreprise.etape}).`,
     );
   }
   // Garde-fou : la trésorerie doit couvrir au moins deux mois de salaire chargé approximatif (×1,42)

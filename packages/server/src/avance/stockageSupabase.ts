@@ -23,7 +23,7 @@ import {
 } from "./port.js";
 
 // ---------------------------------------------------------------------------
-// Contrat avec la fonction Postgres appliquer_pas_entreprise (migration 0020)
+// Contrat avec la fonction Postgres appliquer_pas_entreprise (migration 0020, remplacée par 0025)
 // ---------------------------------------------------------------------------
 
 /** Charge utile JSON de la fonction Postgres : les clés doivent rester celles du SQL. */
@@ -52,6 +52,10 @@ export type ChargeUtilePas = {
   readonly entreprise: {
     readonly statut: string;
     readonly mois_decouvert_consecutifs?: number;
+    /** Étape constatée (migration 0025 : la base ne la fait jamais redescendre). */
+    readonly etape: number;
+    readonly pieces_vendues_total: number;
+    readonly chiffre_affaires_cumule_ht_centimes: number;
   };
   readonly commandes_matiere_livrees: readonly string[];
   readonly ordres_faconnier_livres: readonly string[];
@@ -87,10 +91,15 @@ export function chargeUtileDepuisLot(lot: ResultatLotAEnregistrer): ChargeUtileP
     })),
     echeances_payees: lot.echeancesPayees.map((p) => ({ loan_id: p.pretId, numero: p.numero })),
     marque: { notoriete: e.marque.notoriete, desirabilite: e.marque.desirabilite },
-    entreprise:
-      lot.moisDecouvertConsecutifs === null
-        ? { statut: e.statut }
-        : { statut: e.statut, mois_decouvert_consecutifs: lot.moisDecouvertConsecutifs },
+    entreprise: {
+      statut: e.statut,
+      ...(lot.moisDecouvertConsecutifs === null
+        ? {}
+        : { mois_decouvert_consecutifs: lot.moisDecouvertConsecutifs }),
+      etape: e.etape,
+      pieces_vendues_total: e.cumulsEtape?.piecesVendues ?? 0,
+      chiffre_affaires_cumule_ht_centimes: e.cumulsEtape?.chiffreAffairesHt ?? 0,
+    },
     commandes_matiere_livrees: lot.commandesMatiereLivrees,
     ordres_faconnier_livres: lot.ordresFaconnierLivres,
     cumul: lot.cumul,
@@ -110,6 +119,8 @@ type LigneCompany = {
   tresorerie_centimes: number;
   owner_profile_id: string | null;
   mois_decouvert_consecutifs: number;
+  pieces_vendues_total: number;
+  chiffre_affaires_cumule_ht_centimes: number;
 };
 
 function verifier<T>(nom: string, r: { data: T | null; error: { message: string } | null }): T {
@@ -193,7 +204,7 @@ export class StockageSupabase implements StockageMonde {
       await Promise.all([
         this.supabase
           .from("companies")
-          .select("id, nom, gamme, etape, statut, tresorerie_centimes, owner_profile_id, mois_decouvert_consecutifs")
+          .select("id, nom, gamme, etape, statut, tresorerie_centimes, owner_profile_id, mois_decouvert_consecutifs, pieces_vendues_total, chiffre_affaires_cumule_ht_centimes")
           .eq("id", companyId)
           .maybeSingle(),
         this.supabase
@@ -266,6 +277,10 @@ export class StockageSupabase implements StockageMonde {
       nom: company.nom,
       gamme: company.gamme,
       etape: company.etape,
+      cumulsEtape: {
+        piecesVendues: Number(company.pieces_vendues_total),
+        chiffreAffairesHt: centimes(Number(company.chiffre_affaires_cumule_ht_centimes)),
+      },
       proprietaire: company.owner_profile_id
         ? { type: "joueur", idProfil: company.owner_profile_id }
         : { type: "pnj" },

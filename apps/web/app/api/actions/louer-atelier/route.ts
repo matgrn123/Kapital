@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
+import { chargerContexte, estErreurAction, refuserSiVerrouille } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
 
 export async function POST() {
   const ctx = await chargerContexte();
   if (estErreurAction(ctx)) return ctx;
+  const verrou = refuserSiVerrouille(ctx, "louer_atelier");
+  if (verrou) return verrou;
 
   const { data: existing } = await ctx.supabaseAdmin
     .from("workshops")

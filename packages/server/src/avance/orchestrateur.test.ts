@@ -316,3 +316,27 @@ describe("avancerMondeJusquA — événements datés", () => {
     ]);
   });
 });
+
+describe("avancerMondeJusquA — constat d'étape à la clôture (AE-2)", () => {
+  it("l'étape et les compteurs sont enregistrés à la clôture du mois, et ne redescendent pas", async () => {
+    const s = new StockageMemoire({ id: "monde1", moisCourant: 0, debutReelMs: DEBUT });
+    s.ajouterEntreprise({ ...entreprise("e"), etape: 0 }, 0);
+
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 0.5 * JOUR);
+    // mois pas encore clos : rien n'est constaté
+    expect(s.entreprises.get("e")!.entreprise.etape).toBe(0);
+    expect(s.entreprises.get("e")!.entreprise.cumulsEtape).toBeUndefined();
+
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 1 * JOUR);
+    const apres = s.entreprises.get("e")!.entreprise;
+    expect(apres.cumulsEtape!.piecesVendues).toBeGreaterThanOrEqual(50);
+    expect(apres.cumulsEtape!.chiffreAffairesHt).toBeGreaterThan(0);
+    expect(apres.etape).toBeGreaterThanOrEqual(1);
+
+    const etapeMois1 = apres.etape;
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 2 * JOUR);
+    const mois2 = s.entreprises.get("e")!.entreprise;
+    expect(mois2.etape).toBeGreaterThanOrEqual(etapeMois1);
+    expect(mois2.cumulsEtape!.piecesVendues).toBeGreaterThan(apres.cumulsEtape!.piecesVendues);
+  });
+});

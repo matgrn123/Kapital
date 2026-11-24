@@ -26,3 +26,9 @@ export {
   type ResultatSerieLancement,
 } from "./demarrage/lancement.js";
 export { creerSocieteJoueur, type ResultatCreationSociete } from "./societe/creation.js";
+export {
+  CODE_ETAPE_VERROUILLEE,
+  refusDepuisVerrou,
+  verifierDeblocage,
+  verifierDeblocageEtape,
+} from "./validations/verrouEtape.js";

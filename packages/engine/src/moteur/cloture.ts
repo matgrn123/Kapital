@@ -12,6 +12,7 @@ import {
   cotisationsPatronales,
   enregistrerPaieMensuelle,
 } from "../salaires/calculs.js";
+import { constaterEtape, seuilsEtapesDepuis } from "../etapes/etapes.js";
 import type { Entreprise, Pret } from "../types/entreprise.js";
 import { centimes, type MoisJeu } from "../types/primitifs.js";
 import type { Explication } from "../types/resultatMois.js";
@@ -320,11 +321,24 @@ export function cloturerMois(
   ent = incrementerAnciennete(ent);
   ent = { ...ent, tresorerie: tresorerieFin, statut: nouveauStatut };
 
+  // Constat d'étape : compteurs cumulés depuis la création, puis étape (jamais en arrière)
+  const piecesDuMois = Object.values(cumul.serviParLigne).reduce((s, q) => s + q, 0);
+  const cumulsEtape = {
+    piecesVendues: (ent.cumulsEtape?.piecesVendues ?? 0) + piecesDuMois,
+    chiffreAffairesHt: centimes((ent.cumulsEtape?.chiffreAffairesHt ?? 0) + cumul.chiffreAffairesHt),
+  };
+  const etapeApres = constaterEtape(
+    { etape: ent.etape, cumuls: cumulsEtape, tresorerie: tresorerieFin },
+    seuilsEtapesDepuis(params),
+  );
+  ent = { ...ent, etape: etapeApres, cumulsEtape };
+
   return {
     entrepriseApres: ent,
     ecritures: ecrituresCloture,
     ventesPerdues,
     explications,
     moisDecouvertConsecutifsApres,
+    etapeApres,
   };
 }
