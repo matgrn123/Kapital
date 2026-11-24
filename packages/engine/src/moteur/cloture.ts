@@ -13,6 +13,10 @@ import {
   enregistrerPaieMensuelle,
 } from "../salaires/calculs.js";
 import {
+  ecritureAmortissementConstruction,
+  ecritureEntretienLocal,
+} from "../locaux/achat.js";
+import {
   bailTermineAu,
   ecritureRestitutionDepot,
   ecrituresMensuellesBail,
@@ -143,6 +147,14 @@ export function cloturerMois(
       atelier.bail?.chargesMensuelles ?? centimes(0),
     )) {
       enr(ecriture);
+    }
+
+    // Propriétaire (AE-6) : entretien du local (614) et amortissement de la construction (681 / 2813)
+    if (atelier.achat) {
+      const entretien = ecritureEntretienLocal(ent.id, mois, atelier.achat);
+      if (entretien) enr(entretien);
+      const amortConstruction = ecritureAmortissementConstruction(ent.id, mois, atelier.achat);
+      if (amortConstruction) enr(amortConstruction);
     }
 
     // Énergie : 100 kwh/machine/mois

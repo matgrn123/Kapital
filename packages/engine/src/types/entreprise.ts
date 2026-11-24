@@ -50,12 +50,25 @@ export type Bail = {
   readonly moisFin: MoisJeu | null;
 };
 
+/** Local acheté à crédit (AE-6) : immobilisation 213 amortie en 2813, plus de loyer. */
+export type AchatLocal = {
+  readonly prixAchat: Centimes;
+  /** Part payée comptant ; le reste est un prêt immobilier. */
+  readonly apport: Centimes;
+  /** Charges d'entretien mensuelles du catalogue (compte 614). */
+  readonly chargesMensuelles: Centimes;
+  readonly moisAchat: MoisJeu;
+  readonly dureeAmortissementMois: number;
+};
+
 export type Atelier = {
   readonly surfaceM2: number;
   readonly loyerMensuel: Centimes;
   readonly nombreMachines: number;
   /** Absent pour un atelier loué avant AE-5 : loyer seul, pas de dépôt. */
   readonly bail?: Bail;
+  /** Présent pour un local acheté (loyerMensuel vaut alors 0, pas de bail). */
+  readonly achat?: AchatLocal;
 };
 
 export type EtatMarque = {

@@ -223,7 +223,7 @@ export class StockageSupabase implements StockageMonde {
           .eq("statut", "actif"),
         this.supabase
           .from("workshops")
-          .select("surface_m2, loyer_mensuel_centimes, nombre_machines, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin")
+          .select("surface_m2, loyer_mensuel_centimes, nombre_machines, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin, mode_detention, prix_achat_centimes, apport_centimes, mois_achat, duree_amortissement_mois")
           .eq("company_id", companyId)
           .maybeSingle(),
         this.supabase
@@ -263,6 +263,8 @@ export class StockageSupabase implements StockageMonde {
       surface_m2: number; loyer_mensuel_centimes: number; nombre_machines: number;
       depot_garantie_centimes: number; charges_mensuelles_centimes: number;
       mois_signature: number | null; mois_fin: number | null;
+      mode_detention: string; prix_achat_centimes: number; apport_centimes: number;
+      mois_achat: number | null; duree_amortissement_mois: number | null;
     } | null;
     const loans = (verifier("loans", pretsR) ?? []) as Array<{
       id: string; capital_initial_centimes: number; capital_restant_centimes: number;
@@ -310,17 +312,31 @@ export class StockageSupabase implements StockageMonde {
         };
       }),
       atelier: workshop
-        ? {
-            surfaceM2: workshop.surface_m2,
-            loyerMensuel: centimes(workshop.loyer_mensuel_centimes),
-            nombreMachines: workshop.nombre_machines,
-            bail: {
-              depotGarantie: centimes(Number(workshop.depot_garantie_centimes)),
-              chargesMensuelles: centimes(Number(workshop.charges_mensuelles_centimes)),
-              moisSignature: moisJeu(workshop.mois_signature ?? 0),
-              moisFin: workshop.mois_fin === null ? null : moisJeu(workshop.mois_fin),
-            },
-          }
+        ? workshop.mode_detention === "bail"
+          ? {
+              surfaceM2: workshop.surface_m2,
+              loyerMensuel: centimes(workshop.loyer_mensuel_centimes),
+              nombreMachines: workshop.nombre_machines,
+              bail: {
+                depotGarantie: centimes(Number(workshop.depot_garantie_centimes)),
+                chargesMensuelles: centimes(Number(workshop.charges_mensuelles_centimes)),
+                moisSignature: moisJeu(workshop.mois_signature ?? 0),
+                moisFin: workshop.mois_fin === null ? null : moisJeu(workshop.mois_fin),
+              },
+            }
+          : {
+              // Local acheté à crédit (AE-6) : plus de loyer, une immobilisation à amortir.
+              surfaceM2: workshop.surface_m2,
+              loyerMensuel: centimes(0),
+              nombreMachines: workshop.nombre_machines,
+              achat: {
+                prixAchat: centimes(Number(workshop.prix_achat_centimes)),
+                apport: centimes(Number(workshop.apport_centimes)),
+                chargesMensuelles: centimes(Number(workshop.charges_mensuelles_centimes)),
+                moisAchat: moisJeu(workshop.mois_achat ?? 0),
+                dureeAmortissementMois: workshop.duree_amortissement_mois ?? 0,
+              },
+            }
         : null,
       marque: { notoriete: marque?.notoriete ?? 50, desirabilite: marque?.desirabilite ?? 50 },
       prets: loans.map((l) => ({

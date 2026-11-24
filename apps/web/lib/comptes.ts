@@ -11,6 +11,8 @@ export type CompteV1 = {
 export const PLAN_COMPTABLE: readonly CompteV1[] = [
   { numero: "101", libelle: "Capital social", type: "passif" },
   { numero: "164", libelle: "Emprunts bancaires", type: "passif" },
+  { numero: "213", libelle: "Constructions", type: "actif" },
+  { numero: "2813", libelle: "Amortissement des constructions", type: "passif" },
   { numero: "275", libelle: "Dépôts et cautionnements versés", type: "actif" },
   { numero: "31", libelle: "Stocks de matières premières", type: "actif" },
   { numero: "35", libelle: "Stocks de produits finis", type: "actif" },

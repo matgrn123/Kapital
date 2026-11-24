@@ -22,6 +22,9 @@ export async function POST() {
     if (error.code === "KP404" || error.message.startsWith("aucun_local")) {
       return NextResponse.json({ error: "Vous n'avez aucun local loué.", code: "aucun_local" }, { status: 404 });
     }
+    if (error.message.startsWith("local_possede")) {
+      return NextResponse.json({ error: "Ce local vous appartient : il n'y a pas de bail à quitter.", code: "local_possede" }, { status: 409 });
+    }
     if (error.code === "KP409" || error.message.startsWith("conge_deja_donne")) {
       return NextResponse.json({ error: "Un congé est déjà donné.", code: "conge_deja_donne" }, { status: 409 });
     }
