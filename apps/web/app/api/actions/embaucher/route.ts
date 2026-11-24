@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     company_id: ctx.companyId,
     poste,
     salaire_brut_mensuel_centimes: salaire,
+    mois_jeu_debut: ctx.moisCourant,
   });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { avancerMonde } from "@kapital/server";
+import { simulerMondeComplet } from "@kapital/server";
 
-// Route de progression du monde : lit l'etat actuel, calcule les ventes du mois
-// ecoule, ecrit les ecritures comptables et met a jour le mois courant.
-// Appelee automatiquement par pg_cron / cron Vercel toutes les 30 min,
-// et manuellement depuis la page admin "Avancer maintenant".
+// Clôture mensuelle complète : livraisons, production, ventes, charges, TVA,
+// prêts, découvert, IS. Idempotente via la table clotures.
+// Appelée par le cron Vercel quotidien et manuellement depuis /admin.
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
-async function avancer(request: Request) {
+async function cloturer(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
     return NextResponse.json({ error: "CRON_SECRET non configuré" }, { status: 500 });
@@ -31,7 +30,7 @@ async function avancer(request: Request) {
 
   const admin = createClient(url, serviceKey);
   try {
-    const resultat = await avancerMonde(admin);
+    const resultat = await simulerMondeComplet(admin);
     return NextResponse.json({ ok: true, ...resultat });
   } catch (ex) {
     const message = ex instanceof Error ? ex.message : "Erreur inconnue";
@@ -39,5 +38,5 @@ async function avancer(request: Request) {
   }
 }
 
-export const GET = avancer;
-export const POST = avancer;
+export const GET = cloturer;
+export const POST = cloturer;

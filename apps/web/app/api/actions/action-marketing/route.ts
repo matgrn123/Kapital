@@ -100,13 +100,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  // Débite la trésorerie
-  await ctx.supabaseAdmin
-    .from("companies")
-    .update({
-      tresorerie_centimes: ctx.companyTresorerie - montant,
-    })
-    .eq("id", ctx.companyId);
-
   return NextResponse.json({ ok: true });
 }

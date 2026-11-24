@@ -47,6 +47,8 @@ export async function POST(request: Request) {
       lieu_type: "atelier",
       instant_commande: maintenant.toISOString(),
       instant_livraison_prevue: livraison.toISOString(),
+      mois_jeu_commande: ctx.moisCourant,
+      mois_jeu_livraison: ctx.moisCourant + 1,
     });
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -104,6 +106,8 @@ export async function POST(request: Request) {
     prix_facon_par_piece_centimes: catalogue.prix_par_piece_centimes,
     instant_commande: maintenant.toISOString(),
     instant_livraison_prevue: livraison.toISOString(),
+    mois_jeu_commande: ctx.moisCourant,
+    mois_jeu_livraison: ctx.moisCourant + fac.delai_mois,
   });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

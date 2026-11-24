@@ -73,6 +73,8 @@ export async function POST(request: Request) {
     prix_unitaire_centimes: catalogue.prix_centimes,
     instant_commande: maintenant.toISOString(),
     instant_livraison_prevue: livraison.toISOString(),
+    mois_jeu_commande: ctx.moisCourant,
+    mois_jeu_livraison: ctx.moisCourant + fournisseur.delai_mois,
   });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
