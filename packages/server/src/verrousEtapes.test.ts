@@ -70,7 +70,7 @@ function refus(r: Result) {
 }
 
 const MARKETING: Decision = { type: "action_marketing", action: "publicite", montant: centimes(10_000) };
-const PRET: Decision = { type: "demande_pret", montant: centimes(100_000), dureeMois: 24 };
+const PRET: Decision = { type: "demande_pret", objet: "equipement", montant: centimes(100_000), dureeMois: 24 };
 const PRODUCTION: Decision = { type: "ordre_production", produit: PROD, quantite: 10, lieu: { type: "atelier" } };
 const REVENDEUR: Decision = { type: "changer_prix", produit: PROD, canal: "revendeur", prix: centimes(3000) };
 const EMBAUCHE: Decision = { type: "embauche", poste: "artisan", salaireBrutMensuel: centimes(186_702) };

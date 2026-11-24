@@ -262,6 +262,7 @@ async function main(): Promise<void> {
           capitalRestant: centimes(55_000),
           tauxAnnuel: 0.04,
           dureeTotaleMois: 12,
+          objet: "tresorerie",
           moisDebut: moisJeu(0),
         },
       ],

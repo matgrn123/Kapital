@@ -99,6 +99,7 @@ function entrepriseDeTest(surcharge: Partial<Entreprise> = {}): Entreprise {
         capitalRestant: centimes(1_000_000),
         tauxAnnuel: 0.04,
         dureeTotaleMois: 24,
+        objet: "tresorerie",
         moisDebut: moisJeu(0),
       },
     ],

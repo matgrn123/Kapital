@@ -50,8 +50,12 @@ export type EtatMarque = {
   readonly desirabilite: number;
 };
 
+/** À quoi sert un prêt : le plafond, la durée et la marge dépendent de l'objet (AE-4). */
+export type ObjetPret = "tresorerie" | "equipement" | "immobilier";
+
 export type Pret = {
   readonly id: IdPret;
+  readonly objet: ObjetPret;
   readonly capitalInitial: Centimes;
   readonly capitalRestant: Centimes;
   readonly tauxAnnuel: number;

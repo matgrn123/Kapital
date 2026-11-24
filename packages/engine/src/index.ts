@@ -8,6 +8,7 @@ export * from "./faconniers/index.js";
 export * from "./demarrage/index.js";
 export * from "./societe/index.js";
 export * from "./etapes/index.js";
+export * from "./indicateurs/index.js";
 export * from "./marche/index.js";
 export * from "./marketing/index.js";
 export * from "./ventes/index.js";
