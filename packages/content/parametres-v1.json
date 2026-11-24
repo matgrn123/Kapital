@@ -316,5 +316,23 @@
     "unite": "ratio",
     "source": "docs/cahier-des-charges-v1.md section 4 (le grossiste local est plus cher que l'usine : aller vite coûte de la marge) : valeur de départ à calibrer au banc d'essai",
     "date": "2026-11-24"
+  },
+  "capital_depart_centimes": {
+    "valeur": 2000000,
+    "unite": "centimes",
+    "source": "docs/cahier-des-charges-v1.md section 3 (capital de départ fixe, 20 000 € d'apport) ; docs/plan-architecture-entreprise.md section 0 (SAS, capital de 20 000 €)",
+    "date": "2026-11-24"
+  },
+  "seuil_etape_1_pieces_vendues": {
+    "valeur": 50,
+    "unite": "pieces",
+    "source": "docs/plan-architecture-entreprise.md section 7 (décision de Mathieu, 24 novembre 2026 : l'étape 1 s'ouvre à 50 pièces vendues au total) ; 50 pièces = bas de la fourchette d'une marque nouvelle (section 5) : valeur de départ à calibrer au banc d'essai",
+    "date": "2026-11-24"
+  },
+  "seuil_etape_2_chiffre_affaires_ht_cumule_centimes": {
+    "valeur": 3000000,
+    "unite": "centimes",
+    "source": "docs/plan-architecture-entreprise.md section 7 (décision de Mathieu, 24 novembre 2026 : l'étape 2 s'ouvre à 30 000 € de chiffre d'affaires cumulé hors taxes, avec une trésorerie positive à la clôture) : valeur de départ à calibrer au banc d'essai",
+    "date": "2026-11-24"
   }
 }

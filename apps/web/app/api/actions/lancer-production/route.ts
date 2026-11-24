@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
+import { chargerContexte, estErreurAction, refuserSiVerrouille } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
 
@@ -27,6 +27,8 @@ export async function POST(request: Request) {
   }
 
   if (body.lieuType === "atelier") {
+    const verrou = refuserSiVerrouille(ctx, "production_atelier");
+    if (verrou) return verrou;
     const { data: atelier } = await ctx.supabaseAdmin
       .from("workshops")
       .select("id")

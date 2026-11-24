@@ -1,5 +1,6 @@
 import type { DecisionDemandePret } from "@kapital/engine";
 import { ok, refuse, type ContexteValidation, type Result } from "../types.js";
+import { verifierDeblocage } from "./verrouEtape.js";
 
 const DUREE_MIN_MOIS = 12;
 const DUREE_MAX_MOIS = 240;
@@ -8,6 +9,8 @@ export function validerDemandePret(
   ctx: ContexteValidation,
   d: DecisionDemandePret,
 ): Result {
+  const verrou = verifierDeblocage(ctx, "demande_pret");
+  if (!verrou.ok) return verrou;
   if (d.montant <= 0) {
     return refuse(
       "montant_invalide",

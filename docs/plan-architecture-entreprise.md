@@ -106,8 +106,14 @@ Moteur, serveur et contenu seulement ; l'interface revient au design.
 | AE-10 | Boutique, exploitation : bail commercial, un mois de travaux, stock transféré, ventes plafonnées par stock et vendeurs | Sans vendeur ou sans stock, aucune vente ; point mort calculé |
 | AE-11 | Missions « Ouvrir ma boutique sans découvert » et « Louer ou acheter » ; banc prolongé à 36 mois | Les missions se valident ; étape 3 atteinte |
 
-## 7. Questions ouvertes
+## 7. Questions tranchées (24 novembre 2026)
 
-1. **Achat des murs** : le plus petit local vaut 428 570 €. Crédit dès l'étape 2 avec 20 % d'apport, achat réservé à l'étape 3, ou local plus modeste au catalogue ?
-2. **Passage d'étape** : constat automatique (proposé) ou décision du joueur ?
-3. **Forme juridique** : SAS seule (proposé), ou choix SAS / SARL ?
+1. **Achat des murs** : crédit possible dès l'étape 2, avec 20 % d'apport (ticket AE-6).
+2. **Passage d'étape** : constat automatique à la clôture du mois, jamais de retour en arrière (ticket AE-2).
+   - Étape 1 : 50 pièces vendues au total, tous canaux (paramètre `seuil_etape_1_pieces_vendues`).
+   - Étape 2 : 30 000 € de chiffre d'affaires cumulé hors taxes (paramètre `seuil_etape_2_chiffre_affaires_ht_cumule_centimes`) et trésorerie positive à la clôture.
+   - Les deux seuils sont des valeurs de départ, à calibrer au banc d'essai (AE-8).
+   - Déblocages : publicité à l'étape 1 ; emprunt, location d'un local, production à l'atelier, embauche et prix revendeur à l'étape 2. Le prix en ligne, les achats et le façonnier restent libres dès l'étape 0.
+   - Une action verrouillée est refusée avec la clé `etape_insuffisante`, l'étape requise et la condition manquante chiffrée (pièces ou euros qui manquent).
+3. **Forme juridique** : SAS seule.
+4. **Série de lancement** : payée sur le capital.

@@ -1,6 +1,6 @@
 import type { EcritureComptable } from "../comptabilite/types.js";
 import { AGREGATS_VIDES, type AgregatsMois } from "./agregats.js";
-import type { Entreprise } from "../types/entreprise.js";
+import type { Entreprise, EtapeEntreprise } from "../types/entreprise.js";
 import type { Centimes, IdMatiere, IdProduit, MoisJeu } from "../types/primitifs.js";
 import type { Explication } from "../types/resultatMois.js";
 
@@ -81,6 +81,8 @@ export type ResultatClotureEntreprise = {
   readonly ventesPerdues: readonly VentePerdueParProduit[];
   readonly explications: readonly Explication[];
   readonly moisDecouvertConsecutifsApres: number;
+  /** Étape constatée à la clôture (jamais inférieure à l'étape d'avant). */
+  readonly etapeApres: EtapeEntreprise;
 };
 
 // ---------------------------------------------------------------------------

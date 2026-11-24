@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
+import { chargerContexte, estErreurAction, refuserSiVerrouille } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
   if (estErreurAction(ctx)) return ctx;
+  const verrou = refuserSiVerrouille(ctx, "embauche");
+  if (verrou) return verrou;
 
   const body = (await request.json()) as {
     poste?: "artisan" | "encadrement";
@@ -19,15 +21,6 @@ export async function POST(request: Request) {
   if (!Number.isFinite(salaire) || salaire <= 0) {
     return NextResponse.json({ error: "Salaire invalide." }, { status: 400 });
   }
-  if (poste === "encadrement" && ctx.companyEtape < 1) {
-    return NextResponse.json(
-      {
-        error: `L'encadrement est débloqué à partir de l'étape 1 (vous êtes à l'étape ${ctx.companyEtape}).`,
-      },
-      { status: 400 },
-    );
-  }
-
   const { error } = await ctx.supabaseAdmin.from("employees").insert({
     company_id: ctx.companyId,
     poste,

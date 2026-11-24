@@ -32,7 +32,7 @@ function entreprise(overrides: Partial<Entreprise> = {}): Entreprise {
     id: ENT,
     nom: "Test",
     gamme: "milieu",
-    etape: 1,
+    etape: 2,
     proprietaire: { type: "joueur", idProfil: "profil_test" },
     statut: "active",
     tresorerie: centimes(2_000_000),
