@@ -286,5 +286,17 @@
     "unite": "centimes_par_piece",
     "source": "docs/referentiel-couts.md - faconnier Portugal : 300 a 900 centimes selon produit, moyenne pour MVP - sera remplace par le vrai cout minute atelier / prix facon reel avec T27",
     "date": "2026-11-22"
+  },
+  "temps_minutes_reelles_par_pas": {
+    "valeur": 10,
+    "unite": "minutes_reelles",
+    "source": "docs/cahier-des-charges-v1.md section 4 (pas d'avance du monde, décision du 24 novembre 2026)",
+    "date": "2026-11-24"
+  },
+  "temps_minutes_reelles_par_mois_jeu": {
+    "valeur": 1440,
+    "unite": "minutes_reelles",
+    "source": "docs/cahier-des-charges-v1.md section 2 (1 jour réel = 1 mois de jeu)",
+    "date": "2026-11-24"
   }
 }
