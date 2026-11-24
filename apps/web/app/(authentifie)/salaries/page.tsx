@@ -96,7 +96,7 @@ export default async function PageSalaries() {
 
       <section className="mt-10 space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider">Embaucher</h2>
-        <FormulaireEmbauche companyId={entreprise.id} etape={entreprise.etape} />
+        <FormulaireEmbauche etape={entreprise.etape} />
       </section>
     </div>
   );

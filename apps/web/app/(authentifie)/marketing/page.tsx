@@ -61,7 +61,6 @@ export default async function PageMarketing() {
       <section className="mt-10 space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider">Lancer une action</h2>
         <ActionsMarketing
-          companyId={entreprise.id}
           tresorerie={entreprise.tresorerie_centimes}
           marque={marque}
         />

@@ -95,7 +95,7 @@ export default async function PageAtelier() {
               1 000 €/mois).
             </p>
             <div className="mt-3">
-              <LouerAtelierBouton companyId={entreprise.id} />
+              <LouerAtelierBouton />
             </div>
           </div>
         )}
@@ -153,7 +153,6 @@ export default async function PageAtelier() {
           Lancer une production
         </h2>
         <FormulaireProduction
-          companyId={entreprise.id}
           aUnAtelier={!!atelier}
           faconniers={faconniersTab}
           catalogueFaconnier={catalogueFacTab}

@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { creerClientNavigateur } from "../../../lib/supabase/client";
 import { formaterEuros } from "../../../lib/formatage";
 
 const HEURES_PAR_MOIS_JEU = 24;
@@ -37,11 +36,9 @@ function genererEcheancier(capital: number, tauxAnnuel: number, dureeMois: numbe
 }
 
 export function FormulairePret({
-  companyId,
   tresorerieActuelle,
   detteActuelle,
 }: {
-  companyId: string;
   tresorerieActuelle: number;
   detteActuelle: number;
 }) {
@@ -82,46 +79,16 @@ export function FormulairePret({
     }
     setEnCours(true);
     try {
-      const supabase = creerClientNavigateur();
-      const maintenant = new Date();
-      const { data: pret, error: errPret } = await supabase
-        .from("loans")
-        .insert({
-          company_id: companyId,
-          capital_initial_centimes: capitalCentimes,
-          capital_restant_centimes: capitalCentimes,
-          taux_annuel: TAUX_ANNUEL,
-          duree_mois: dureeN,
-          instant_debut: maintenant.toISOString(),
-        })
-        .select("id")
-        .single();
-      if (errPret || !pret) {
-        setErreur(errPret?.message ?? "Erreur création");
+      const reponse = await fetch("/api/actions/demander-pret", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ capitalCentimes, dureeMois: dureeN }),
+      });
+      const data = (await reponse.json()) as { error?: string };
+      if (data.error) {
+        setErreur(data.error);
         return;
       }
-      const echeancier = genererEcheancier(capitalCentimes, TAUX_ANNUEL, dureeN);
-      const lignes = echeancier.map((ech) => ({
-        loan_id: pret.id,
-        numero: ech.numero,
-        mensualite_centimes: ech.mensualite,
-        interets_centimes: ech.interets,
-        amortissement_centimes: ech.amortissement,
-        capital_restant_apres_centimes: ech.capitalRestantApres,
-        instant_prevu: new Date(
-          maintenant.getTime() + ech.numero * HEURES_PAR_MOIS_JEU * 3600 * 1000,
-        ).toISOString(),
-      }));
-      const { error: errSched } = await supabase.from("loan_schedules").insert(lignes);
-      if (errSched) {
-        setErreur(errSched.message);
-        return;
-      }
-      // Crédite la trésorerie
-      await supabase
-        .from("companies")
-        .update({ tresorerie_centimes: tresorerieActuelle + capitalCentimes })
-        .eq("id", companyId);
       router.refresh();
     } finally {
       setEnCours(false);

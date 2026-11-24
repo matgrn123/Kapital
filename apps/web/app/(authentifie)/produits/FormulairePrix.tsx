@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { creerClientNavigateur } from "../../../lib/supabase/client";
 
 type Ligne = {
   id: string;
@@ -39,18 +38,20 @@ export function FormulairePrix({ lignePrix }: { lignePrix: Ligne }) {
     }
     setEnCours(true);
     try {
-      const supabase = creerClientNavigateur();
-      const { error } = await supabase
-        .from("company_products")
-        .update({
-          prix_vente_directe_centimes: pDirecte,
-          prix_revendeur_centimes: pRevendeur,
-          production_mensuelle_cible: prod,
-          qualite_visee: q,
-        })
-        .eq("id", lignePrix.id);
-      if (error) {
-        setErreur(error.message);
+      const reponse = await fetch("/api/actions/fixer-prix", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          lignePrixId: lignePrix.id,
+          prixVenteDirecteCentimes: pDirecte,
+          prixRevendeurCentimes: pRevendeur,
+          productionMensuelleCible: prod,
+          qualiteVisee: q,
+        }),
+      });
+      const data = (await reponse.json()) as { error?: string };
+      if (data.error) {
+        setErreur(data.error);
         return;
       }
       router.refresh();
@@ -107,19 +108,7 @@ function ChampChiffre({
   );
 }
 
-const PRIX_DEFAUT_PAR_GAMME: Record<string, { tt: number; gros: number }> = {
-  entree: { tt: 2000, gros: 1000 },
-  milieu: { tt: 6000, gros: 3000 },
-  haut: { tt: 15000, gros: 7500 },
-};
-
-export function AjouterProduitBouton({
-  companyId,
-  productId,
-}: {
-  companyId: string;
-  productId: string;
-}) {
+export function AjouterProduitBouton({ productId }: { productId: string }) {
   const router = useRouter();
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -128,23 +117,14 @@ export function AjouterProduitBouton({
     setErreur(null);
     setEnCours(true);
     try {
-      const supabase = creerClientNavigateur();
-      const { data: ent } = await supabase
-        .from("companies")
-        .select("gamme")
-        .eq("id", companyId)
-        .maybeSingle();
-      const defaut = PRIX_DEFAUT_PAR_GAMME[ent?.gamme ?? "milieu"]!;
-      const { error } = await supabase.from("company_products").insert({
-        company_id: companyId,
-        product_id: productId,
-        qualite_visee: 60,
-        prix_vente_directe_centimes: defaut.tt,
-        prix_revendeur_centimes: defaut.gros,
-        production_mensuelle_cible: 100,
+      const reponse = await fetch("/api/actions/ajouter-produit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId }),
       });
-      if (error) {
-        setErreur(error.message);
+      const data = (await reponse.json()) as { error?: string };
+      if (data.error) {
+        setErreur(data.error);
         return;
       }
       router.refresh();

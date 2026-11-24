@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { creerClientNavigateur } from "../../../lib/supabase/client";
 
 type Marque = { notoriete: number; desirabilite: number };
 
@@ -25,11 +24,9 @@ function clamp(x: number): number {
 }
 
 export function ActionsMarketing({
-  companyId,
   tresorerie,
   marque,
 }: {
-  companyId: string;
   tresorerie: number;
   marque: Marque;
 }) {
@@ -63,33 +60,16 @@ export function ActionsMarketing({
     }
     setEnCours(true);
     try {
-      const supabase = creerClientNavigateur();
-      const sim = simuler(type)!;
-      const { error: errAction } = await supabase.from("marketing_actions").insert({
-        company_id: companyId,
-        type,
-        montant_centimes: montantCentimes,
+      const reponse = await fetch("/api/actions/action-marketing", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type, montantCentimes }),
       });
-      if (errAction) {
-        setErreur(errAction.message);
+      const data = (await reponse.json()) as { error?: string };
+      if (data.error) {
+        setErreur(data.error);
         return;
       }
-      // upsert brand_state (create if not exists)
-      const { error: errUp } = await supabase
-        .from("brand_state")
-        .upsert(
-          { company_id: companyId, notoriete: sim.noto, desirabilite: sim.desi },
-          { onConflict: "company_id" },
-        );
-      if (errUp) {
-        setErreur(errUp.message);
-        return;
-      }
-      // Débit trésorerie
-      await supabase
-        .from("companies")
-        .update({ tresorerie_centimes: tresorerie - montantCentimes })
-        .eq("id", companyId);
       router.refresh();
     } finally {
       setEnCours(false);

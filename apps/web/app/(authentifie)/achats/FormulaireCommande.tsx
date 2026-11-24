@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { creerClientNavigateur } from "../../../lib/supabase/client";
 import { formaterEuros } from "../../../lib/formatage";
 
 type Fournisseur = {
@@ -22,12 +21,10 @@ type LigneCatalogue = {
 const HEURES_PAR_MOIS_JEU = 24;
 
 export function FormulaireCommande({
-  companyId,
   fournisseurs,
   catalogue,
   materials,
 }: {
-  companyId: string;
   fournisseurs: readonly Fournisseur[];
   catalogue: readonly LigneCatalogue[];
   materials: readonly { id: string; nom: string }[];
@@ -69,22 +66,18 @@ export function FormulaireCommande({
     }
     setEnCours(true);
     try {
-      const supabase = creerClientNavigateur();
-      const maintenant = new Date();
-      const livraison = new Date(
-        maintenant.getTime() + fournisseur.delai_mois * HEURES_PAR_MOIS_JEU * 3600 * 1000,
-      );
-      const { error } = await supabase.from("purchase_orders").insert({
-        company_id: companyId,
-        supplier_id: fournisseur.id,
-        material_id: materialId,
-        quantite: quantiteN,
-        prix_unitaire_centimes: ligne.prix_centimes,
-        instant_commande: maintenant.toISOString(),
-        instant_livraison_prevue: livraison.toISOString(),
+      const reponse = await fetch("/api/actions/commander-matiere", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          supplierId: fournisseur.id,
+          materialId,
+          quantite: quantiteN,
+        }),
       });
-      if (error) {
-        setErreur(error.message);
+      const data = (await reponse.json()) as { error?: string };
+      if (data.error) {
+        setErreur(data.error);
         return;
       }
       setQuantite("100");
