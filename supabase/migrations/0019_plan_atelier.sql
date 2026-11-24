@@ -42,38 +42,9 @@ create policy "placed_modules_select_own"
     )
   );
 
+-- Écriture : uniquement par le serveur (route POST /api/actions/sauvegarder-amenagement),
+-- jamais par le navigateur du joueur (migration 0017, règle « le joueur n'écrit jamais en base »).
+-- Ces drops gardent la base fermée même si les policies existaient déjà.
 drop policy if exists "placed_modules_insert_own" on public.placed_modules;
-create policy "placed_modules_insert_own"
-  on public.placed_modules for insert
-  with check (
-    exists (
-      select 1 from public.workshops w
-      join public.companies c on c.id = w.company_id
-      where w.id = placed_modules.workshop_id
-      and c.owner_profile_id = auth.uid()
-    )
-  );
-
 drop policy if exists "placed_modules_update_own" on public.placed_modules;
-create policy "placed_modules_update_own"
-  on public.placed_modules for update
-  using (
-    exists (
-      select 1 from public.workshops w
-      join public.companies c on c.id = w.company_id
-      where w.id = placed_modules.workshop_id
-      and c.owner_profile_id = auth.uid()
-    )
-  );
-
 drop policy if exists "placed_modules_delete_own" on public.placed_modules;
-create policy "placed_modules_delete_own"
-  on public.placed_modules for delete
-  using (
-    exists (
-      select 1 from public.workshops w
-      join public.companies c on c.id = w.company_id
-      where w.id = placed_modules.workshop_id
-      and c.owner_profile_id = auth.uid()
-    )
-  );
