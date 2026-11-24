@@ -11,11 +11,14 @@
     "import-estr": "tsx --env-file=../../.env.local import-estr.ts",
     "test-market-data": "tsx --env-file=../../.env.local test-market-data.ts",
     "test-horloge": "tsx --env-file=../../.env.local test-horloge.ts",
+    "activer-minuterie": "tsx --env-file=../../.env.local activer-minuterie.ts",
     "reset-monde-recette": "tsx --env-file=../../.env.local reset-monde-recette.ts",
     "configurer-compte-dev": "tsx --env-file=../../.env.local configurer-compte-dev.ts"
   },
   "dependencies": {
     "@kapital/content": "*",
+    "@kapital/engine": "*",
+    "@kapital/server": "*",
     "@supabase/supabase-js": "^2.119.2",
     "pg": "^8.23.1"
   },

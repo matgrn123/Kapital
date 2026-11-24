@@ -15,12 +15,13 @@ import {
   moisJeu,
   type MoisJeu,
 } from "../types/primitifs.js";
-import type {
-  CumulMois,
-  DonneesFinMois,
-  DonneesFlux,
-  DonneesReellesMois,
-  ResultatClotureEntreprise,
+import {
+  cumulDemarrantAuPas,
+  type CumulMois,
+  type DonneesFinMois,
+  type DonneesFlux,
+  type DonneesReellesMois,
+  type ResultatClotureEntreprise,
 } from "./donneesMois.js";
 import { simulerPas } from "./pas.js";
 import { simulerMoisEntreprise } from "./simulerMois.js";
@@ -32,7 +33,9 @@ import { configTempsDepuis } from "./temps.js";
 
 const PARAMS_REELS = chargerParametresV1();
 const G = graine(42);
-const NB_PAS = configTempsDepuis(PARAMS_REELS).pasParMois; // 144
+// Les scénarios courants tournent avec un pas de 10 minutes (144 pas par mois) pour
+// rester rapides ; un test dédié rejoue le rythme réel (1 minute, 1440 pas par mois).
+const NB_PAS = configTempsDepuis(paramsNeutres()).pasParMois; // 144
 
 /**
  * Paramètres « neutres » : marché petit (environ 150 pièces vendues en direct
@@ -40,7 +43,7 @@ const NB_PAS = configTempsDepuis(PARAMS_REELS).pasParMois; // 144
  * Dans ces conditions, avancer d'un bloc ou pas à pas doit donner exactement
  * les mêmes comptes.
  */
-function paramsNeutres(): Parametres {
+function paramsNeutres(minutesParPas = 10): Parametres {
   const p: Parametres = { ...PARAMS_REELS };
   const fixer = (cle: string, valeur: number) => {
     p[cle] = { ...PARAMS_REELS[cle]!, valeur };
@@ -48,6 +51,7 @@ function paramsNeutres(): Parametres {
   fixer("taille_marche_mois_milieu", 1500);
   fixer("decroissance_notoriete_mois", 0);
   fixer("decroissance_desirabilite_mois", 0);
+  fixer("temps_minutes_reelles_par_pas", minutesParPas);
   return p;
 }
 
@@ -122,6 +126,8 @@ type Trace = {
   readonly entreprisesParPas: readonly Entreprise[];
   readonly cumulsParPas: readonly (CumulMois | null)[];
   readonly ecrituresParPas: readonly (readonly EcritureComptable[])[];
+  /** Toutes les écritures du mois, flux de chaque pas puis clôture. */
+  readonly ecrituresDuMois: readonly EcritureComptable[];
   readonly cloture: ResultatClotureEntreprise;
 };
 
@@ -137,6 +143,7 @@ type OptionsMois = {
 /** Joue un mois complet, pas par pas, comme le fera le serveur (TP-2). */
 function jouerUnMois(depart: Entreprise, o: OptionsMois = {}): Trace {
   const params = o.params ?? paramsNeutres();
+  const nbPas = configTempsDepuis(params).pasParMois;
   const mois = o.mois ?? moisJeu(1);
   let ent = depart;
   let cumul: CumulMois | null = null;
@@ -145,8 +152,8 @@ function jouerUnMois(depart: Entreprise, o: OptionsMois = {}): Trace {
   const ecrituresParPas: (readonly EcritureComptable[])[] = [];
   let cloture: ResultatClotureEntreprise | null = null;
 
-  for (let i = 0; i < NB_PAS; i++) {
-    const dernier = i === NB_PAS - 1;
+  for (let i = 0; i < nbPas; i++) {
+    const dernier = i === nbPas - 1;
     const r = simulerPas(
       ent,
       cumul,
@@ -170,7 +177,7 @@ function jouerUnMois(depart: Entreprise, o: OptionsMois = {}): Trace {
     if (r.cloture) cloture = r.cloture;
   }
   if (!cloture) throw new Error("le dernier pas aurait dû clôturer le mois");
-  return { entreprisesParPas, cumulsParPas, ecrituresParPas, cloture };
+  return { entreprisesParPas, cumulsParPas, ecrituresParPas, ecrituresDuMois: ecrituresParPas.flat(), cloture };
 }
 
 function soldesParCompte(ecritures: readonly EcritureComptable[]): Record<string, number> {
@@ -207,7 +214,7 @@ describe("simulerPas — un mois en bloc donne le même état que 144 pas", () =
     const pas = jouerUnMois(entrepriseDeTest(), { mois });
 
     expect(pas.cloture.entrepriseApres).toEqual(bloc.entrepriseApres);
-    expect(soldesParCompte(pas.cloture.ecritures)).toEqual(soldesParCompte(bloc.ecritures));
+    expect(soldesParCompte(pas.ecrituresDuMois)).toEqual(soldesParCompte(bloc.ecritures));
     expect(pas.cloture.ventesPerdues).toEqual(bloc.ventesPerdues);
     expect(pas.cloture.explications).toEqual(bloc.explications);
     expect(pas.cloture.moisDecouvertConsecutifsApres).toBe(bloc.moisDecouvertConsecutifsApres);
@@ -232,6 +239,26 @@ describe("simulerPas — un mois en bloc donne le même état que 144 pas", () =
     expect(Math.max(...parPas)).toBeLessThanOrEqual(3);
     // les ventes sont étalées sur le mois, pas concentrées sur un pas
     expect(parPas.length).toBeGreaterThan(50);
+  });
+
+  it("au rythme réel (1 minute, 1440 pas par mois) : même résultat qu'en bloc", () => {
+    const params = paramsNeutres(1);
+    expect(configTempsDepuis(params).pasParMois).toBe(1440);
+    const bloc = simulerMoisEntreprise(
+      entrepriseDeTest(),
+      { ...FLUX_VIDE, ...FIN_VIDE } as DonneesReellesMois,
+      MARKET,
+      params,
+      G,
+      moisJeu(1),
+    );
+    const pas = jouerUnMois(entrepriseDeTest(), { params });
+    expect(pas.ecrituresParPas).toHaveLength(1440);
+    expect(pas.cloture.entrepriseApres).toEqual(bloc.entrepriseApres);
+    expect(soldesParCompte(pas.ecrituresDuMois)).toEqual(soldesParCompte(bloc.ecritures));
+    // les ventes sont étalées : presque une par minute de jeu, pas de gros paquets
+    const parPas = pas.ecrituresParPas.flatMap((e) => piecesDansLibelles(e, "Vente directe"));
+    expect(Math.max(...parPas)).toBeLessThanOrEqual(2);
   });
 
   it("la marque s'érode de façon continue : même résultat qu'en bloc", () => {
@@ -263,6 +290,58 @@ describe("simulerPas — un mois en bloc donne le même état que 144 pas", () =
 });
 
 // ---------------------------------------------------------------------------
+// Entreprise créée en cours de mois
+// ---------------------------------------------------------------------------
+
+describe("simulerPas — une entreprise qui démarre en cours de mois", () => {
+  const params = paramsNeutres();
+  const mois = moisJeu(1);
+
+  function jouerDepuis(debut: number) {
+    let ent = entrepriseDeTest();
+    let cumul: CumulMois | null = cumulDemarrantAuPas(mois, ent.tresorerie, debut);
+    const ecritures: EcritureComptable[][] = [];
+    for (let i = debut; i < NB_PAS; i++) {
+      const dernier = i === NB_PAS - 1;
+      const r = simulerPas(ent, cumul, FLUX_VIDE, dernier ? FIN_VIDE : null, MARKET, params, G, mois, i);
+      ent = r.entrepriseApres;
+      cumul = r.cumul;
+      ecritures.push([...r.ecrituresDuPas]);
+    }
+    return ecritures;
+  }
+
+  const piecesProduites = (ecr: readonly (readonly EcritureComptable[])[]) =>
+    ecr.flat().filter((e) => e.libelle.startsWith("Production atelier"))
+      .map((e) => Number(/×(\d+)/.exec(e.libelle)?.[1] ?? 0))
+      .reduce((a, b) => a + b, 0);
+
+  it("ne produit que la part du mois qui reste, sans rattrapage du début de mois", () => {
+    const pleinMois = jouerDepuis(0);
+    const demiMois = jouerDepuis(NB_PAS / 2);
+    expect(piecesProduites(pleinMois)).toBe(60);
+    expect(piecesProduites(demiMois)).toBe(30);
+  });
+
+  it("ne vend que la part du mois qui reste, sans rafale au premier pas", () => {
+    const vendues = (ecr: readonly (readonly EcritureComptable[])[]) =>
+      ecr.flatMap((e) => piecesDansLibelles(e, "Vente directe"));
+    const plein = vendues(jouerDepuis(0)).reduce((a, b) => a + b, 0);
+    const demi = vendues(jouerDepuis(NB_PAS / 2));
+    expect(demi.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(Math.floor(plein / 2) - 1);
+    expect(demi.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(Math.ceil(plein / 2) + 1);
+    expect(Math.max(...demi)).toBeLessThanOrEqual(3);
+  });
+
+  it("refuse un état de démarrage dont le compteur ne correspond pas au pas", () => {
+    const cumul = cumulDemarrantAuPas(mois, entrepriseDeTest().tresorerie, 10);
+    expect(() =>
+      simulerPas(entrepriseDeTest(), cumul, FLUX_VIDE, null, MARKET, params, G, mois, 11),
+    ).toThrow(/déjà/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Bilan équilibré à chaque pas
 // ---------------------------------------------------------------------------
 
@@ -276,7 +355,7 @@ describe("simulerPas — comptabilité", () => {
       for (const e of toutes) gl = enregistrer(gl, e);
       expect(enEquilibre(gl)).toBe(true);
     }
-    expect(toutes.length).toBe(pas.cloture.ecritures.length);
+    expect(toutes.length).toBe(pas.ecrituresDuMois.length);
   });
 
   it("la trésorerie affichée suit les écritures de banque (512) à chaque pas", () => {
@@ -394,6 +473,14 @@ describe("simulerPas — flux à chaque pas, échéances en fin de mois", () => 
 // ---------------------------------------------------------------------------
 
 describe("simulerPas — reprise et garde-fous", () => {
+  it("l'état du mois reste petit : il ne recopie pas les écritures déjà enregistrées", () => {
+    const pas = jouerUnMois(entrepriseDeTest());
+    const tailles = pas.cumulsParPas.filter((c): c is CumulMois => c !== null).map((c) => JSON.stringify(c).length);
+    expect(Math.max(...tailles)).toBeLessThan(2_000);
+    // et il ne grossit pas au fil du mois
+    expect(tailles.at(-1)!).toBeLessThan(tailles[0]! * 2);
+  });
+
   it("l'état qui passe par du JSON entre deux pas (comme en base) donne le même résultat", () => {
     const direct = jouerUnMois(entrepriseDeTest());
     const viaJson = jouerUnMois(entrepriseDeTest(), { viaJson: true });
@@ -479,7 +566,7 @@ describe("simulerPas — reprise et garde-fous", () => {
     const depart = entrepriseDeTest();
     const pas = jouerUnMois(depart);
     expect(pas.cloture.entrepriseApres.tresorerie).toBe(
-      depart.tresorerie + (soldesParCompte(pas.cloture.ecritures)["512"] ?? 0),
+      depart.tresorerie + (soldesParCompte(pas.ecrituresDuMois)["512"] ?? 0),
     );
   });
 });

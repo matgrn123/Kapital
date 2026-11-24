@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { avancerMonde } from "@kapital/server";
+import { avancerMondeMaintenant } from "@kapital/server";
 import { creerClientServeur } from "../../../../../lib/supabase/server";
 
 // Variante UI de la route d'avancement : authentification par session Supabase
 // avec verification du role admin, pour declenchement depuis la page /admin.
+// Elle met le monde à jour à l'instant présent. Aucune date n'est lue dans la
+// requête : l'horloge est commune et on ne peut pas faire avancer le temps à la main.
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,8 +41,9 @@ export async function POST() {
 
   const admin = createClient(url, serviceKey);
   try {
-    const resultat = await avancerMonde(admin);
-    return NextResponse.json({ ok: true, ...resultat });
+    const resultat = await avancerMondeMaintenant(admin);
+    const erreurs = resultat.entreprises.filter((e) => e.etat === "erreur").length;
+    return NextResponse.json({ ok: erreurs === 0, erreurs, ...resultat });
   } catch (ex) {
     const message = ex instanceof Error ? ex.message : "Erreur inconnue";
     return NextResponse.json({ error: message }, { status: 500 });

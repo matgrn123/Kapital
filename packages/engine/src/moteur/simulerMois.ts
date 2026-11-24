@@ -41,7 +41,7 @@ export function simulerMoisEntreprise(
     donnees,
     { params, mois, pasDebut: 0, pasFin: 1, pasParMois: 1, suffixeId: "" },
   );
-  return cloturerMois(
+  const cloture = cloturerMois(
     flux.entreprise,
     flux.cumul,
     {
@@ -51,4 +51,6 @@ export function simulerMoisEntreprise(
     params,
     mois,
   );
+  // Un mois pris d'un bloc rend toutes ses écritures : flux puis clôture
+  return { ...cloture, ecritures: [...flux.ecritures, ...cloture.ecritures] };
 }

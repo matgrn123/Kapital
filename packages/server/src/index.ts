@@ -7,8 +7,7 @@ export { validerActionMarketing } from "./validations/actionMarketing.js";
 export { validerEmbauche } from "./validations/embauche.js";
 export { validerLicenciement } from "./validations/licenciement.js";
 export { validerDemandePret } from "./validations/demandePret.js";
-export { avancerMonde, type ResultatAvancement } from "./avancerMonde.js";
-export { simulerMondeComplet, type ResultatCloture } from "./simulerMondeComplet.js";
+export * from "./avance/index.js";
 export {
   approvisionnerStock,
   type ParamsApprovisionner,

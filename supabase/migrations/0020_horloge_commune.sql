@@ -54,6 +54,8 @@ alter table public.etat_mois_entreprise enable row level security;
 --    prêts, marque, statut, commandes livrées, état du mois et compteur de pas.
 --    Si le serveur plante ou si deux traitements se croisent, le pas n'est
 --    jamais appliqué deux fois : le compteur doit valoir p_pas_attendu.
+--    p_nb_pas permet d'appliquer d'un coup plusieurs pas calculés en mémoire
+--    (rattrapage d'une entreprise absente) : le compteur avance de p_nb_pas.
 --
 --    p_etat (objet JSON, toutes les clés sont facultatives) :
 --      ecritures                : [{ecriture_id, mois_jeu, libelle, compte, sens, montant_centimes}]
@@ -67,13 +69,15 @@ alter table public.etat_mois_entreprise enable row level security;
 --      ordres_faconnier_livres  : [uuid]
 --      cumul                    : objet (état du mois en cours, avec sa clé "mois") ou null à la clôture du mois
 --
---    Erreurs : KP404 entreprise introuvable ; KP409 pas déjà traité (ou manquant).
+--    Erreurs : KP400 nombre de pas invalide ; KP404 entreprise introuvable ;
+--    KP409 pas déjà traité (ou manquant).
 -- ---------------------------------------------------------------------------
 
 create or replace function public.appliquer_pas_entreprise(
   p_company_id uuid,
   p_pas_attendu integer,
-  p_etat jsonb
+  p_etat jsonb,
+  p_nb_pas integer default 1
 ) returns integer
 language plpgsql
 security definer
@@ -84,6 +88,10 @@ declare
   v_pas integer;
   v_etat jsonb := coalesce(p_etat, '{}'::jsonb);
 begin
+  if p_nb_pas is null or p_nb_pas < 1 then
+    raise exception 'nb_pas_invalide: %', p_nb_pas using errcode = 'KP400';
+  end if;
+
   -- Verrou sur l'entreprise : deux traitements simultanés se mettent en file.
   select true, c.pas_traites into v_trouve, v_pas
   from public.companies c
@@ -194,15 +202,15 @@ begin
         (v_etat->'entreprise'->>'mois_decouvert_consecutifs')::integer,
         mois_decouvert_consecutifs
       ),
-      pas_traites = p_pas_attendu + 1
+      pas_traites = p_pas_attendu + p_nb_pas
   where id = p_company_id;
 
-  return p_pas_attendu + 1;
+  return p_pas_attendu + p_nb_pas;
 end;
 $$;
 
 -- Réservée au serveur (clé de service) : jamais appelable depuis un navigateur.
-revoke all on function public.appliquer_pas_entreprise(uuid, integer, jsonb)
+revoke all on function public.appliquer_pas_entreprise(uuid, integer, jsonb, integer)
   from public, anon, authenticated;
-grant execute on function public.appliquer_pas_entreprise(uuid, integer, jsonb)
+grant execute on function public.appliquer_pas_entreprise(uuid, integer, jsonb, integer)
   to service_role;

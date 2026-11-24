@@ -21,7 +21,7 @@ export type ResultatSimulerPas = {
    * `null` quand le mois est clos : le pas suivant ouvre un nouveau mois.
    */
   readonly cumul: CumulMois | null;
-  /** Écritures passées pendant ce pas seulement (celles du mois entier : `cloture.ecritures`). */
+  /** Écritures passées pendant ce pas seulement (au dernier pas : flux du pas puis clôture du mois). */
   readonly ecrituresDuPas: readonly EcritureComptable[];
   /** Renseigné au dernier pas du mois : bilan, explications, ventes perdues. */
   readonly cloture: ResultatClotureEntreprise | null;
@@ -106,7 +106,7 @@ export function simulerPas(
   return {
     entrepriseApres: cloture.entrepriseApres,
     cumul: null,
-    ecrituresDuPas: cloture.ecritures.slice(cumulAvant.ecritures.length),
+    ecrituresDuPas: [...flux.ecritures, ...cloture.ecritures],
     cloture,
   };
 }
