@@ -1,6 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// Pendant la phase de développement, le site tourne sur un compte partagé
+// (LVMH, admin). Tout visiteur sans session est automatiquement connecté
+// avec les credentials KAPITAL_DEV_EMAIL / KAPITAL_DEV_PASSWORD (côté serveur
+// uniquement). Avant l'ouverture publique, retirer ces variables et restaurer
+// la vraie auth.
+
 export async function raffraichirSession(request: NextRequest) {
   let response = NextResponse.next({ request });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -26,11 +32,11 @@ export async function raffraichirSession(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user && process.env.NODE_ENV === "development") {
-    const devEmail = process.env.DEV_EMAIL;
-    const devPassword = process.env.DEV_PASSWORD;
-    if (devEmail && devPassword) {
-      await supabase.auth.signInWithPassword({ email: devEmail, password: devPassword });
+  if (!user) {
+    const email = process.env.KAPITAL_DEV_EMAIL;
+    const password = process.env.KAPITAL_DEV_PASSWORD;
+    if (email && password) {
+      await supabase.auth.signInWithPassword({ email, password });
     }
   }
 

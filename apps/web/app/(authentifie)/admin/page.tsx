@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { BoutonAvancerMonde } from "./BoutonAvancerMonde";
 import { BoutonApprovisionnerAdmin } from "./BoutonApprovisionnerAdmin";
@@ -8,7 +7,13 @@ export default async function PageAdmin() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/connexion");
+  if (!user) {
+    return (
+      <div className="mx-auto max-w-2xl px-8 py-16">
+        <h1 className="text-xl font-semibold">Non authentifié</h1>
+      </div>
+    );
+  }
 
   const { data: profil } = await supabase
     .from("profiles")

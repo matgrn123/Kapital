@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { creerClientServeur } from "../../lib/supabase/server";
 import { NavLaterale } from "./NavLaterale";
-import { FormulaireDeconnexion } from "./FormulaireDeconnexion";
 
 export default async function LayoutAuthentifie({
   children,
@@ -13,7 +11,23 @@ export default async function LayoutAuthentifie({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/connexion");
+
+  // Phase de développement : le middleware a déjà auto-connecté le visiteur
+  // sur le compte partagé. Si l'auto-connexion a échoué (env mal configuré),
+  // on affiche un message plutôt que de rediriger vers /connexion (supprimée).
+  if (!user) {
+    return (
+      <div className="mx-auto max-w-2xl px-8 py-16">
+        <h1 className="text-xl font-semibold">Connexion automatique indisponible</h1>
+        <p className="mt-2 text-sm text-[color:var(--color-g-500)]">
+          Les variables KAPITAL_DEV_EMAIL et KAPITAL_DEV_PASSWORD ne sont pas
+          configurées côté serveur. Lance{" "}
+          <code>npm run configurer-compte-dev -w tools/supabase</code> et copie
+          les valeurs affichées dans Vercel.
+        </p>
+      </div>
+    );
+  }
 
   const { data: profil } = await supabase
     .from("profiles")
@@ -26,7 +40,16 @@ export default async function LayoutAuthentifie({
     .select("id, nom")
     .eq("owner_profile_id", user.id)
     .limit(1);
-  if (!entreprises || entreprises.length === 0) redirect("/creer-entreprise");
+  if (!entreprises || entreprises.length === 0) {
+    return (
+      <div className="mx-auto max-w-2xl px-8 py-16">
+        <h1 className="text-xl font-semibold">Compte sans entreprise</h1>
+        <p className="mt-2 text-sm text-[color:var(--color-g-500)]">
+          Le compte partagé n'a pas d'entreprise associée. Vérifie la base.
+        </p>
+      </div>
+    );
+  }
   const entreprise = entreprises[0]!;
 
   return (
@@ -43,7 +66,6 @@ export default async function LayoutAuthentifie({
           <p className="truncate text-[color:var(--color-g-700)]">
             {profil?.pseudo ?? user.email}
           </p>
-          <FormulaireDeconnexion />
           {profil?.role === "admin" && (
             <Link
               href="/admin"
