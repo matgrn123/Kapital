@@ -298,5 +298,11 @@
     "unite": "minutes_reelles",
     "source": "docs/cahier-des-charges-v1.md section 2 (1 jour réel = 1 mois de jeu)",
     "date": "2026-11-24"
+  },
+  "temps_jours_par_mois_jeu": {
+    "valeur": 30,
+    "unite": "jours",
+    "source": "docs/cahier-des-charges-v1.md section 4 (échéance de prêt tous les 30 jours = toutes les 24 h réelles)",
+    "date": "2026-11-24"
   }
 }

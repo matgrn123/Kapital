@@ -77,14 +77,18 @@ const APPEL_N =
 async function main(): Promise<void> {
   const lire = (nom: string) =>
     readFileSync(new URL(`../../supabase/migrations/${nom}`, import.meta.url), "utf8");
-  const migrations = [lire("0020_horloge_commune.sql"), lire("0021_minuterie_et_direct.sql")];
+  const migrations = [
+    lire("0020_horloge_commune.sql"),
+    lire("0021_minuterie_et_direct.sql"),
+    lire("0022_cockpit_admin.sql"),
+  ];
   const c = new Client({ connectionString: connectionString(), ssl: { rejectUnauthorized: false } });
   await c.connect();
   await c.query("begin");
   try {
     console.log("Migration");
     for (const m of [...migrations, ...migrations]) await c.query(m); // rejouables : la CI les rejouera
-    verifier("les migrations 0020 et 0021 s'appliquent, et se rejouent sans erreur", true);
+    verifier("les migrations 0020, 0021 et 0022 s'appliquent, et se rejouent sans erreur", true);
 
     // --- Jeu de données de test (annulé en fin de test) ---------------------
     const monde = await un<{ id: string; debut_reel: Date | null }>(
@@ -306,6 +310,46 @@ async function main(): Promise<void> {
       `(${JSON.stringify(contrat)})`,
     );
 
+    // --- Migration 0022 : lecture admin et journal des passages ----------------
+    console.log("Cockpit d'administration (lecture admin, journal des passages)");
+    const idAdmin = "00000000-0000-4000-8000-0000000000a1";
+    const idJoueur = "00000000-0000-4000-8000-0000000000b2";
+    for (const [id, email] of [[idAdmin, "admin-test@kapital.invalid"], [idJoueur, "joueur-test@kapital.invalid"]] as const) {
+      await c.query("insert into auth.users (id, email) values ($1, $2)", [id, email]);
+    }
+    await c.query("update public.profiles set role = 'admin' where id = $1", [idAdmin]);
+    async function commeUtilisateur<T>(id: string, requete: string, params: unknown[] = []): Promise<T[]> {
+      await c.query("set local role authenticated");
+      await c.query("select set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claims', $2, true)", [id, JSON.stringify({ sub: id, role: "authenticated" })]);
+      try {
+        return (await c.query(requete, params)).rows as T[];
+      } finally {
+        await c.query("reset role");
+      }
+    }
+    const lignesAdmin = await commeUtilisateur<{ n: string }>(idAdmin, "select count(*) as n from public.ledger_entries where company_id = $1", [company.id]);
+    const lignesJoueur = await commeUtilisateur<{ n: string }>(idJoueur, "select count(*) as n from public.ledger_entries where company_id = $1", [company.id]);
+    verifier("un administrateur lit les écritures d'une entreprise qui n'est pas la sienne", Number(lignesAdmin[0]!.n) > 0, `(${lignesAdmin[0]!.n})`);
+    verifier("un simple joueur ne les lit pas", Number(lignesJoueur[0]!.n) === 0, `(${lignesJoueur[0]!.n})`);
+    for (const table of ["companies", "purchase_orders", "production_orders"]) {
+      const a = await commeUtilisateur<{ n: string }>(idAdmin, `select count(*) as n from public.${table}`);
+      const j = await commeUtilisateur<{ n: string }>(idJoueur, `select count(*) as n from public.${table}`);
+      verifier(`lecture admin de ${table} : l'admin voit des lignes, le joueur aucune de ces entreprises`, Number(a[0]!.n) > 0 && Number(j[0]!.n) < Number(a[0]!.n), `(admin ${a[0]!.n}, joueur ${j[0]!.n})`);
+    }
+    await c.query("set local role authenticated");
+    await c.query("select set_config('request.jwt.claim.sub', $1, true)", [idAdmin]);
+    await attendreErreur(c, "même administrateur : aucune écriture ajoutée sur ledger_entries", "insert into public.ledger_entries (company_id, ecriture_id, mois_jeu, libelle, compte, sens, montant_centimes) values ($1, 'x', 0, 'x', '512', 'debit', 1)", [company.id], "42501");
+    await c.query("reset role");
+
+    await c.query("set local role service_role");
+    await c.query("insert into public.journal_avance (monde_id, declencheur, pas_cible, mois_courant, nb_entreprises, nb_avancees, nb_erreurs, erreurs, duree_ms) values ($1, 'minuterie', 10, 0, 3, 3, 1, '[\"a : panne\"]', 420)", [monde.id]);
+    await c.query("reset role");
+    const journalAdmin = await commeUtilisateur<{ n: string }>(idAdmin, "select count(*) as n from public.journal_avance");
+    const journalJoueur = await commeUtilisateur<{ n: string }>(idJoueur, "select count(*) as n from public.journal_avance");
+    verifier("le journal des passages est lisible par l'admin", Number(journalAdmin[0]!.n) === 1);
+    verifier("le journal des passages n'est pas lisible par un joueur", Number(journalJoueur[0]!.n) === 0);
+    await attendreErreur(c, "un déclencheur inconnu est refusé par la table", "insert into public.journal_avance (monde_id, declencheur, pas_cible, mois_courant, nb_entreprises, nb_avancees, nb_erreurs, duree_ms) values ($1, 'pirate', 1, 0, 0, 0, 0, 1)", [monde.id], "23514");
+
     // --- Migration 0021 : minuterie et diffusion en direct --------------------
     console.log("Minuterie et diffusion en direct");
     const job = await c.query("select schedule, command from cron.job where jobname = 'kapital-avance-monde'");
@@ -333,10 +377,13 @@ async function main(): Promise<void> {
     }
   } finally {
     await c.query("rollback");
-    const colonne = await c.query(
-      "select 1 from information_schema.columns where table_schema='public' and table_name='companies' and column_name='pas_traites'",
+    // Ce que le test ajoute : la migration 0022 ne doit pas survivre à l'annulation
+    const trace = await c.query(
+      "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'journal_avance'",
     );
-    console.log(`\nTransaction annulée : colonne pas_traites ${colonne.rowCount === 0 ? "absente (la base est intacte)" : "PRÉSENTE (migration déjà appliquée avant le test)"}.`);
+    console.log(
+      `\nTransaction annulée : table journal_avance ${trace.rowCount === 0 ? "absente (le test n'a rien laissé)" : "PRÉSENTE (migration 0022 déjà appliquée avant le test)"}.`,
+    );
     await c.end();
   }
 
