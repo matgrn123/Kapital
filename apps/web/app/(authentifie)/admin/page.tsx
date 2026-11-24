@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { BoutonAvancerMonde } from "./BoutonAvancerMonde";
+import { BoutonApprovisionnerAdmin } from "./BoutonApprovisionnerAdmin";
 
 export default async function PageAdmin() {
   const supabase = await creerClientServeur();
@@ -31,6 +32,15 @@ export default async function PageAdmin() {
     .select("id, mois_courant, etat")
     .limit(1);
   const monde = mondes?.[0];
+
+  const { data: entreprises } = await supabase
+    .from("companies")
+    .select("id, nom, gamme")
+    .order("nom");
+  const { data: produitsRef } = await supabase
+    .from("products")
+    .select("id, nom")
+    .order("nom");
 
   return (
     <div className="mx-auto max-w-4xl px-8 py-10">
@@ -65,6 +75,27 @@ export default async function PageAdmin() {
         </p>
         <div className="mt-4">
           <BoutonAvancerMonde />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-md border border-[color:var(--color-g-200)] p-6">
+        <h2 className="text-sm font-semibold">Approvisionner un stock (recette)</h2>
+        <p className="mt-2 text-sm text-[color:var(--color-g-700)]">
+          Ajoute des pièces au stock d'une entreprise au coût de revient estimé.
+          Débite la trésorerie et écrit 35 débit / 512 crédit. Utile pour les
+          testeurs en attendant le vrai flux atelier/façonnier (T27/T28).
+        </p>
+        <div className="mt-4">
+          <BoutonApprovisionnerAdmin
+            entreprises={((entreprises ?? []) as Array<{
+              id: string;
+              nom: string;
+              gamme: string;
+            }>).map((e) => ({ id: e.id, nom: e.nom, gamme: e.gamme }))}
+            produits={((produitsRef ?? []) as Array<{ id: string; nom: string }>).map(
+              (p) => ({ id: p.id, nom: p.nom }),
+            )}
+          />
         </div>
       </section>
     </div>
