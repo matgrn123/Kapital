@@ -1,10 +1,17 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   centimes,
   evaluerMissions,
   type MetriquesMissions,
   type ProgressionMission,
 } from "@kapital/engine";
+
+function clientAdmin(): SupabaseClient | null {
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
 type EcritureCompta = {
   mois_jeu: number;
@@ -131,22 +138,28 @@ export async function chargerProgressionMissions(
     return p;
   });
 
-  // Persistance : met à jour mission_progress
-  const maintenant = new Date().toISOString();
-  const upserts = resultat.map((p) => ({
-    company_id: companyId,
-    mission_id: p.id,
-    etat: p.etat,
-    actuel: p.actuel,
-    cible: p.cible,
-    validee_le: p.etat === "validee"
-      ? (lignes.find((l) => l.mission_id === p.id)?.validee_le ?? maintenant)
-      : null,
-    mise_a_jour_le: maintenant,
-  }));
-  await supabase
-    .from("mission_progress")
-    .upsert(upserts, { onConflict: "company_id,mission_id" });
+  // Persistance : met à jour mission_progress via le client admin (RLS fermées
+  // côté joueur après A.4). Si la clé service_role n'est pas disponible côté
+  // navigateur, on saute la persistance — l'affichage reste correct puisque
+  // `resultat` est calculé à partir des écritures.
+  const admin = clientAdmin();
+  if (admin) {
+    const maintenant = new Date().toISOString();
+    const upserts = resultat.map((p) => ({
+      company_id: companyId,
+      mission_id: p.id,
+      etat: p.etat,
+      actuel: p.actuel,
+      cible: p.cible,
+      validee_le: p.etat === "validee"
+        ? (lignes.find((l) => l.mission_id === p.id)?.validee_le ?? maintenant)
+        : null,
+      mise_a_jour_le: maintenant,
+    }));
+    await admin
+      .from("mission_progress")
+      .upsert(upserts, { onConflict: "company_id,mission_id" });
+  }
 
   return resultat;
 }
