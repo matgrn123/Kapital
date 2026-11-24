@@ -8,6 +8,10 @@ export { validerEmbauche } from "./validations/embauche.js";
 export { validerLicenciement } from "./validations/licenciement.js";
 export { validerDemandePret } from "./validations/demandePret.js";
 export * from "./avance/index.js";
+export { avancerLeTemps, DUREES_AVANCE, type ContexteAction, type DureeAvance } from "./admin/avancerLeTemps.js";
+export { construireVueCockpit, type VueCockpit, type Declencheur } from "./admin/cockpit.js";
+export { ErreurAdmin } from "./admin/port.js";
+export { chargerDonneesCockpit, JournalAuditSupabase } from "./admin/supabaseAdmin.js";
 export {
   approvisionnerStock,
   type ParamsApprovisionner,

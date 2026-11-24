@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { chargerParametresV1 } from "@kapital/content";
+import { enregistrerPassage } from "../admin/supabaseAdmin.js";
+import type { Declencheur } from "../admin/cockpit.js";
 import { avancerMondeJusquA, type ResultatAvanceMonde } from "./orchestrateur.js";
 import { StockageSupabase } from "./stockageSupabase.js";
 
@@ -17,7 +19,17 @@ export {
   type StockageMonde,
 } from "./port.js";
 
-/** Met tout le monde à jour à l'instant présent (horloge du serveur, jamais celle du navigateur). */
-export function avancerMondeMaintenant(supabase: SupabaseClient): Promise<ResultatAvanceMonde> {
-  return avancerMondeJusquA(new StockageSupabase(supabase), chargerParametresV1(), Date.now());
+/**
+ * Met tout le monde à jour à l'instant présent (horloge du serveur, jamais celle du navigateur)
+ * et garde une trace du passage dans journal_avance.
+ */
+export async function avancerMondeMaintenant(
+  supabase: SupabaseClient,
+  declencheur: Declencheur = "minuterie",
+): Promise<ResultatAvanceMonde> {
+  const debutMs = Date.now();
+  const resultat = await avancerMondeJusquA(new StockageSupabase(supabase), chargerParametresV1(), debutMs);
+  const finMs = Date.now();
+  await enregistrerPassage(supabase, resultat, finMs - debutMs, declencheur, finMs);
+  return resultat;
 }

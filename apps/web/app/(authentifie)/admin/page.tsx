@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { BoutonAvancerMonde } from "./BoutonAvancerMonde";
 import { BoutonApprovisionnerAdmin } from "./BoutonApprovisionnerAdmin";
@@ -71,12 +72,16 @@ export default async function PageAdmin() {
       </section>
 
       <section className="mt-6 rounded-md border border-[color:var(--color-g-200)] p-6">
-        <h2 className="text-sm font-semibold">Avancer le monde manuellement</h2>
+        <h2 className="text-sm font-semibold">Mettre le monde à jour</h2>
         <p className="mt-2 text-sm text-[color:var(--color-g-700)]">
-          Déclenche une avancée d'un mois jeu : calcule les ventes du mois sur
-          la base des prix et des marques actuels, écrit les écritures
-          comptables correspondantes et met à jour le mois courant. Le même
-          traitement tourne automatiquement toutes les 30 minutes via le cron.
+          Le monde avance tout seul, au rythme d'un pas par minute réelle (un mois de
+          jeu par jour réel), pour tous les joueurs. Ce bouton fait rattraper
+          immédiatement les pas manquants à toutes les entreprises ; il ne change
+          pas l'heure du jeu. Pour suivre le monde en direct, ouvrir le{" "}
+          <Link href="/admin/cockpit" className="underline">
+            cockpit
+          </Link>
+          .
         </p>
         <div className="mt-4">
           <BoutonAvancerMonde />
