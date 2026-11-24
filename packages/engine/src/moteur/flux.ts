@@ -2,6 +2,7 @@ import type { Parametres } from "@kapital/content";
 import { enregistrer, planComptableV1 } from "../comptabilite/index.js";
 import type { EcritureComptable, GrandLivre } from "../comptabilite/types.js";
 import { capaciteMinutes, rendement } from "../atelier/calculs.js";
+import { artisansAuPoste } from "../personnel/postes.js";
 import { calculerVentesMois } from "../marche/ventesMois.js";
 import { coefficientsMarketingDepuisParametres, fluxMarque } from "../marketing/index.js";
 import type { DepenseMarketing } from "../marketing/types.js";
@@ -172,9 +173,11 @@ type LignePlanProduction = { readonly produit: IdProduit; readonly pieces: numbe
  * selon le nombre d'artisans, l'expérience et le nombre de machines.
  * Un pas n'en fait qu'une part (voir `avancerFlux`).
  */
-function planProductionDuMois(ent: Entreprise, params: Parametres): readonly LignePlanProduction[] {
+export function planProductionDuMois(ent: Entreprise, params: Parametres): readonly LignePlanProduction[] {
   if (ent.atelier === null) return [];
-  const artisans = ent.salaries.filter((s) => s.poste === "artisan");
+  // AE-7 : seuls les artisans qui occupent un poste équipé produisent et comptent dans le
+  // rendement (les plus expérimentés d'abord) ; embaucher sans poste libre ne change rien.
+  const artisans = artisansAuPoste(ent.salaries, ent.atelier.nombreMachines);
   const nbArtisans = artisans.length;
   if (nbArtisans === 0) return [];
 

@@ -1,7 +1,16 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { verifierDeblocageEtape } from "@kapital/server";
-import { centimes, type ActionVerrouillable, type EtapeEntreprise } from "@kapital/engine";
+import {
+  centimes,
+  idEntreprise,
+  idSalarie,
+  type ActionVerrouillable,
+  type Entreprise,
+  type EtapeEntreprise,
+  type Poste,
+  type Salarie,
+} from "@kapital/engine";
 import { creerClientServeur } from "./supabase/server";
 
 // Helpers partagés par toutes les routes /api/actions/*.
@@ -141,4 +150,70 @@ export async function ecrireEcritures(
   }));
   const { error } = await admin.from("ledger_entries").insert(rows);
   if (error) throw new Error(`insert ledger : ${error.message}`);
+}
+
+type LigneSalarie = {
+  id: string;
+  poste: Poste;
+  salaire_brut_mensuel_centimes: number;
+  anciennete_mois_debut: number;
+  experience_mois_debut: number;
+  mois_jeu_debut: number | null;
+};
+
+/**
+ * AE-7 : l'entreprise telle que la voit `validerDecision` pour l'embauche et le licenciement
+ * (trésorerie, salariés actifs avec ancienneté et expérience, nombre de machines). Les stocks,
+ * prêts et catalogue ne servent pas à ces deux validations.
+ */
+export async function chargerEntreprisePersonnel(ctx: ContexteAction): Promise<Entreprise> {
+  const [{ data: lignes }, { data: atelier }] = await Promise.all([
+    ctx.supabaseAdmin
+      .from("employees")
+      .select("id, poste, salaire_brut_mensuel_centimes, anciennete_mois_debut, experience_mois_debut, mois_jeu_debut")
+      .eq("company_id", ctx.companyId)
+      .eq("statut", "actif"),
+    ctx.supabaseAdmin
+      .from("workshops")
+      .select("surface_m2, loyer_mensuel_centimes, nombre_machines")
+      .eq("company_id", ctx.companyId)
+      .maybeSingle(),
+  ]);
+  const salaries: Salarie[] = ((lignes ?? []) as LigneSalarie[]).map((e) => {
+    const dureeService = Math.max(0, ctx.moisCourant - (e.mois_jeu_debut ?? 0));
+    return {
+      id: idSalarie(e.id),
+      poste: e.poste,
+      salaireBrutMensuel: centimes(Number(e.salaire_brut_mensuel_centimes)),
+      ancienneteMois: e.anciennete_mois_debut + dureeService,
+      experienceMois: e.experience_mois_debut + dureeService,
+    };
+  });
+  const a = atelier as { surface_m2: number; loyer_mensuel_centimes: number; nombre_machines: number } | null;
+  return {
+    id: idEntreprise(ctx.companyId),
+    nom: "",
+    gamme: ctx.companyGamme,
+    etape: ctx.companyEtape as EtapeEntreprise,
+    cumulsEtape: {
+      piecesVendues: ctx.companyPiecesVendues,
+      chiffreAffairesHt: centimes(ctx.companyChiffreAffairesHt),
+    },
+    proprietaire: { type: "joueur", idProfil: ctx.userId },
+    statut: "active",
+    tresorerie: centimes(ctx.companyTresorerie),
+    stocksMatiere: [],
+    stocksFinis: [],
+    salaries,
+    atelier: a
+      ? {
+          surfaceM2: a.surface_m2,
+          loyerMensuel: centimes(Number(a.loyer_mensuel_centimes)),
+          nombreMachines: a.nombre_machines,
+        }
+      : null,
+    marque: { notoriete: 0, desirabilite: 0 },
+    prets: [],
+    catalogue: [],
+  };
 }
