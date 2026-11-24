@@ -87,7 +87,7 @@ export async function POST(request: Request) {
   try {
     await ecrireEcritures(ctx.supabaseAdmin, {
       companyId: ctx.companyId,
-      ecritureId: `marketing_${Date.now()}`,
+      ecritureId: `marketing_${crypto.randomUUID()}`,
       moisJeu: ctx.moisCourant,
       libelle: `Marketing : ${type}`,
       lignes: [

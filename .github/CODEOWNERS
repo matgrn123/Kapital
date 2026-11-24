@@ -1,0 +1,21 @@
+# Propriétaires de code — Kapital
+# Les reviewers listés ici sont automatiquement ajoutés aux PRs qui touchent ces chemins.
+
+# Moteur de simulation et paramètres : toute modification doit passer par l'architecte
+/packages/engine/           @matgrn123
+/packages/content/          @matgrn123
+/supabase/migrations/       @matgrn123
+
+# Assets 3D : licences et modèles validés par l'architecte
+/assets/                    @matgrn123
+
+# Docs de référence : tout le monde peut contribuer, architecte valide
+/docs/                      @matgrn123
+
+# CI/CD : architecte uniquement
+/.github/                   @matgrn123
+
+# Interface web : review ouverte à toute l'équipe
+/apps/web/app/              @matgrn123
+/apps/web/components/       @matgrn123
+/apps/web/lib/              @matgrn123
