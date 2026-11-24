@@ -8,7 +8,11 @@ export const PLAN_COMPTABLE_V1: readonly Compte[] = [
     libelle: "Emprunts auprès des établissements de crédit",
     type: "passif",
   },
+  // Limite connue (AE-5) : la V1 n'enregistre pas l'achat des machines (pas de compte 215),
+  // donc 2815 est typé passif plutôt qu'en moins de l'actif. L'équation actif = passif + résultat
+  // reste exacte (681 au débit, 2815 au crédit), seule la présentation du bilan est simplifiée.
   { numero: "2815", libelle: "Amortissement du matériel industriel", type: "passif" },
+  { numero: "275", libelle: "Dépôts et cautionnements versés", type: "actif" },
   { numero: "31", libelle: "Stocks de matières premières", type: "actif" },
   { numero: "35", libelle: "Stocks de produits finis", type: "actif" },
   { numero: "401", libelle: "Fournisseurs", type: "passif" },
@@ -30,6 +34,11 @@ export const PLAN_COMPTABLE_V1: readonly Compte[] = [
   {
     numero: "613",
     libelle: "Locations",
+    type: "charges",
+  },
+  {
+    numero: "614",
+    libelle: "Charges locatives et de copropriété",
     type: "charges",
   },
   {

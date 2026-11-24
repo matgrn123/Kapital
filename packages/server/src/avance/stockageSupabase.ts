@@ -24,7 +24,7 @@ import {
 } from "./port.js";
 
 // ---------------------------------------------------------------------------
-// Contrat avec la fonction Postgres appliquer_pas_entreprise (migration 0020, remplacée par 0025)
+// Contrat avec la fonction Postgres appliquer_pas_entreprise (migration 0020, remplacée par 0025 puis 0027)
 // ---------------------------------------------------------------------------
 
 /** Charge utile JSON de la fonction Postgres : les clés doivent rester celles du SQL. */
@@ -223,7 +223,7 @@ export class StockageSupabase implements StockageMonde {
           .eq("statut", "actif"),
         this.supabase
           .from("workshops")
-          .select("surface_m2, loyer_mensuel_centimes, nombre_machines")
+          .select("surface_m2, loyer_mensuel_centimes, nombre_machines, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin")
           .eq("company_id", companyId)
           .maybeSingle(),
         this.supabase
@@ -261,6 +261,8 @@ export class StockageSupabase implements StockageMonde {
     }>;
     const workshop = verifier("workshops", atelierR) as {
       surface_m2: number; loyer_mensuel_centimes: number; nombre_machines: number;
+      depot_garantie_centimes: number; charges_mensuelles_centimes: number;
+      mois_signature: number | null; mois_fin: number | null;
     } | null;
     const loans = (verifier("loans", pretsR) ?? []) as Array<{
       id: string; capital_initial_centimes: number; capital_restant_centimes: number;
@@ -312,6 +314,12 @@ export class StockageSupabase implements StockageMonde {
             surfaceM2: workshop.surface_m2,
             loyerMensuel: centimes(workshop.loyer_mensuel_centimes),
             nombreMachines: workshop.nombre_machines,
+            bail: {
+              depotGarantie: centimes(Number(workshop.depot_garantie_centimes)),
+              chargesMensuelles: centimes(Number(workshop.charges_mensuelles_centimes)),
+              moisSignature: moisJeu(workshop.mois_signature ?? 0),
+              moisFin: workshop.mois_fin === null ? null : moisJeu(workshop.mois_fin),
+            },
           }
         : null,
       marque: { notoriete: marque?.notoriete ?? 50, desirabilite: marque?.desirabilite ?? 50 },
