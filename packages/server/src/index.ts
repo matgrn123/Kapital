@@ -8,6 +8,7 @@ export { validerEmbauche } from "./validations/embauche.js";
 export { validerLicenciement } from "./validations/licenciement.js";
 export { validerDemandePret } from "./validations/demandePret.js";
 export { avancerMonde, type ResultatAvancement } from "./avancerMonde.js";
+export { simulerMondeComplet, type ResultatCloture } from "./simulerMondeComplet.js";
 export {
   approvisionnerStock,
   type ParamsApprovisionner,

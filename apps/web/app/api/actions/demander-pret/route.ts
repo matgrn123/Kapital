@@ -88,6 +88,7 @@ export async function POST(request: Request) {
       taux_annuel: TAUX_ANNUEL,
       duree_mois: duree,
       instant_debut: maintenant.toISOString(),
+      mois_jeu_debut: ctx.moisCourant,
     })
     .select("id")
     .single();
@@ -133,14 +134,6 @@ export async function POST(request: Request) {
     const message = ex instanceof Error ? ex.message : "Erreur écriture.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  // Crédite la trésorerie
-  await ctx.supabaseAdmin
-    .from("companies")
-    .update({
-      tresorerie_centimes: ctx.companyTresorerie + capital,
-    })
-    .eq("id", ctx.companyId);
 
   return NextResponse.json({ ok: true });
 }
