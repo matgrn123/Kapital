@@ -2,6 +2,11 @@ import type { DecisionEmbauche } from "@kapital/engine";
 import { ok, refuse, type ContexteValidation, type Result } from "../types.js";
 import { verifierDeblocage } from "./verrouEtape.js";
 
+/**
+ * AE-7 : l'embauche sans poste libre est ACCEPTÉE (le joueur peut anticiper), mais le salarié
+ * ne produit pas tant qu'aucune machine n'est libre : le moteur ne compte que les artisans qui
+ * occupent un poste (artisansAuPoste). Le salaire est dû dans tous les cas.
+ */
 export function validerEmbauche(
   ctx: ContexteValidation,
   d: DecisionEmbauche,

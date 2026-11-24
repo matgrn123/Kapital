@@ -478,5 +478,29 @@
     "unite": "mois_de_jeu",
     "source": "valeur provisoire à calibrer : 15 ans, durée proposée par défaut pour le crédit d'achat du local ; elle reste dans les bornes du prêt immobilier (pret_duree_min_mois_immobilier à pret_duree_max_mois_immobilier)",
     "date": "2026-11-24"
+  },
+  "licenciement_anciennete_minimale_mois": {
+    "valeur": 8,
+    "unite": "mois",
+    "source": "https://www.service-public.fr/particuliers/vosdroits/F987 (indemnité légale de licenciement : au moins 8 mois d'ancienneté ininterrompue ; Code du travail, article L1234-9 et R1234-2)",
+    "date": "2026-11-24"
+  },
+  "licenciement_indemnite_mois_de_salaire_par_an": {
+    "valeur": 0.25,
+    "unite": "mois_de_salaire_par_annee",
+    "source": "https://www.service-public.fr/particuliers/vosdroits/F987 (un quart de mois de salaire par année d'ancienneté jusqu'à 10 ans ; Code du travail, article R1234-2) ; simplification du jeu : salaire de référence = salaire brut mensuel actuel",
+    "date": "2026-11-24"
+  },
+  "licenciement_indemnite_mois_de_salaire_par_an_apres_seuil": {
+    "valeur": 0.3333333333,
+    "unite": "mois_de_salaire_par_annee",
+    "source": "https://www.service-public.fr/particuliers/vosdroits/F987 (un tiers de mois de salaire par année d'ancienneté à partir de la 11e année ; Code du travail, article R1234-2)",
+    "date": "2026-11-24"
+  },
+  "licenciement_indemnite_seuil_annees": {
+    "valeur": 10,
+    "unite": "annees",
+    "source": "https://www.service-public.fr/particuliers/vosdroits/F987 (le taux passe du quart au tiers au-delà de 10 ans d'ancienneté ; Code du travail, article R1234-2)",
+    "date": "2026-11-24"
   }
 }
