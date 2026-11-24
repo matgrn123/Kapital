@@ -6,6 +6,8 @@ import type {
   Entreprise,
   Fournisseur,
   Produit,
+  Depassement,
+  ReglesPret,
 } from "@kapital/engine";
 
 export type ResultOk = { readonly ok: true };
@@ -17,6 +19,8 @@ export type ResultErreur = {
   /** Refus d'étape : l'étape qui débloque l'action et ce qu'il manque, chiffré. */
   readonly etapeRequise?: EtapeEntreprise;
   readonly conditions?: readonly ConditionManquante[];
+  /** Refus de prêt : le plafond qui joue, ce qui est demandé et ce qui manque (centimes). */
+  readonly depassement?: Depassement;
 };
 export type Result = ResultOk | ResultErreur;
 
@@ -27,6 +31,8 @@ export type ContexteValidation = {
   readonly produits?: readonly Produit[];
   /** Seuils de passage d'étape ; par défaut ceux des paramètres V1. */
   readonly seuilsEtapes?: SeuilsEtapes;
+  /** Règles des prêts ; par défaut celles des paramètres V1. */
+  readonly reglesPret?: ReglesPret;
 };
 
 export const ok = (): Result => ({ ok: true });

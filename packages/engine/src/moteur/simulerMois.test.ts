@@ -527,6 +527,7 @@ describe("simulerMoisEntreprise — prêts", () => {
       capitalRestant: centimes(1_000_000),
       tauxAnnuel: 0.03,
       dureeTotaleMois: 24,
+      objet: "tresorerie",
       moisDebut: moisJeu(0),
     };
     const ent: Entreprise = {
@@ -566,6 +567,7 @@ describe("simulerMoisEntreprise — prêts", () => {
       capitalRestant: centimes(2_000_000),
       tauxAnnuel: 0.05,
       dureeTotaleMois: 12,
+      objet: "tresorerie",
       moisDebut: moisJeu(0),
     };
     const ent: Entreprise = {

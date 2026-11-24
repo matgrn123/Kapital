@@ -4,6 +4,7 @@ import {
   idEntreprise,
   idMatiere,
   idPret,
+  estObjetPret,
   idProduit,
   idSalarie,
   moisJeu,
@@ -227,7 +228,7 @@ export class StockageSupabase implements StockageMonde {
           .maybeSingle(),
         this.supabase
           .from("loans")
-          .select("id, capital_initial_centimes, capital_restant_centimes, taux_annuel, duree_mois, mois_jeu_debut")
+          .select("id, capital_initial_centimes, capital_restant_centimes, taux_annuel, duree_mois, mois_jeu_debut, objet")
           .eq("company_id", companyId)
           .eq("statut", "actif"),
         this.supabase
@@ -263,7 +264,7 @@ export class StockageSupabase implements StockageMonde {
     } | null;
     const loans = (verifier("loans", pretsR) ?? []) as Array<{
       id: string; capital_initial_centimes: number; capital_restant_centimes: number;
-      taux_annuel: number; duree_mois: number; mois_jeu_debut: number | null;
+      taux_annuel: number; duree_mois: number; mois_jeu_debut: number | null; objet: string | null;
     }>;
     const produits = (verifier("company_products", produitsR) ?? []) as Array<{
       product_id: string; qualite_visee: number; prix_vente_directe_centimes: number;
@@ -320,6 +321,7 @@ export class StockageSupabase implements StockageMonde {
         capitalRestant: centimes(l.capital_restant_centimes),
         tauxAnnuel: l.taux_annuel,
         dureeTotaleMois: l.duree_mois,
+        objet: estObjetPret(l.objet) ? l.objet : "tresorerie",
         moisDebut: moisJeu(l.mois_jeu_debut ?? 1),
       })),
       catalogue: produits.map((p) => ({

@@ -1,49 +1,27 @@
 import { NextResponse } from "next/server";
+import { chargerParametresV1 } from "@kapital/content";
+import {
+  centimes,
+  estObjetPret,
+  evaluerDemandePret,
+  genererEcheancier,
+  capaciteEmprunt,
+  tauxPret,
+  type ObjetPret,
+} from "@kapital/engine";
+import { reglesPretV1 } from "@kapital/server";
 import {
   chargerContexte,
-  ecrireEcritures,
   estErreurAction,
   refuserSiVerrouille,
 } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
 
-const HEURES_PAR_MOIS_JEU = 24;
-const TAUX_ANNUEL = 0.055;
-
-function mensualite(capital: number, tauxAnnuel: number, dureeMois: number): number {
-  if (tauxAnnuel === 0) return Math.round(capital / dureeMois);
-  const i = tauxAnnuel / 12;
-  return Math.round((capital * i) / (1 - Math.pow(1 + i, -dureeMois)));
-}
-
-function genererEcheancier(capital: number, tauxAnnuel: number, dureeMois: number) {
-  const mens = mensualite(capital, tauxAnnuel, dureeMois);
-  const i = tauxAnnuel / 12;
-  const result: Array<{
-    numero: number;
-    mensualite: number;
-    interets: number;
-    amortissement: number;
-    capitalRestantApres: number;
-  }> = [];
-  let restant = capital;
-  for (let k = 1; k < dureeMois; k++) {
-    const interets = Math.round(restant * i);
-    const amort = mens - interets;
-    restant -= amort;
-    result.push({ numero: k, mensualite: mens, interets, amortissement: amort, capitalRestantApres: restant });
-  }
-  const interetsFinal = Math.round(restant * i);
-  result.push({
-    numero: dureeMois,
-    mensualite: restant + interetsFinal,
-    interets: interetsFinal,
-    amortissement: restant,
-    capitalRestantApres: 0,
-  });
-  return result;
-}
+// AE-4 : la route ne recalcule plus rien elle-même. Les plafonds, durées et marges sont
+// dans les paramètres (reglesPretV1), la décision est évaluée par le moteur, l'échéancier
+// vient de genererEcheancier, et le prêt, son échéancier et l'écriture 512/164 sont
+// enregistrés ensemble par la fonction SQL creer_pret (une seule transaction).
 
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
@@ -54,89 +32,101 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     capitalCentimes?: number;
     dureeMois?: number;
+    objet?: string;
   };
   const capital = body.capitalCentimes ?? 0;
   const duree = body.dureeMois ?? 0;
-  if (!Number.isFinite(capital) || capital <= 0) {
-    return NextResponse.json({ error: "Capital invalide." }, { status: 400 });
-  }
-  if (!Number.isFinite(duree) || duree < 12 || duree > 240) {
-    return NextResponse.json({ error: "Durée entre 12 et 240 mois." }, { status: 400 });
-  }
-
-  // Dette actuelle (somme des capital_restant_centimes des prêts actifs)
-  const { data: prets } = await ctx.supabaseAdmin
-    .from("loans")
-    .select("capital_restant_centimes")
-    .eq("company_id", ctx.companyId);
-  const detteActuelle = ((prets ?? []) as Array<{ capital_restant_centimes: number }>)
-    .reduce((s, p) => s + p.capital_restant_centimes, 0);
-  const plafond = Math.max(ctx.companyTresorerie, 1) * 5;
-  if (detteActuelle + capital > plafond) {
+  // Sans objet (page actuelle de la banque), la demande est un prêt de trésorerie.
+  const objetBrut = body.objet ?? "tresorerie";
+  if (!estObjetPret(objetBrut)) {
     return NextResponse.json(
-      {
-        error: `Dette totale (${((detteActuelle + capital) / 100).toFixed(2)} €) dépasse 5× votre trésorerie actuelle.`,
-      },
+      { error: "Objet du prêt inconnu (trésorerie, équipement ou immobilier).", code: "objet_invalide" },
       { status: 400 },
     );
   }
-
-  const maintenant = new Date();
-  const { data: pret, error: errPret } = await ctx.supabaseAdmin
-    .from("loans")
-    .insert({
-      company_id: ctx.companyId,
-      capital_initial_centimes: capital,
-      capital_restant_centimes: capital,
-      taux_annuel: TAUX_ANNUEL,
-      duree_mois: duree,
-      instant_debut: maintenant.toISOString(),
-      mois_jeu_debut: ctx.moisCourant,
-    })
-    .select("id")
-    .single();
-  if (errPret || !pret) {
-    return NextResponse.json(
-      { error: errPret?.message ?? "Erreur création prêt." },
-      { status: 500 },
-    );
+  const objet: ObjetPret = objetBrut;
+  if (!Number.isInteger(capital) || capital <= 0) {
+    return NextResponse.json({ error: "Capital invalide.", code: "montant_invalide" }, { status: 400 });
+  }
+  if (!Number.isInteger(duree) || duree <= 0) {
+    return NextResponse.json({ error: "Durée invalide.", code: "duree_hors_bornes" }, { status: 400 });
   }
 
-  const echeancier = genererEcheancier(capital, TAUX_ANNUEL, duree);
+  const { data: prets } = await ctx.supabaseAdmin
+    .from("loans")
+    .select("capital_restant_centimes")
+    .eq("company_id", ctx.companyId)
+    .eq("statut", "actif");
+  const detteEnCours = ((prets ?? []) as Array<{ capital_restant_centimes: number }>)
+    .reduce((s, p) => s + Number(p.capital_restant_centimes), 0);
+
+  const regles = reglesPretV1();
+  const situation = { tresorerie: centimes(ctx.companyTresorerie), detteEnCours: centimes(detteEnCours) };
+  const evaluation = evaluerDemandePret(
+    situation,
+    { objet, montant: centimes(capital), dureeMois: duree },
+    regles,
+  );
+  if (!evaluation.ok) {
+    return NextResponse.json(
+      { error: evaluation.message, code: evaluation.code, depassement: evaluation.depassement },
+      { status: 400 },
+    );
+  }
+  const plafondEndettement = capaciteEmprunt(situation, objet, regles).plafondEndettement;
+
+  // €STR du mois : dernière valeur connue ; à défaut, la valeur de secours des paramètres.
+  const aujourdhui = new Date();
+  const { data: estrLigne } = await ctx.supabaseAdmin
+    .from("market_data")
+    .select("valeur")
+    .eq("donnee", "estr_annuel")
+    .lte("date_effet", aujourdhui.toISOString().slice(0, 10))
+    .order("date_effet", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const estrLu = Number((estrLigne as { valeur?: unknown } | null)?.valeur);
+  const estr = Number.isFinite(estrLu) ? estrLu : regles.estrDeSecoursAnnuel;
+  const taux = tauxPret(objet, estr, regles);
+
+  const echeancier = genererEcheancier(centimes(capital), taux, duree);
+  const minutesParMoisJeu = chargerParametresV1()["temps_minutes_reelles_par_mois_jeu"]?.valeur;
+  if (!minutesParMoisJeu || minutesParMoisJeu <= 0) {
+    return NextResponse.json({ error: "Paramètre de temps manquant." }, { status: 500 });
+  }
   const lignes = echeancier.map((ech) => ({
-    loan_id: pret.id,
     numero: ech.numero,
-    mensualite_centimes: ech.mensualite,
+    mensualite_centimes: ech.montant,
     interets_centimes: ech.interets,
     amortissement_centimes: ech.amortissement,
     capital_restant_apres_centimes: ech.capitalRestantApres,
-    instant_prevu: new Date(
-      maintenant.getTime() + ech.numero * HEURES_PAR_MOIS_JEU * 3600 * 1000,
-    ).toISOString(),
+    instant_prevu: new Date(aujourdhui.getTime() + ech.numero * minutesParMoisJeu * 60_000).toISOString(),
   }));
-  const { error: errSched } = await ctx.supabaseAdmin
-    .from("loan_schedules")
-    .insert(lignes);
-  if (errSched) {
-    return NextResponse.json({ error: errSched.message }, { status: 500 });
+
+  const { data: idPret, error } = await ctx.supabaseAdmin.rpc("creer_pret", {
+    p_company_id: ctx.companyId,
+    p_objet: objet,
+    p_capital_centimes: capital,
+    p_taux_annuel: taux,
+    p_duree_mois: duree,
+    p_mois_jeu: ctx.moisCourant,
+    p_instant_debut: aujourdhui.toISOString(),
+    p_plafond_endettement_centimes: plafondEndettement,
+    p_echeancier: lignes,
+  });
+  if (error) {
+    // KP422 : le plafond a été atteint entre-temps par une autre demande.
+    const refusConcurrent = error.message.startsWith("endettement_excessif") || error.code === "KP422";
+    return NextResponse.json(
+      {
+        error: refusConcurrent
+          ? "Votre endettement a changé pendant la demande : le plafond est atteint."
+          : error.message,
+        ...(refusConcurrent ? { code: "endettement_excessif" } : {}),
+      },
+      { status: refusConcurrent ? 400 : 500 },
+    );
   }
 
-  // Écriture comptable : 512 débit (banque), 164 crédit (emprunts)
-  try {
-    await ecrireEcritures(ctx.supabaseAdmin, {
-      companyId: ctx.companyId,
-      ecritureId: `pret_${pret.id}`,
-      moisJeu: ctx.moisCourant,
-      libelle: `Mise à disposition du prêt`,
-      lignes: [
-        { compte: "512", sens: "debit", montant_centimes: capital },
-        { compte: "164", sens: "credit", montant_centimes: capital },
-      ],
-    });
-  } catch (ex) {
-    const message = ex instanceof Error ? ex.message : "Erreur écriture.";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, id: idPret, tauxAnnuel: taux });
 }
