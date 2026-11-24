@@ -32,3 +32,10 @@ export {
   verifierDeblocage,
   verifierDeblocageEtape,
 } from "./validations/verrouEtape.js";
+export {
+  chargerLignesGrandLivreSupabase,
+  construireGrandLivre,
+  lireIndicateursEntreprise,
+  type LigneLedger,
+  type SourceIndicateurs,
+} from "./indicateurs/indicateurs.js";

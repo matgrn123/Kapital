@@ -334,5 +334,17 @@
     "unite": "centimes",
     "source": "docs/plan-architecture-entreprise.md section 7 (décision de Mathieu, 24 novembre 2026 : l'étape 2 s'ouvre à 30 000 € de chiffre d'affaires cumulé hors taxes, avec une trésorerie positive à la clôture) : valeur de départ à calibrer au banc d'essai",
     "date": "2026-11-24"
+  },
+  "indicateurs_horizon_previsionnel_mois": {
+    "valeur": 3,
+    "unite": "mois",
+    "source": "docs/cahier-des-charges-v1.md section 13 (AE-3 : prévisionnel de trésorerie à 3 mois) ; docs/chantier-v1-1.md section tableau de bord (prévisionnel à 3 mois avec alerte si découvert prévu)",
+    "date": "2026-11-24"
+  },
+  "indicateurs_delai_encaissement_revendeur_mois": {
+    "valeur": 2,
+    "unite": "mois",
+    "source": "docs/plan-architecture-entreprise.md section 1 (revendeurs payant à 60 jours) ; aligné sur le moteur, qui encaisse la créance revendeur deux mois après la vente (stockageSupabase.chargerCreances)",
+    "date": "2026-11-24"
   }
 }
