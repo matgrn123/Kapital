@@ -1,7 +1,6 @@
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros } from "../../../lib/formatage";
 import { AjouterProduitBouton, FormulairePrix } from "./FormulairePrix";
-import { BoutonApprovisionner } from "./BoutonApprovisionner";
 
 type Produit = {
   id: string;
@@ -102,7 +101,6 @@ export default async function PageProduits() {
                     <span className="chiffre font-medium">
                       {stockMap.get(p.id) ?? 0} pièces
                     </span>
-                    <BoutonApprovisionner productId={p.id} />
                   </div>
                   <FormulairePrix lignePrix={ligne} />
                 </div>
