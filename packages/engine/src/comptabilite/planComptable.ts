@@ -8,16 +8,33 @@ export const PLAN_COMPTABLE_V1: readonly Compte[] = [
     libelle: "Emprunts auprès des établissements de crédit",
     type: "passif",
   },
+  { numero: "2815", libelle: "Amortissement du matériel industriel", type: "passif" },
   { numero: "31", libelle: "Stocks de matières premières", type: "actif" },
   { numero: "35", libelle: "Stocks de produits finis", type: "actif" },
   { numero: "401", libelle: "Fournisseurs", type: "passif" },
   { numero: "411", libelle: "Clients", type: "actif" },
+  { numero: "44551", libelle: "TVA à payer", type: "passif" },
   { numero: "44566", libelle: "TVA déductible", type: "actif" },
   { numero: "44571", libelle: "TVA collectée", type: "passif" },
   { numero: "512", libelle: "Banque", type: "actif" },
   {
     numero: "601",
     libelle: "Achats de matières premières",
+    type: "charges",
+  },
+  {
+    numero: "606",
+    libelle: "Achats non stockés (énergie, fournitures)",
+    type: "charges",
+  },
+  {
+    numero: "613",
+    libelle: "Locations",
+    type: "charges",
+  },
+  {
+    numero: "623",
+    libelle: "Publicité, publications, relations publiques",
     type: "charges",
   },
   {
@@ -48,6 +65,11 @@ export const PLAN_COMPTABLE_V1: readonly Compte[] = [
   {
     numero: "661",
     libelle: "Charges d'intérêts",
+    type: "charges",
+  },
+  {
+    numero: "681",
+    libelle: "Dotations aux amortissements",
     type: "charges",
   },
   {
