@@ -1,35 +1,14 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
-const emailTest = `t19-${Date.now()}@kapital-e2e.local`;
-const motDePasse = "motDePasseE2E123!";
-const pseudoTest = `e2e_${Date.now()}`;
-const nomEntreprise = `Marque E2E ${Date.now()}`;
+// Pendant la phase de développement, le site auto-connecte chaque visiteur
+// sur le compte partagé via le middleware. Les pages /connexion /inscription
+// /creer-entreprise sont supprimées. Le test vérifie seulement qu'ouvrir la
+// racine mène au tableau de bord sans erreur.
+//
+// Nécessite les variables KAPITAL_DEV_EMAIL / KAPITAL_DEV_PASSWORD côté
+// serveur (voir tools/supabase/configurer-compte-dev.ts).
 
-async function remplirInscription(page: Page) {
-  await page.getByLabel("Pseudo").fill(pseudoTest);
-  await page.getByLabel("Email").fill(emailTest);
-  await page.getByLabel("Mot de passe").fill(motDePasse);
-  await page.getByRole("button", { name: /créer mon compte/i }).click();
-}
-
-test("parcours complet : inscription → création entreprise → tableau de bord", async ({ page }) => {
-  // Landing
+test("racine redirige vers le tableau de bord du compte partagé", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Kapital" })).toBeVisible();
-
-  // Inscription
-  await page.getByRole("link", { name: /créer un compte/i }).click();
-  await expect(page).toHaveURL(/\/inscription$/);
-  await remplirInscription(page);
-
-  // Création entreprise
-  await expect(page).toHaveURL(/\/creer-entreprise$/, { timeout: 15_000 });
-  await page.getByLabel("Nom de la marque").fill(nomEntreprise);
-  await page.getByText("Haut", { exact: true }).click();
-  await page.getByRole("button", { name: /démarrer l'aventure/i }).click();
-
-  // Jeu
   await expect(page).toHaveURL(/\/jeu$/, { timeout: 15_000 });
-  await expect(page.getByRole("heading", { name: nomEntreprise })).toBeVisible();
-  await expect(page.locator("text=20 000,00 €")).toBeVisible();
 });

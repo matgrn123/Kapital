@@ -10,7 +10,8 @@
     "seed-world": "tsx --env-file=../../.env.local seed-world.ts",
     "import-estr": "tsx --env-file=../../.env.local import-estr.ts",
     "test-market-data": "tsx --env-file=../../.env.local test-market-data.ts",
-    "reset-monde-recette": "tsx --env-file=../../.env.local reset-monde-recette.ts"
+    "reset-monde-recette": "tsx --env-file=../../.env.local reset-monde-recette.ts",
+    "configurer-compte-dev": "tsx --env-file=../../.env.local configurer-compte-dev.ts"
   },
   "dependencies": {
     "@kapital/content": "*",
