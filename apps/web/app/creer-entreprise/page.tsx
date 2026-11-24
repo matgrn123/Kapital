@@ -4,8 +4,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { creerClientNavigateur } from "../../lib/supabase/client";
 
-const CAPITAL_INITIAL_CENTIMES = 2_000_000; // 20 000 €
-
 type Gamme = "entree" | "milieu" | "haut";
 
 export default function PageCreerEntreprise() {
@@ -41,38 +39,14 @@ export default function PageCreerEntreprise() {
     setErreur(null);
     setEnCours(true);
     try {
-      const supabase = creerClientNavigateur();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setErreur("Session expirée, reconnectez-vous.");
-        return;
-      }
-      const { data: worlds, error: errWorld } = await supabase
-        .from("worlds")
-        .select("id")
-        .eq("etat", "actif")
-        .limit(1);
-      if (errWorld) {
-        setErreur(`Lecture du monde : ${errWorld.message}`);
-        return;
-      }
-      if (!worlds || worlds.length === 0) {
-        setErreur("Aucun monde actif. L'administrateur doit en créer un.");
-        return;
-      }
-      const worldId = worlds[0]!.id;
-
-      const { error: errIns } = await supabase.from("companies").insert({
-        world_id: worldId,
-        owner_profile_id: user.id,
-        nom: nom.trim(),
-        gamme,
-        etape: 0,
-        statut: "active",
-        tresorerie_centimes: CAPITAL_INITIAL_CENTIMES,
+      const reponse = await fetch("/api/actions/creer-entreprise", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ nom: nom.trim(), gamme }),
       });
-      if (errIns) {
-        setErreur(`Création : ${errIns.message}`);
+      const data = (await reponse.json()) as { error?: string };
+      if (data.error) {
+        setErreur(data.error);
         return;
       }
       router.push("/jeu");

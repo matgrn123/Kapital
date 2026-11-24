@@ -31,3 +31,9 @@ supabase/.branches/
 
 # Packs 3D téléchargés complets (ne committer que les modèles utilisés)
 apps/web/Downtown City MegaKit*/
+
+# Env Python local
+.venv/
+
+# Notes personnelles locales
+Claude app/
