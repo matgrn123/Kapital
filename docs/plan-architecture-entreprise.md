@@ -6,7 +6,7 @@ Rôle : architecture de l'entreprise. Chaque ticket de la section 6 se donne tel
 
 **Écart.** L'objectif demande un magasin physique. Le cahier (§1) classe les « boutiques en propre » hors V1, et `batiments-3d-groupe.md` les place à l'étape 3, en V2.
 
-**Proposition.** Une « tranche boutique » en fin de V1, après le deuxième local (3D-7), réduite à une boutique simple en France. Tickets AE-9 à AE-11, bloqués tant que le cahier n'est pas amendé.
+**Proposition.** Une « tranche boutique » en fin de V1, après le deuxième local (3D-7), réduite à une boutique simple en France. Validée le 24 novembre 2026 et inscrite au cahier (§1 et §13) : tickets AE-9 à AE-11.
 
 **Hypothèses tranchées.**
 
@@ -19,7 +19,7 @@ Rôle : architecture de l'entreprise. Chaque ticket de la section 6 se donne tel
 
 **Décision sur le temps (validée par Mathieu le 24 novembre 2026).** Une seule horloge pour tous, sans pause ni accéléré. Ratio du cahier conservé : 1 jour réel = 1 mois de jeu (1 minute réelle = 30 minutes de jeu). C'est un réglage du monde, à doubler seulement si les testeurs s'ennuient.
 
-- Le monde avance en continu, par petits pas de 10 minutes réelles (le cahier dit 30 : à amender). Ventes, production et marché bougent à chaque pas ; salaires, loyers, échéances et TVA tombent en fin de mois.
+- Le monde avance en continu, par petits pas de 10 minutes réelles (cahier amendé). Ventes, production et marché bougent à chaque pas ; salaires, loyers, échéances et TVA tombent en fin de mois.
 - Le dépôt calcule aujourd'hui tout le mois en un bloc : à refondre (TP-1, TP-2).
 - Aucune attente au démarrage : la société naît avec une série de lancement prête à vendre ; ensuite, un grossiste local livre le jour même, plus cher que l'usine (TP-3).
 - Joueur absent : ses décisions permanentes continuent.
@@ -31,7 +31,7 @@ Rôle : architecture de l'entreprise. Chaque ticket de la section 6 se donne tel
 | 0. L'idée | Créer la société, choisir la gamme, acheter le jersey, faire produire chez un façonnier, fixer le prix, vendre en ligne | Coût de revient et marge | Oublier les retours (19 %), l'expédition et la publicité : vendre à perte |
 | 1. Le lancement | Faire de la publicité, réassortir, régler la taille des commandes | Trésorerie : un bénéfice n'est pas de l'argent en banque | Commander trop : l'argent dort en stock ; oublier la TVA à reverser |
 | 2. L'atelier | Emprunter, louer un local, acheter des machines, embaucher, vendre aux revendeurs | Frais fixes, point mort, besoin en fonds de roulement | Atelier à moitié vide : coût minute doublé ; revendeurs payant à 60 jours |
-| 3. La boutique (tranche proposée) | Ouvrir un magasin, recruter des vendeurs, répartir le stock, louer ou acheter les murs, ouvrir un second point de vente | Levier : la dette amplifie les gains comme les pertes | Emprunter pour couvrir des pertes ; loyer et vendeurs fixes face à des ventes saisonnières |
+| 3. La boutique | Ouvrir un magasin, recruter des vendeurs, répartir le stock, louer ou acheter les murs, ouvrir un second point de vente | Levier : la dette amplifie les gains comme les pertes | Emprunter pour couvrir des pertes ; loyer et vendeurs fixes face à des ventes saisonnières |
 
 ## 3. Emprunt, locaux, embauches : trésorerie et capacité
 
@@ -102,13 +102,12 @@ Moteur, serveur et contenu seulement ; l'interface revient au design.
 | AE-6 | Achat à crédit : apport, immobilisation, prêt immobilier, amortissement | Louer et acheter le même local sur 24 mois donnent les écarts calculés à la main |
 | AE-7 | Embauche et licenciement : poste requis, rendement du débutant, coût de départ | Embaucher sans poste libre n'augmente pas la production |
 | AE-8 | Scénario solo de 24 mois au banc d'essai, de la création aux embauches | Étape 2 atteinte ; bilan équilibré chaque mois ; résultat rejouable à l'identique |
-| AE-9 (bloqué) | Boutique, contenu : bâtiment au catalogue, poste vendeur, canal boutique, paramètres sourcés | Chaque entrée a prix, source et licence |
-| AE-10 (bloqué) | Boutique, exploitation : bail commercial, un mois de travaux, stock transféré, ventes plafonnées par stock et vendeurs | Sans vendeur ou sans stock, aucune vente ; point mort calculé |
-| AE-11 (bloqué) | Missions « Ouvrir ma boutique sans découvert » et « Louer ou acheter » ; banc prolongé à 36 mois | Les missions se valident ; étape 3 atteinte |
+| AE-9 | Boutique, contenu : bâtiment au catalogue, poste vendeur, canal boutique, paramètres sourcés | Chaque entrée a prix, source et licence |
+| AE-10 | Boutique, exploitation : bail commercial, un mois de travaux, stock transféré, ventes plafonnées par stock et vendeurs | Sans vendeur ou sans stock, aucune vente ; point mort calculé |
+| AE-11 | Missions « Ouvrir ma boutique sans découvert » et « Louer ou acheter » ; banc prolongé à 36 mois | Les missions se valident ; étape 3 atteinte |
 
 ## 7. Questions ouvertes
 
-1. **Boutique** : valides-tu la tranche boutique en fin de V1, donc un amendement du cahier (§1 et §13) ?
-2. **Achat des murs** : le plus petit local vaut 428 570 €. Crédit dès l'étape 2 avec 20 % d'apport, achat réservé à l'étape 3, ou local plus modeste au catalogue ?
-3. **Passage d'étape** : constat automatique (proposé) ou décision du joueur ?
-4. **Forme juridique** : SAS seule (proposé), ou choix SAS / SARL ?
+1. **Achat des murs** : le plus petit local vaut 428 570 €. Crédit dès l'étape 2 avec 20 % d'apport, achat réservé à l'étape 3, ou local plus modeste au catalogue ?
+2. **Passage d'étape** : constat automatique (proposé) ou décision du joueur ?
+3. **Forme juridique** : SAS seule (proposé), ou choix SAS / SARL ?
