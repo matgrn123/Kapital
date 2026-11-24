@@ -442,5 +442,41 @@
     "unite": "ratio_annuel",
     "source": "valeur provisoire à calibrer : €STR utilisé seulement si la table market_data n'en contient aucun ; reprend la valeur d'attente de l'orchestrateur (packages/server/src/avance/orchestrateur.ts)",
     "date": "2026-11-24"
+  },
+  "bail_depot_garantie_mois_de_loyer": {
+    "valeur": 1,
+    "unite": "mois_de_loyer",
+    "source": "docs/plan-architecture-entreprise.md section 3 (petit atelier : dépôt de 2 500 € pour un loyer de 2 500 €, soit un mois) ; valeur provisoire à calibrer : un bail commercial réel demande souvent 2 à 3 mois, le montant est libre entre les parties",
+    "date": "2026-11-24"
+  },
+  "bail_preavis_mois": {
+    "valeur": 6,
+    "unite": "mois_de_jeu",
+    "source": "Code de commerce, article L145-4 (congé donné au moins six mois à l'avance, par acte d'huissier ou lettre recommandée) ; simplification du jeu : le locataire peut donner congé à tout moment, et non à l'échéance triennale ; valeur à confirmer",
+    "date": "2026-11-24"
+  },
+  "bail_machines_a_la_signature": {
+    "valeur": 2,
+    "unite": "machines",
+    "source": "valeur provisoire à calibrer : reprend la valeur écrite en dur dans l'ancienne route louer-atelier ; l'achat de machines est un ticket à part",
+    "date": "2026-11-24"
+  },
+  "achat_apport_minimal_ratio": {
+    "valeur": 0.2,
+    "unite": "ratio_du_prix",
+    "source": "docs/plan-architecture-entreprise.md section 7 (décision du 24 novembre 2026 : achat des murs à crédit dès l'étape 2 avec 20 % d'apport) ; ordre de grandeur courant pour un crédit immobilier professionnel, à confirmer",
+    "date": "2026-11-24"
+  },
+  "achat_duree_amortissement_construction_mois": {
+    "valeur": 300,
+    "unite": "mois_de_jeu",
+    "source": "valeur provisoire à calibrer : 25 ans, dans la fourchette usuelle de 20 à 40 ans des constructions industrielles (plan comptable général, amortissement par composants) ; la V1 amortit tout le prix, sans distinguer le terrain",
+    "date": "2026-11-24"
+  },
+  "achat_duree_pret_immobilier_mois": {
+    "valeur": 180,
+    "unite": "mois_de_jeu",
+    "source": "valeur provisoire à calibrer : 15 ans, durée proposée par défaut pour le crédit d'achat du local ; elle reste dans les bornes du prêt immobilier (pret_duree_min_mois_immobilier à pret_duree_max_mois_immobilier)",
+    "date": "2026-11-24"
   }
 }

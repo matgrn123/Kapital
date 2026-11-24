@@ -111,13 +111,14 @@ export function conditionsManquantes(
 /**
  * Actions soumises à une étape (docs/plan-architecture-entreprise.md §1) :
  * étape 0 : fixer les prix en ligne, acheter, produire chez un façonnier ;
- * étape 1 : publicité ; étape 2 : emprunter, louer, produire à l'atelier,
+ * étape 1 : publicité ; étape 2 : emprunter, louer, acheter un local, produire à l'atelier,
  * embaucher, vendre aux revendeurs.
  */
 export const DEBLOCAGES_PAR_ACTION = {
   action_marketing: 1,
   demande_pret: 2,
   louer_atelier: 2,
+  achat_local: 2,
   production_atelier: 2,
   embauche: 2,
   vente_revendeur: 2,

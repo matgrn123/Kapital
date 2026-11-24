@@ -39,10 +39,36 @@ export type Salarie = {
   readonly experienceMois: number;
 };
 
+/** Bail d'un local (AE-5) : dépôt de garantie, charges, mois de fin quand le congé est donné. */
+export type Bail = {
+  /** Dépôt versé à la signature (compte 275), restitué à la fin du bail. */
+  readonly depotGarantie: Centimes;
+  /** Charges locatives mensuelles (compte 614). */
+  readonly chargesMensuelles: Centimes;
+  readonly moisSignature: MoisJeu;
+  /** Dernier mois du bail (fin du préavis) ; null tant qu'aucun congé n'est donné. */
+  readonly moisFin: MoisJeu | null;
+};
+
+/** Local acheté à crédit (AE-6) : immobilisation 213 amortie en 2813, plus de loyer. */
+export type AchatLocal = {
+  readonly prixAchat: Centimes;
+  /** Part payée comptant ; le reste est un prêt immobilier. */
+  readonly apport: Centimes;
+  /** Charges d'entretien mensuelles du catalogue (compte 614). */
+  readonly chargesMensuelles: Centimes;
+  readonly moisAchat: MoisJeu;
+  readonly dureeAmortissementMois: number;
+};
+
 export type Atelier = {
   readonly surfaceM2: number;
   readonly loyerMensuel: Centimes;
   readonly nombreMachines: number;
+  /** Absent pour un atelier loué avant AE-5 : loyer seul, pas de dépôt. */
+  readonly bail?: Bail;
+  /** Présent pour un local acheté (loyerMensuel vaut alors 0, pas de bail). */
+  readonly achat?: AchatLocal;
 };
 
 export type EtatMarque = {

@@ -19,6 +19,7 @@ const LIBELLES: Record<ActionVerrouillable, string> = {
   action_marketing: "La publicité",
   demande_pret: "L'emprunt",
   louer_atelier: "La location d'un local",
+  achat_local: "L'achat d'un local",
   production_atelier: "La production à l'atelier",
   embauche: "L'embauche",
   vente_revendeur: "La vente aux revendeurs",

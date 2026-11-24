@@ -12,6 +12,15 @@ import {
   cotisationsPatronales,
   enregistrerPaieMensuelle,
 } from "../salaires/calculs.js";
+import {
+  ecritureAmortissementConstruction,
+  ecritureEntretienLocal,
+} from "../locaux/achat.js";
+import {
+  bailTermineAu,
+  ecritureRestitutionDepot,
+  ecrituresMensuellesBail,
+} from "../locaux/bail.js";
 import { constaterEtape, seuilsEtapesDepuis } from "../etapes/etapes.js";
 import type { Entreprise, Pret } from "../types/entreprise.js";
 import { centimes, type MoisJeu } from "../types/primitifs.js";
@@ -68,6 +77,7 @@ export function cloturerMois(
   let ent = { ...entreprise };
   let gl: GrandLivre = planComptableV1();
   const ecrituresCloture: EcritureComptable[] = [];
+  const atelierDuMois = ent.atelier;
 
   function enr(ecriture: EcritureComptable): void {
     gl = enregistrer(gl, ecriture);
@@ -129,16 +139,22 @@ export function cloturerMois(
   if (ent.atelier !== null) {
     const atelier = ent.atelier;
 
-    if (atelier.loyerMensuel > 0) {
-      enr({
-        id: `loyer_${mois}_${ent.id}`,
-        mois,
-        libelle: `Loyer atelier`,
-        lignes: [
-          { compte: "613", sens: "debit", montant: atelier.loyerMensuel },
-          { compte: "512", sens: "credit", montant: atelier.loyerMensuel },
-        ],
-      });
+    // Loyer (613) et charges locatives (614) ; un atelier d'avant AE-5 n'a pas de charges.
+    for (const ecriture of ecrituresMensuellesBail(
+      ent.id,
+      mois,
+      atelier.loyerMensuel,
+      atelier.bail?.chargesMensuelles ?? centimes(0),
+    )) {
+      enr(ecriture);
+    }
+
+    // Propriétaire (AE-6) : entretien du local (614) et amortissement de la construction (681 / 2813)
+    if (atelier.achat) {
+      const entretien = ecritureEntretienLocal(ent.id, mois, atelier.achat);
+      if (entretien) enr(entretien);
+      const amortConstruction = ecritureAmortissementConstruction(ent.id, mois, atelier.achat);
+      if (amortConstruction) enr(amortConstruction);
     }
 
     // Énergie : 100 kwh/machine/mois
@@ -172,6 +188,13 @@ export function cloturerMois(
         ],
       });
     }
+  }
+
+  // Fin de bail : dernier mois payé, le dépôt de garantie revient, le local est libéré.
+  if (ent.atelier?.bail && bailTermineAu(ent.atelier.bail, mois)) {
+    const restitution = ecritureRestitutionDepot(ent.id, mois, ent.atelier.bail);
+    if (restitution) enr(restitution);
+    ent = { ...ent, atelier: null };
   }
 
   // Prêts : échéances
@@ -292,10 +315,10 @@ export function cloturerMois(
     });
   }
 
-  if (ent.atelier !== null && ent.atelier.loyerMensuel > 0) {
+  if (atelierDuMois !== null && atelierDuMois.loyerMensuel > 0) {
     explications.push({
       cle: "loyer",
-      message: `Loyer atelier : ${(ent.atelier.loyerMensuel / 100).toFixed(2)} €`,
+      message: `Loyer atelier : ${(atelierDuMois.loyerMensuel / 100).toFixed(2)} €`,
     });
   }
 
