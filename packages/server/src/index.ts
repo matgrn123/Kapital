@@ -17,3 +17,11 @@ export {
   type ParamsApprovisionner,
   type ResultatApprovisionner,
 } from "./approvisionnerStock.js";
+export {
+  coutUsineParPiece,
+  ID_GROSSISTE_LOCAL,
+  lancerSerieDeLancement,
+  passerCommandeGrossiste,
+  type ResultatCommandeGrossiste,
+  type ResultatSerieLancement,
+} from "./demarrage/lancement.js";

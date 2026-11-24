@@ -304,5 +304,17 @@
     "unite": "jours",
     "source": "docs/cahier-des-charges-v1.md section 4 (échéance de prêt tous les 30 jours = toutes les 24 h réelles)",
     "date": "2026-11-24"
+  },
+  "serie_lancement_pieces": {
+    "valeur": 100,
+    "unite": "pieces",
+    "source": "docs/cahier-des-charges-v1.md section 4 (démarrage sans attente) ; docs/plan-architecture-entreprise.md section 5 (une marque nouvelle vend 50 à 300 pièces par mois) : valeur de départ à calibrer au banc d'essai",
+    "date": "2026-11-24"
+  },
+  "grossiste_majoration_sur_cout_usine": {
+    "valeur": 0.4,
+    "unite": "ratio",
+    "source": "docs/cahier-des-charges-v1.md section 4 (le grossiste local est plus cher que l'usine : aller vite coûte de la marge) : valeur de départ à calibrer au banc d'essai",
+    "date": "2026-11-24"
   }
 }

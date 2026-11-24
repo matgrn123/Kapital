@@ -307,9 +307,13 @@ export function avancerFlux(
       id: `livraison_fac_${mois}_${livraison.id}`,
       mois,
       libelle: `Livraison façonnier ${livraison.produit} ×${livraison.quantite}`,
+      // Un produit fini acheté tel quel (grossiste) n'a pas de matière à sortir du stock :
+      // le grand livre refuse les lignes à zéro.
       lignes: [
         { compte: "35", sens: "debit", montant: totalPF },
-        { compte: "31", sens: "credit", montant: totalMatiere },
+        ...(totalMatiere > 0
+          ? [{ compte: "31", sens: "credit" as const, montant: totalMatiere }]
+          : []),
         { compte: "401", sens: "credit", montant: totalFacon },
       ],
     });
