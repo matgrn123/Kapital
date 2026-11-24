@@ -316,5 +316,11 @@
     "unite": "ratio",
     "source": "docs/cahier-des-charges-v1.md section 4 (le grossiste local est plus cher que l'usine : aller vite coûte de la marge) : valeur de départ à calibrer au banc d'essai",
     "date": "2026-11-24"
+  },
+  "capital_depart_centimes": {
+    "valeur": 2000000,
+    "unite": "centimes",
+    "source": "docs/cahier-des-charges-v1.md section 3 (capital de départ fixe, 20 000 € d'apport) ; docs/plan-architecture-entreprise.md section 0 (SAS, capital de 20 000 €)",
+    "date": "2026-11-24"
   }
 }
