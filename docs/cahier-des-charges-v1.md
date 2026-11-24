@@ -38,13 +38,21 @@ Le joueur doit apprendre trois choses : calculer un coût de revient et une marg
 - L'écran « Mon Empire » et le profil public du joueur.
 - Un deuxième local, loué ou acheté (atelier plus grand ou petit entrepôt).
 
-**Hors V1** : boutiques en propre, international, maroquinerie cuir, holdings, filiales et rachat d'entreprises (LBO compris), procédures collectives, métiers avocat et fonds, style 3D semi-réaliste, personnages animés, IA conversationnelle, application mobile, paiement.
+**Ajouts du 24 novembre 2026 (tranche boutique et temps)**, détaillés dans `docs/plan-architecture-entreprise.md` :
+
+- Une **tranche boutique** en fin de V1 (étape 3 réduite) : une boutique simple en France, louée ou achetée, avec ses vendeurs et son propre stock. Elle ajoute un troisième canal de vente (boutique) et un nouveau poste (vendeur).
+- Un **démarrage sans attente** : la société naît avec une série de lancement prête à vendre ; ensuite, un grossiste local livre le jour même, plus cher que l'usine.
+- Le monde avance **par pas de 10 minutes réelles** (au lieu de 30) ; les salaires et les loyers sont payés en fin de mois de jeu.
+
+Sur la boutique, ce cahier l'emporte sur `docs/batiments-3d-groupe.md` (sections 3.1 et 12), qui la place en V2.
+
+**Hors V1** : corners de grand magasin et boutiques amiral, international, maroquinerie cuir, holdings, filiales et rachat d'entreprises (LBO compris), procédures collectives, métiers avocat et fonds, style 3D semi-réaliste, personnages animés, IA conversationnelle, application mobile, paiement.
 
 ## 2. Décisions fixées
 
 | Sujet | Décision |
 | --- | --- |
-| Rythme | **Monde persistant asynchrone**. Ratio : 1 jour réel = 1 mois de jeu. Les flux (ventes, production, charges) avancent au prorata du temps réel. Les événements datés (livraisons, échéances, missions) se déclenchent à leur horodatage. Parts de marché recalculées **toutes les 30 min réelles**. Négociations entre joueurs : deadlines en temps réel, **48 h par défaut**. |
+| Rythme | **Monde persistant asynchrone**. Ratio : 1 jour réel = 1 mois de jeu. Les flux (ventes, production, charges) avancent au prorata du temps réel. Les événements datés (livraisons, échéances, missions) se déclenchent à leur horodatage. Une seule horloge pour tous, sans pause ni accéléré. Parts de marché recalculées **toutes les 10 min réelles** (30 avant le 24 novembre 2026). Négociations entre joueurs : deadlines en temps réel, **48 h par défaut**. |
 | Monde | Partagé et persistant dès la V1, sans remise à zéro des fortunes |
 | Support | Ordinateur (écran de 1 280 px et plus) ; sur mobile, consultation seule |
 | Accès | Compte obligatoire (email ou Google) |
@@ -71,7 +79,7 @@ Le joueur doit apprendre trois choses : calculer un coût de revient et une marg
 
 ## 4. Le temps
 
-**Le monde avance en continu, pas par tours.** Les grandeurs qui coulent (ventes, production, charges fixes, décroissance de la marque) progressent au prorata du temps réel écoulé, au ratio **1 jour réel = 1 mois de jeu**. Les joueurs ne sont jamais obligés d'être connectés : quand ils reviennent, leur entreprise a avancé toute seule.
+**Le monde avance en continu, pas par tours.** Les grandeurs qui coulent (ventes, production, énergie, décroissance de la marque) progressent au prorata du temps réel écoulé, au ratio **1 jour réel = 1 mois de jeu**. Les salaires et les loyers, eux, sont payés en fin de mois de jeu, comme dans la réalité (décision du 24 novembre 2026). Les joueurs ne sont jamais obligés d'être connectés : quand ils reviennent, leur entreprise a avancé toute seule.
 
 **Les décisions sont de deux sortes.** Permanentes (prix, effectif, production récurrente) : elles restent en place tant que le joueur ne les change pas. Ponctuelles (une commande, une campagne, une embauche) : elles génèrent un **événement daté** qui se réalisera à son échéance (commande France : livraison dans 24 h réelles = 1 mois jeu ; Portugal : 48 h = 2 mois).
 
@@ -79,14 +87,17 @@ Le joueur doit apprendre trois choses : calculer un coût de revient et une marg
 - Livraisons de matières (délai fournisseur en mois → en heures réelles au ratio 24:1)
 - Fins de production façonnier (même conversion)
 - Échéances de prêt (tous les 30 jours → toutes les 24 h)
+- Paie et loyers (fin de chaque mois de jeu → toutes les 24 h)
 - Clôtures comptables trimestrielles (90 jours → 3 jours)
 - Clôtures annuelles (365 jours → 12 jours)
 - Expiration d'offres entre joueurs (48 h par défaut, en temps réel, pas en jeu)
 - En V2 : livrables des missions d'avocat, sorties de LBO
 
-**Rafraîchissement du marché.** Les parts de marché et les ventes qui en découlent sont recalculées **toutes les 30 minutes réelles** (≈ 15 heures jeu). Assez fin pour que le marché vive visiblement, assez espacé pour que les joueurs non connectés ne soient pas désavantagés.
+**Rafraîchissement du marché.** Les parts de marché et les ventes qui en découlent sont recalculées **toutes les 10 minutes réelles** (≈ 5 heures de jeu ; 30 minutes avant le 24 novembre 2026). Assez fin pour que le marché vive visiblement, assez espacé pour que les joueurs non connectés ne soient pas désavantagés.
 
 **Délais.** Ils se mesurent en mois de jeu dans les règles et se convertissent en temps réel au ratio 24:1 : une commande de tissu arrive 1 à 2 jours réels après ; une production façonnier prend 1 à 2 jours. Les minuteries liées aux négociations entre joueurs restent en **temps réel absolu** (indépendamment du ratio) : une offre est valable 48 h réelles, point.
+
+**Démarrage sans attente** (ajout du 24 novembre 2026). Un nouveau joueur ne doit pas attendre un jour réel sa première livraison. La société naît avec une série de lancement prête à vendre, comme un fondateur qui a préparé sa collection avant d'ouvrir. Ensuite, un grossiste local livre le jour même (48 minutes réelles), plus cher que l'usine : aller vite coûte de la marge.
 
 **Déterminisme et audit.** L'état du monde à n'importe quel instant est reconstructible à partir de la suite des décisions et des événements avec leurs horodatages. Rejouer un intervalle donne exactement le même résultat (critère T13).
 
@@ -133,6 +144,7 @@ Le moteur vit dans `packages/engine`. C'est une **fonction pure** : elle prend l
    - Livraison de matière → stock + dette fournisseur
    - Fin de production façonnier → stock produits finis + dette façonnier
    - Échéance de prêt → amortissement + intérêts
+   - Fin de mois → salaires, cotisations et loyers
    - Clôture trimestrielle TVA → écriture de déclaration
    - Clôture annuelle → impôt sur les sociétés
    - Expiration d'offre entre joueurs → annulation
@@ -140,9 +152,9 @@ Le moteur vit dans `packages/engine`. C'est une **fonction pure** : elle prend l
    - Production atelier : capacité mensuelle × (Δ / durée-mois)
    - Ventes : demande du segment × part de marché × (Δ / durée-mois), limitée par le stock
    - Décroissance exponentielle des jauges de marque
-   - Charges fixes : loyer, salaires, énergie au prorata
+   - Énergie au prorata (salaires et loyers : en fin de mois, voir l'étape 2)
    - Dépenses marketing en cours
-4. Les parts de marché sont recalculées quand Δ franchit un multiple de 30 min réelles.
+4. Les parts de marché sont recalculées quand Δ franchit un multiple de 10 min réelles.
 5. Toutes les écritures comptables sont passées (partie double).
 6. Contrôle de trésorerie : sous zéro, découvert facturé ; trois mois cumulés sous la limite, entreprise en difficulté.
 7. Indicateurs et explications mis à jour.
@@ -284,6 +296,25 @@ Chaque mission se termine par une fiche courte : la notion, puis ce qu'elle a ch
 | 3D-8 | Écran « Mon Empire » et profil public | Un joueur voit l'extérieur et les comptes annuels d'un autre, jamais ses données privées |
 | 3D-9 | Garde-fou monétaire | Après chaque clôture du banc d'essai, aucune richesse n'apparaît sans contrepartie |
 
+**Tickets ajoutés le 24 novembre 2026** (temps et architecture de l'entreprise), détaillés dans `docs/plan-architecture-entreprise.md`. Les tickets TP-1 à TP-3 puis AE-1 à AE-8 passent après le lot C « marché » de `docs/chantier-v1-1.md` ; la tranche boutique (AE-9 à AE-11) passe après 3D-7.
+
+| Ticket | Contenu | Critère d'acceptation |
+| --- | --- | --- |
+| TP-1 | Avance par pas : flux à chaque pas, charges et échéances en fin de mois | Avancer d'un mois en une fois ou pas à pas donne le même état ; bilan équilibré à chaque pas |
+| TP-2 | Horloge commune côté serveur : avance à la demande, plus une tâche planifiée | Deux joueurs voient la même date et le même marché ; l'entreprise d'un absent avance ; le navigateur ne peut pas imposer une date |
+| TP-3 | Démarrage sans attente : série de lancement à la création, grossiste local en stock | Un nouveau joueur met en vente en moins de dix minutes ; le grossiste coûte plus cher que l'usine |
+| AE-1 | Création de la société : apport, capital, étape 0, sans atelier | Après création : 20 000 € en banque = 20 000 € de capital |
+| AE-2 | Étapes : seuils en paramètres sourcés, constat à la clôture, déblocages | Une action verrouillée est refusée, avec la condition manquante |
+| AE-3 | Indicateurs : marge par canal, point mort, besoin en fonds de roulement, prévisionnel à 3 mois, endettement | Valeurs égales au calcul à la main ; doubler les ventes aux revendeurs augmente le besoin en fonds de roulement |
+| AE-4 | Capacité d'emprunt : plafonds en paramètres, objet du prêt (trésorerie, équipement, immobilier), refus chiffré | Demande hors plafond refusée ; intérêts en charge, capital hors résultat |
+| AE-5 | Bail : dépôt de garantie, loyer, charges, préavis (part moteur de 3D-7) | Écritures exactes ; dépôt restitué en fin de bail ; actif = passif |
+| AE-6 | Achat à crédit : apport, immobilisation, prêt immobilier, amortissement | Louer et acheter le même local sur 24 mois donnent les écarts calculés à la main |
+| AE-7 | Embauche et licenciement : poste requis, rendement du débutant, coût de départ | Embaucher sans poste libre n'augmente pas la production |
+| AE-8 | Scénario solo de 24 mois au banc d'essai, de la création aux embauches | Étape 2 atteinte ; bilan équilibré chaque mois ; résultat rejouable à l'identique |
+| AE-9 | Boutique, contenu : bâtiment au catalogue, poste vendeur, canal boutique, paramètres sourcés | Chaque entrée a prix, source et licence |
+| AE-10 | Boutique, exploitation : bail commercial, un mois de travaux, stock transféré, ventes plafonnées par stock et vendeurs | Sans vendeur ou sans stock, aucune vente ; point mort calculé |
+| AE-11 | Missions « Ouvrir ma boutique sans découvert » et « Louer ou acheter » ; banc prolongé à 36 mois | Les missions se valident ; étape 3 atteinte |
+
 Les tickets T01 à T14 ne touchent ni la base ni l'interface : le cœur du jeu est testé avant d'être affiché.
 
 ## 14. Points encore ouverts
@@ -293,4 +324,4 @@ Les tickets T01 à T14 ne touchent ni la base ni l'interface : le cœur du jeu e
 - **Nom de domaine, conditions d'utilisation, politique de confidentialité** : à rédiger avant l'ouverture publique.
 - **Coefficients du modèle d'attraction et taille des segments** : réglés au banc d'essai (T08 et T14).
 - **Durées des négociations entre joueurs** : 48 h par défaut acté. Les cas spéciaux (LBO, levée de fonds) seront tranchés plus tard, probablement 7 j.
-- **Ratio temps** : 1 jour réel = 1 mois de jeu acté. Possibilité d'un « événement saison » accéléré (1 h = 1 mois le temps d'un weekend) à étudier plus tard.
+- **Ratio temps** : 1 jour réel = 1 mois de jeu acté, reconfirmé le 24 novembre 2026 ; à doubler seulement si les testeurs de la recette s'ennuient. Possibilité d'un « événement saison » accéléré (1 h = 1 mois le temps d'un weekend) à étudier plus tard.
