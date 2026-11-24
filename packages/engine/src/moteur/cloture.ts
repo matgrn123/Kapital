@@ -21,6 +21,7 @@ import type {
   ResultatClotureEntreprise,
   VentePerdueParProduit,
 } from "./donneesMois.js";
+import { agregatsDe, sommeAgregats } from "./agregats.js";
 import { incrementerAnciennete, netMouvements512, sommeTvaCollectee } from "./flux.js";
 
 /** Lignes de vente où la demande a dépassé le stock, directes d'abord. */
@@ -52,8 +53,9 @@ function ventesPerduesDepuisCumul(cumul: CumulMois): readonly VentePerdueParProd
  * énergie, amortissement, échéance de prêt, déclaration de TVA, agios,
  * impôt de fin d'exercice, explications, ancienneté des salariés.
  *
- * `entreprise` est l'entreprise après les flux du mois ; `cumul` contient
- * toutes les écritures du mois déjà passées.
+ * `entreprise` est l'entreprise après les flux du mois ; `cumul` contient les
+ * totaux des écritures du mois déjà passées. Le résultat ne liste que les
+ * écritures passées par la clôture elle-même.
  */
 export function cloturerMois(
   entreprise: Entreprise,
@@ -64,11 +66,11 @@ export function cloturerMois(
 ): ResultatClotureEntreprise {
   let ent = { ...entreprise };
   let gl: GrandLivre = planComptableV1();
-  const ecrituresAccumulees: EcritureComptable[] = [...cumul.ecritures];
+  const ecrituresCloture: EcritureComptable[] = [];
 
   function enr(ecriture: EcritureComptable): void {
     gl = enregistrer(gl, ecriture);
-    ecrituresAccumulees.push(ecriture);
+    ecrituresCloture.push(ecriture);
   }
 
   // Paiement TVA du mois précédent (44551 → 512)
@@ -104,7 +106,7 @@ export function cloturerMois(
       salaireBrutMensuel: salarie.salaireBrutMensuel,
       cotisationsPatronales: cotisations,
     });
-    ecrituresAccumulees.push(gl.ecritures[gl.ecritures.length - 1]!);
+    ecrituresCloture.push(gl.ecritures[gl.ecritures.length - 1]!);
 
     // Paiement immédiat : 421+431 débit, 512 crédit
     const totalAPayer = centimes(salarie.salaireBrutMensuel + cotisations);
@@ -188,7 +190,7 @@ export function cloturerMois(
           mois,
           echeance,
         });
-        ecrituresAccumulees.push(gl.ecritures[gl.ecritures.length - 1]!);
+        ecrituresCloture.push(gl.ecritures[gl.ecritures.length - 1]!);
         pretsApres.push({ ...pret, capitalRestant: echeance.capitalRestantApres });
         continue;
       }
@@ -198,7 +200,7 @@ export function cloturerMois(
   ent = { ...ent, prets: pretsApres };
 
   // Déclaration TVA du mois (toute la TVA collectée pendant le mois)
-  const tvaCollecteeCeMois = sommeTvaCollectee(ecrituresAccumulees);
+  const tvaCollecteeCeMois = cumul.agregats.tvaCollectee + sommeTvaCollectee(ecrituresCloture);
   if (tvaCollecteeCeMois > 0) {
     const tvaCollecteeArrondie = centimes(Math.round(tvaCollecteeCeMois));
     enr({
@@ -213,7 +215,8 @@ export function cloturerMois(
   }
 
   // Découvert et agios (sur la trésorerie de début de mois et tous les mouvements du mois)
-  const tresorerieFinAvantStatut = cumul.tresorerieDebutMois + netMouvements512(ecrituresAccumulees);
+  const tresorerieFinAvantStatut =
+    cumul.tresorerieDebutMois + cumul.agregats.net512 + netMouvements512(ecrituresCloture);
 
   let moisDecouvertConsecutifsApres = donnees.moisDecouvertConsecutifs;
   if (tresorerieFinAvantStatut < 0) {
@@ -242,20 +245,8 @@ export function cloturerMois(
 
   // IS de fin d'exercice (tous les 12 mois)
   if (mois > 0 && mois % 12 === 0) {
-    let totalProduits = 0;
-    let totalCharges = 0;
-    for (const ec of ecrituresAccumulees) {
-      for (const ligne of ec.lignes) {
-        const compte = gl.comptes[ligne.compte];
-        if (!compte) continue;
-        if (compte.type === "produits") {
-          totalProduits += ligne.sens === "credit" ? ligne.montant : -ligne.montant;
-        } else if (compte.type === "charges") {
-          totalCharges += ligne.sens === "debit" ? ligne.montant : -ligne.montant;
-        }
-      }
-    }
-    const resultatImposable = centimes(Math.max(0, totalProduits - totalCharges));
+    const totaux = sommeAgregats(cumul.agregats, agregatsDe(ecrituresCloture, gl.comptes));
+    const resultatImposable = centimes(Math.max(0, totaux.produits - totaux.charges));
     const is = calculImpotSocietes(resultatImposable, parametresIsDepuis(params));
 
     if (is > 0) {
@@ -264,7 +255,7 @@ export function cloturerMois(
         mois,
         montant: is,
       });
-      ecrituresAccumulees.push(gl.ecritures[gl.ecritures.length - 1]!);
+      ecrituresCloture.push(gl.ecritures[gl.ecritures.length - 1]!);
       // Paiement immédiat de l'IS
       enr({
         id: `is_pmt_${mois}_${ent.id}`,
@@ -280,7 +271,9 @@ export function cloturerMois(
 
   // Explications
   const ventesPerdues = ventesPerduesDepuisCumul(cumul);
-  const tresorerieFin = centimes(cumul.tresorerieDebutMois + netMouvements512(ecrituresAccumulees));
+  const tresorerieFin = centimes(
+    cumul.tresorerieDebutMois + cumul.agregats.net512 + netMouvements512(ecrituresCloture),
+  );
   const variationTresorerie = centimes(tresorerieFin - cumul.tresorerieDebutMois);
   const signVariation = variationTresorerie >= 0 ? "+" : "";
 
@@ -329,7 +322,7 @@ export function cloturerMois(
 
   return {
     entrepriseApres: ent,
-    ecritures: ecrituresAccumulees,
+    ecritures: ecrituresCloture,
     ventesPerdues,
     explications,
     moisDecouvertConsecutifsApres,

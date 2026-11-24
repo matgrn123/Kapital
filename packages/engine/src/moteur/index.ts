@@ -3,5 +3,5 @@ export * from "./simulate.js";
 export * from "./simulerMois.js";
 export * from "./temps.js";
 export * from "./pas.js";
-export { cumulVide } from "./donneesMois.js";
+export { cumulDemarrantAuPas, cumulVide } from "./donneesMois.js";
 export type { CumulMois, DonneesFinMois, DonneesFlux } from "./donneesMois.js";

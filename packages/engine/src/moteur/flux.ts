@@ -21,6 +21,7 @@ import {
   enregistrerVenteRevendeur,
   prixHtDepuisTtc,
 } from "../ventes/ventes.js";
+import { agregatsDe, sommeAgregats } from "./agregats.js";
 import type { CumulMois, DonneesFlux } from "./donneesMois.js";
 
 // ---------------------------------------------------------------------------
@@ -246,6 +247,8 @@ export function avancerFlux(
   ctx: ContexteFlux,
 ): ResultatFlux {
   const { params, mois, pasDebut, pasFin, pasParMois, suffixeId } = ctx;
+  // Part du mois vécue par l'entreprise depuis son démarrage, à la fin de ce flux
+  const pasVecus = pasFin - cumulAvant.pasDemarrage;
   let ent = { ...entreprise };
   let gl: GrandLivre = planComptableV1();
   const ecritures: EcritureComptable[] = [];
@@ -316,7 +319,7 @@ export function avancerFlux(
   // moins ce qui est déjà produit
   for (const ligne of planProductionDuMois(ent, params)) {
     const dejaProduit = produitParProduit[ligne.produit] ?? 0;
-    const piecesAProduire = Math.floor((ligne.pieces * pasFin) / pasParMois) - dejaProduit;
+    const piecesAProduire = Math.floor((ligne.pieces * pasVecus) / pasParMois) - dejaProduit;
     if (piecesAProduire <= 0) continue;
 
     // Première matière disponible
@@ -394,8 +397,8 @@ export function avancerFlux(
     franges: [],
     evenements: [],
   };
-  // Demande cumulée depuis le début du mois jusqu'à la fin de ce flux
-  const ventesGenerees = calculerVentesMois(mondePourVentes, pasFin / pasParMois, params);
+  // Demande cumulée depuis le démarrage de l'entreprise jusqu'à la fin de ce flux
+  const ventesGenerees = calculerVentesMois(mondePourVentes, pasVecus / pasParMois, params);
 
   const stockRestant = new Map<string, number>();
   for (const sf of ent.stocksFinis) stockRestant.set(sf.produit as string, sf.quantite);
@@ -512,7 +515,7 @@ export function avancerFlux(
     ecritures,
     cumul: {
       ...cumulAvant,
-      ecritures: [...cumulAvant.ecritures, ...ecritures],
+      agregats: sommeAgregats(cumulAvant.agregats, agregatsDe(ecritures, gl.comptes)),
       produitParProduit,
       demandeParLigne,
       serviParLigne,

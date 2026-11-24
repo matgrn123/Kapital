@@ -28,7 +28,7 @@ En cas de contradiction, le cahier des charges l'emporte.
 - Montants en centimes (entiers). Jamais de nombres à virgule pour l'argent.
 - Aucun chiffre métier en dur dans le code : tout vient de `packages/content/parametres-v1.json`, chaque paramètre avec valeur, unité, source et date.
 - Comptabilité en partie double : après chaque opération, actif = passif.
-- Temps : une seule horloge pour tous, sans pause ni accéléré. Le ratio (1 jour réel = 1 mois de jeu) et le pas d'avance du monde (10 minutes réelles) sont des paramètres ; salaires et loyers sont payés en fin de mois de jeu.
+- Temps : une seule horloge pour tous, sans pause ni accéléré. Le ratio (1 jour réel = 1 mois de jeu) et le pas d'avance du monde (1 minute réelle) sont des paramètres ; salaires et loyers sont payés en fin de mois de jeu.
 
 ## Règles 3D
 

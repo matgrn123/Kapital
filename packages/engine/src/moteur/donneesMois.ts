@@ -1,4 +1,5 @@
 import type { EcritureComptable } from "../comptabilite/types.js";
+import { AGREGATS_VIDES, type AgregatsMois } from "./agregats.js";
 import type { Entreprise } from "../types/entreprise.js";
 import type { Centimes, IdMatiere, IdProduit, MoisJeu } from "../types/primitifs.js";
 import type { Explication } from "../types/resultatMois.js";
@@ -69,7 +70,11 @@ export type VentePerdueParProduit = {
   readonly quantiteServie: number;
 };
 
-/** Résultat de la clôture mensuelle pour une entreprise */
+/**
+ * Résultat de la clôture mensuelle pour une entreprise.
+ * `ecritures` ne contient que ce que la clôture a passé (paie, loyer, prêt, TVA...) :
+ * les écritures des flux du mois sont celles de chaque pas.
+ */
 export type ResultatClotureEntreprise = {
   readonly entrepriseApres: Entreprise;
   readonly ecritures: readonly EcritureComptable[];
@@ -97,9 +102,18 @@ export type CumulMois = {
   readonly mois: MoisJeu;
   /** Nombre de pas déjà traités ce mois : empêche de rejouer ou de sauter un pas. */
   readonly pasTraites: number;
+  /**
+   * Rang du pas où l'entreprise a démarré dans ce mois (0 : depuis le début du mois).
+   * Une entreprise créée en cours de mois ne produit et ne vend que la part du mois
+   * écoulée depuis son démarrage, jamais le début de mois qu'elle n'a pas vécu.
+   */
+  readonly pasDemarrage: number;
   readonly tresorerieDebutMois: Centimes;
-  /** Toutes les écritures du mois, pas après pas (sert à la TVA, au découvert, à l'impôt). */
-  readonly ecritures: readonly EcritureComptable[];
+  /**
+   * Totaux des écritures du mois (TVA, banque, produits, charges), pour la clôture.
+   * On ne recopie pas les écritures : elles sont déjà en base, et l'état reste petit.
+   */
+  readonly agregats: AgregatsMois;
   /** Pièces produites par l'atelier ce mois, par produit. */
   readonly produitParProduit: Readonly<Record<string, number>>;
   /** Demande déjà traitée (servie ou perdue), par « produit|canal ». */
@@ -120,8 +134,9 @@ export function cumulVide(mois: MoisJeu, tresorerieDebutMois: Centimes): CumulMo
   return {
     mois,
     pasTraites: 0,
+    pasDemarrage: 0,
     tresorerieDebutMois,
-    ecritures: [],
+    agregats: AGREGATS_VIDES,
     produitParProduit: {},
     demandeParLigne: {},
     serviParLigne: {},
@@ -130,4 +145,16 @@ export function cumulVide(mois: MoisJeu, tresorerieDebutMois: Centimes): CumulMo
     chiffreAffairesHt: 0,
     piecesDirectes: 0,
   };
+}
+
+/** État de départ d'une entreprise qui rejoint le monde au pas `pas` d'un mois en cours. */
+export function cumulDemarrantAuPas(
+  mois: MoisJeu,
+  tresorerieDebutMois: Centimes,
+  pas: number,
+): CumulMois {
+  if (!Number.isInteger(pas) || pas < 0) {
+    throw new Error(`Le pas de démarrage doit être un entier >= 0, reçu ${pas}.`);
+  }
+  return { ...cumulVide(mois, tresorerieDebutMois), pasTraites: pas, pasDemarrage: pas };
 }

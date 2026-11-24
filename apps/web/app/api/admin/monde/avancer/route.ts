@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { simulerMondeComplet } from "@kapital/server";
+import { avancerMondeMaintenant } from "@kapital/server";
 
-// Clôture mensuelle complète : livraisons, production, ventes, charges, TVA,
-// prêts, découvert, IS. Idempotente via la table clotures.
-// Appelée par le cron Vercel quotidien et manuellement depuis /admin.
+// Met tout le monde à jour à l'instant présent : chaque entreprise traite les pas
+// (1 minute réelle) qui lui manquent, absents compris. Idempotent : un pas déjà
+// traité n'est jamais rejoué. Appelée chaque minute par la minuterie Supabase
+// (migration 0021) et une fois par jour par le cron Vercel, en filet de sécurité.
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -30,8 +31,9 @@ async function cloturer(request: Request) {
 
   const admin = createClient(url, serviceKey);
   try {
-    const resultat = await simulerMondeComplet(admin);
-    return NextResponse.json({ ok: true, ...resultat });
+    const resultat = await avancerMondeMaintenant(admin);
+    const erreurs = resultat.entreprises.filter((e) => e.etat === "erreur").length;
+    return NextResponse.json({ ok: erreurs === 0, erreurs, ...resultat });
   } catch (ex) {
     const message = ex instanceof Error ? ex.message : "Erreur inconnue";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -288,9 +288,9 @@
     "date": "2026-11-22"
   },
   "temps_minutes_reelles_par_pas": {
-    "valeur": 10,
+    "valeur": 1,
     "unite": "minutes_reelles",
-    "source": "docs/cahier-des-charges-v1.md section 4 (pas d'avance du monde, décision du 24 novembre 2026)",
+    "source": "docs/cahier-des-charges-v1.md section 4 (pas d'avance du monde : 1 minute réelle, décision du 24 novembre 2026 ; 10 minutes au premier jet)",
     "date": "2026-11-24"
   },
   "temps_minutes_reelles_par_mois_jeu": {

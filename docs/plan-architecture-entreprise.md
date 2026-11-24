@@ -19,8 +19,8 @@ Rôle : architecture de l'entreprise. Chaque ticket de la section 6 se donne tel
 
 **Décision sur le temps (validée par Mathieu le 24 novembre 2026).** Une seule horloge pour tous, sans pause ni accéléré. Ratio du cahier conservé : 1 jour réel = 1 mois de jeu (1 minute réelle = 30 minutes de jeu). C'est un réglage du monde, à doubler seulement si les testeurs s'ennuient.
 
-- Le monde avance en continu, par petits pas de 10 minutes réelles (cahier amendé). Ventes, production et marché bougent à chaque pas ; salaires, loyers, échéances et TVA tombent en fin de mois.
-- Le dépôt calcule aujourd'hui tout le mois en un bloc : à refondre (TP-1, TP-2).
+- Le monde avance en continu, par pas de 1 minute réelle (cahier amendé) : les ventes apparaissent presque une par une, en direct à l'écran. Ventes, production et marché bougent à chaque pas ; salaires, loyers, échéances et TVA tombent en fin de mois.
+- Réalisé : le moteur avance par pas (TP-1) ; l'horloge est commune, côté serveur (TP-2).
 - Aucune attente au démarrage : la société naît avec une série de lancement prête à vendre ; ensuite, un grossiste local livre le jour même, plus cher que l'usine (TP-3).
 - Joueur absent : ses décisions permanentes continuent.
 
@@ -92,7 +92,7 @@ Moteur, serveur et contenu seulement ; l'interface revient au design.
 | Ticket | Contenu | Critère d'acceptation |
 | --- | --- | --- |
 | TP-1 | Avance par pas : flux à chaque pas, charges et échéances en fin de mois | Avancer d'un mois en une fois ou pas à pas donne le même état ; bilan équilibré à chaque pas |
-| TP-2 | Horloge commune côté serveur : avance à la demande, plus une tâche planifiée | Deux joueurs voient la même date et le même marché ; l'entreprise d'un absent avance ; le navigateur ne peut pas imposer une date |
+| TP-2 | Horloge commune côté serveur : minuterie Supabase chaque minute, rattrapage des pas manquants, un pas appliqué en une transaction, diffusion en direct | Deux joueurs voient la même date et le même marché ; l'entreprise d'un absent avance ; un pas n'est jamais compté deux fois ; le navigateur ne peut pas imposer une date |
 | TP-3 | Démarrage sans attente : série de lancement à la création, grossiste local en stock | Un nouveau joueur met en vente en moins de dix minutes ; le grossiste coûte plus cher que l'usine |
 | AE-1 | Création de la société : apport, capital, étape 0, sans atelier | Après création : 20 000 € en banque = 20 000 € de capital |
 | AE-2 | Étapes : seuils en paramètres sourcés, constat à la clôture, déblocages | Une action verrouillée est refusée, avec la condition manquante |

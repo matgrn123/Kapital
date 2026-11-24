@@ -42,7 +42,7 @@ Le joueur doit apprendre trois choses : calculer un coût de revient et une marg
 
 - Une **tranche boutique** en fin de V1 (étape 3 réduite) : une boutique simple en France, louée ou achetée, avec ses vendeurs et son propre stock. Elle ajoute un troisième canal de vente (boutique) et un nouveau poste (vendeur).
 - Un **démarrage sans attente** : la société naît avec une série de lancement prête à vendre ; ensuite, un grossiste local livre le jour même, plus cher que l'usine.
-- Le monde avance **par pas de 10 minutes réelles** (au lieu de 30) ; les salaires et les loyers sont payés en fin de mois de jeu.
+- Le monde avance **par pas de 1 minute réelle** (au lieu de 30 minutes) ; les ventes apparaissent presque une par une, **en direct** à l'écran ; les salaires et les loyers sont payés en fin de mois de jeu.
 
 Sur la boutique, ce cahier l'emporte sur `docs/batiments-3d-groupe.md` (sections 3.1 et 12), qui la place en V2.
 
@@ -52,7 +52,7 @@ Sur la boutique, ce cahier l'emporte sur `docs/batiments-3d-groupe.md` (sections
 
 | Sujet | Décision |
 | --- | --- |
-| Rythme | **Monde persistant asynchrone**. Ratio : 1 jour réel = 1 mois de jeu. Les flux (ventes, production, charges) avancent au prorata du temps réel. Les événements datés (livraisons, échéances, missions) se déclenchent à leur horodatage. Une seule horloge pour tous, sans pause ni accéléré. Parts de marché recalculées **toutes les 10 min réelles** (30 avant le 24 novembre 2026). Négociations entre joueurs : deadlines en temps réel, **48 h par défaut**. |
+| Rythme | **Monde persistant asynchrone**. Ratio : 1 jour réel = 1 mois de jeu. Les flux (ventes, production, charges) avancent au prorata du temps réel. Les événements datés (livraisons, échéances, missions) se déclenchent à leur horodatage. Une seule horloge pour tous, sans pause ni accéléré. Parts de marché recalculées **toutes les minutes réelles** (30 minutes avant le 24 novembre 2026). Négociations entre joueurs : deadlines en temps réel, **48 h par défaut**. |
 | Monde | Partagé et persistant dès la V1, sans remise à zéro des fortunes |
 | Support | Ordinateur (écran de 1 280 px et plus) ; sur mobile, consultation seule |
 | Accès | Compte obligatoire (email ou Google) |
@@ -93,7 +93,7 @@ Sur la boutique, ce cahier l'emporte sur `docs/batiments-3d-groupe.md` (sections
 - Expiration d'offres entre joueurs (48 h par défaut, en temps réel, pas en jeu)
 - En V2 : livrables des missions d'avocat, sorties de LBO
 
-**Rafraîchissement du marché.** Les parts de marché et les ventes qui en découlent sont recalculées **toutes les 10 minutes réelles** (≈ 5 heures de jeu ; 30 minutes avant le 24 novembre 2026). Assez fin pour que le marché vive visiblement, assez espacé pour que les joueurs non connectés ne soient pas désavantagés.
+**Rafraîchissement du marché.** Les parts de marché et les ventes qui en découlent sont recalculées **toutes les minutes réelles** (≈ 30 minutes de jeu ; 30 minutes réelles avant le 24 novembre 2026). Une minuterie Supabase (`pg_cron`) appelle le serveur chaque minute : le monde avance même si personne n'est connecté. Les écritures sont diffusées en direct (Supabase Realtime) : une vente s'affiche sans recharger la page, et chaque joueur ne reçoit que celles de son entreprise. Assez fin pour que le marché vive visiblement, assez espacé pour que les joueurs non connectés ne soient pas désavantagés.
 
 **Délais.** Ils se mesurent en mois de jeu dans les règles et se convertissent en temps réel au ratio 24:1 : une commande de tissu arrive 1 à 2 jours réels après ; une production façonnier prend 1 à 2 jours. Les minuteries liées aux négociations entre joueurs restent en **temps réel absolu** (indépendamment du ratio) : une offre est valable 48 h réelles, point.
 
@@ -154,7 +154,7 @@ Le moteur vit dans `packages/engine`. C'est une **fonction pure** : elle prend l
    - Décroissance exponentielle des jauges de marque
    - Énergie au prorata (salaires et loyers : en fin de mois, voir l'étape 2)
    - Dépenses marketing en cours
-4. Les parts de marché sont recalculées quand Δ franchit un multiple de 10 min réelles.
+4. Les parts de marché sont recalculées quand Δ franchit un multiple de 1 min réelle.
 5. Toutes les écritures comptables sont passées (partie double).
 6. Contrôle de trésorerie : sous zéro, découvert facturé ; trois mois cumulés sous la limite, entreprise en difficulté.
 7. Indicateurs et explications mis à jour.
@@ -301,7 +301,7 @@ Chaque mission se termine par une fiche courte : la notion, puis ce qu'elle a ch
 | Ticket | Contenu | Critère d'acceptation |
 | --- | --- | --- |
 | TP-1 | Avance par pas : flux à chaque pas, charges et échéances en fin de mois | Avancer d'un mois en une fois ou pas à pas donne le même état ; bilan équilibré à chaque pas |
-| TP-2 | Horloge commune côté serveur : avance à la demande, plus une tâche planifiée | Deux joueurs voient la même date et le même marché ; l'entreprise d'un absent avance ; le navigateur ne peut pas imposer une date |
+| TP-2 | Horloge commune côté serveur : minuterie Supabase chaque minute, rattrapage des pas manquants (absents compris), application d'un pas en une transaction, diffusion en direct | Deux joueurs voient la même date et le même marché ; l'entreprise d'un absent avance ; un pas n'est jamais compté deux fois ; le navigateur ne peut pas imposer une date |
 | TP-3 | Démarrage sans attente : série de lancement à la création, grossiste local en stock | Un nouveau joueur met en vente en moins de dix minutes ; le grossiste coûte plus cher que l'usine |
 | AE-1 | Création de la société : apport, capital, étape 0, sans atelier | Après création : 20 000 € en banque = 20 000 € de capital |
 | AE-2 | Étapes : seuils en paramètres sourcés, constat à la clôture, déblocages | Une action verrouillée est refusée, avec la condition manquante |
