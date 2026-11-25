@@ -1,4 +1,9 @@
-import type { DecisionEmbauche } from "@kapital/engine";
+import { chargerParametresV1 } from "@kapital/content";
+import {
+  coefficientsSalairesDepuisParametres,
+  evaluerEmbauche,
+  type DecisionEmbauche,
+} from "@kapital/engine";
 import { ok, refuse, type ContexteValidation, type Result } from "../types.js";
 import { verifierDeblocage } from "./verrouEtape.js";
 
@@ -6,6 +11,8 @@ import { verifierDeblocage } from "./verrouEtape.js";
  * AE-7 : l'embauche sans poste libre est ACCEPTÉE (le joueur peut anticiper), mais le salarié
  * ne produit pas tant qu'aucune machine n'est libre : le moteur ne compte que les artisans qui
  * occupent un poste (artisansAuPoste). Le salaire est dû dans tous les cas.
+ * Refus : salaire sous le SMIC, ou trésorerie sous la réserve (paramètre
+ * embauche_reserve_mois_cout_employeur × coût employeur calculé par le moteur).
  */
 export function validerEmbauche(
   ctx: ContexteValidation,
@@ -13,21 +20,16 @@ export function validerEmbauche(
 ): Result {
   const verrou = verifierDeblocage(ctx, "embauche");
   if (!verrou.ok) return verrou;
-  if (d.salaireBrutMensuel <= 0) {
-    return refuse(
-      "salaire_invalide",
-      `Le salaire brut mensuel doit être strictement positif (reçu ${d.salaireBrutMensuel} centimes).`,
-    );
+  const params = chargerParametresV1();
+  const moisReserve = params["embauche_reserve_mois_cout_employeur"]?.valeur;
+  if (moisReserve === undefined || !(moisReserve >= 0)) {
+    return refuse("parametre_manquant", "Paramètre embauche_reserve_mois_cout_employeur manquant.");
   }
-  // Garde-fou : la trésorerie doit couvrir au moins deux mois de salaire chargé approximatif (×1,42)
-  const coutApproximatif = Math.round(d.salaireBrutMensuel * 1.42);
-  const reserveMinimale = coutApproximatif * 2;
-  if (ctx.entreprise.tresorerie < reserveMinimale) {
-    const manque = reserveMinimale - ctx.entreprise.tresorerie;
-    return refuse(
-      "tresorerie_insuffisante",
-      `Il faut au moins deux mois de paie en réserve avant d'embaucher. Il manque ${(manque / 100).toFixed(2)} €.`,
-    );
-  }
-  return ok();
+  const r = evaluerEmbauche(
+    d.salaireBrutMensuel,
+    ctx.entreprise.tresorerie,
+    coefficientsSalairesDepuisParametres(params),
+    moisReserve,
+  );
+  return r.ok ? ok() : refuse(r.code, r.message);
 }

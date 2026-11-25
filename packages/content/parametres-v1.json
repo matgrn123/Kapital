@@ -508,5 +508,35 @@
     "unite": "booleen",
     "source": "Décision de Mathieu, 25 novembre 2026 : tout débloquer tant que le jeu est en développement (1 = tout est débloqué, 0 = les étapes s'appliquent). À remettre à 0 avant l'ouverture publique, avec la fusion de la PR #60.",
     "date": "2026-11-25"
+  },
+  "pret_prime_risque_endettement_max": {
+    "valeur": 0.006,
+    "unite": "ratio_annuel",
+    "source": "Banque de France, taux des crédits nouveaux aux entreprises par cotation (janvier 2026 : cotation élevée 2,673 %, cotation faible 3,261 %, soit environ 0,6 point d'écart), séries Webstat reprises sur https://fgeerolf.com/data/bdf/PME.html ; voir aussi https://www.banque-france.fr/fr/statistiques/credit/acces-des-entreprises-au-credit-2025-q3 ; prime d'endettement maximale = écart cotation faible / élevée",
+    "date": "2026-11-25"
+  },
+  "pret_prime_risque_ratio_endettement_prime_pleine": {
+    "valeur": 3,
+    "unite": "ratio_dette_sur_tresorerie",
+    "source": "hypothèse de jeu, à valider par Mathieu (la prime d'endettement est pleine quand la dette après prêt atteint 3 fois la trésorerie)",
+    "date": "2026-11-25"
+  },
+  "pret_prime_risque_par_mois_decouvert": {
+    "valeur": 0.005,
+    "unite": "ratio_annuel_par_mois",
+    "source": "hypothèse de jeu, à valider par Mathieu (+0,5 point par mois de découvert consécutif)",
+    "date": "2026-11-25"
+  },
+  "pret_prime_risque_totale_max": {
+    "valeur": 0.02,
+    "unite": "ratio_annuel",
+    "source": "hypothèse de jeu, à valider par Mathieu (prime de risque totale plafonnée à 2 points)",
+    "date": "2026-11-25"
+  },
+  "embauche_reserve_mois_cout_employeur": {
+    "valeur": 2,
+    "unite": "mois",
+    "source": "hypothèse de jeu, à valider par Mathieu (réserve de trésorerie exigée avant une embauche : deux mois de coût employeur, valeur reprise de l'ancien garde-fou de packages/server/src/validations/embauche.ts)",
+    "date": "2026-11-25"
   }
 }

@@ -66,7 +66,15 @@ describe("apercuPret", () => {
     expect(r.evaluation.ok).toBe(true);
     expect(r.simulation).not.toBeNull();
     const s = r.simulation!;
-    expect(s.taux).toBe(tauxPret("tresorerie", 0.02, regles));
+    // Même taux que la route : prime de risque comprise (dette après prêt 1 000 000 / trésorerie 2 000 000).
+    expect(s.taux).toBe(
+      tauxPret("tresorerie", 0.02, regles, {
+        tresorerie: centimes(2_000_000),
+        detteApresPret: centimes(1_000_000),
+        moisDecouvertConsecutifs: 0,
+      }),
+    );
+    expect(s.taux).toBeGreaterThan(tauxPret("tresorerie", 0.02, regles));
     expect(s.echeancier).toHaveLength(12);
     expect(s.coutTotal).toBe(s.echeancier.reduce((t, e) => t + e.montant, 0) - 1_000_000);
     expect(s.ecriture.lignes).toEqual([

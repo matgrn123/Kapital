@@ -25,6 +25,12 @@ const BATIMENT = {
   chargesMensuelles: centimes(PETIT.charges_mensuelles_centimes),
 };
 const ESTR = REGLES.estrDeSecoursAnnuel;
+/** Calculs à la main faits sans prime de risque : on la neutralise ici (testée à part). */
+const PARAMS_SANS_PRIME = {
+  ...PARAMS,
+  pret_prime_risque_endettement_max: { ...PARAMS["pret_prime_risque_endettement_max"]!, valeur: 0 },
+  pret_prime_risque_par_mois_decouvert: { ...PARAMS["pret_prime_risque_par_mois_decouvert"]!, valeur: 0 },
+};
 
 function demande(o: Partial<Parameters<typeof acheterLocal>[0]> = {}): Parameters<typeof acheterLocal>[0] {
   return {
@@ -37,7 +43,7 @@ function demande(o: Partial<Parameters<typeof acheterLocal>[0]> = {}): Parameter
     tresorerie: centimes(100_000_000),
     detteEnCours: centimes(0),
     aDejaUnLocal: false,
-    params: PARAMS,
+    params: PARAMS_SANS_PRIME,
     ...o,
   };
 }
@@ -65,6 +71,17 @@ describe("paramètres de l'achat", () => {
 });
 
 describe("acheterLocal : décision", () => {
+  it("le taux du prêt immobilier inclut la prime de risque (endettement, découvert)", () => {
+    const sans = ok(acheterLocal(demande({ params: PARAMS })));
+    const p = PARAMS;
+    const ratio = sans.montantPret / 100_000_000;
+    const primeEndettement = p["pret_prime_risque_endettement_max"]!.valeur *
+      Math.min(ratio / p["pret_prime_risque_ratio_endettement_prime_pleine"]!.valeur, 1);
+    expect(sans.tauxAnnuel).toBeCloseTo(ESTR + p["pret_marge_estr_immobilier"]!.valeur + primeEndettement, 10);
+    const decouvert = ok(acheterLocal(demande({ params: PARAMS, moisDecouvertConsecutifs: 1 })));
+    expect(decouvert.tauxAnnuel - sans.tauxAnnuel).toBeCloseTo(p["pret_prime_risque_par_mois_decouvert"]!.valeur, 10);
+  });
+
   it("accepte avec l'apport minimal : prêt immobilier de 80 %, taux = €STR + marge immobilier", () => {
     const r = ok(acheterLocal(demande()));
     expect(r.apport).toBe(8_571_400);

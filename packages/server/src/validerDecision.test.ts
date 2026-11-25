@@ -1,3 +1,4 @@
+import { chargerParametresV1 } from "@kapital/content";
 import {
   centimes,
   idEntreprise,
@@ -345,6 +346,30 @@ describe("embauche", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe("tresorerie_insuffisante");
+  });
+
+  it("refuse un salaire sous le SMIC, avec le manque chiffré", () => {
+    const smic = chargerParametresV1()["smic_mensuel_brut"]!.valeur;
+    const r = validerDecision(ctxDefault(), {
+      type: "embauche",
+      poste: "artisan",
+      salaireBrutMensuel: centimes(smic - 100),
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe("salaire_sous_smic");
+      expect(r.message).toMatch(/il manque 1,00 €/);
+    }
+  });
+
+  it("accepte un salaire exactement au SMIC", () => {
+    const smic = chargerParametresV1()["smic_mensuel_brut"]!.valeur;
+    const r = validerDecision(ctxDefault(), {
+      type: "embauche",
+      poste: "artisan",
+      salaireBrutMensuel: centimes(smic),
+    });
+    expect(r.ok).toBe(true);
   });
 });
 

@@ -11,6 +11,7 @@ import {
   coefficientsSalairesDepuisParametres,
   cotisationsPatronales,
   enregistrerPaieMensuelle,
+  ecriturePaiementPaie,
 } from "../salaires/calculs.js";
 import {
   ecritureAmortissementConstruction,
@@ -120,17 +121,15 @@ export function cloturerMois(
     ecrituresCloture.push(gl.ecritures[gl.ecritures.length - 1]!);
 
     // Paiement immédiat : 421+431 débit, 512 crédit
-    const totalAPayer = centimes(salarie.salaireBrutMensuel + cotisations);
-    enr({
-      id: `salaire_pmt_${mois}_${salarie.id}`,
-      mois,
-      libelle: `Paiement salaire ${salarie.id}`,
-      lignes: [
-        { compte: "421", sens: "debit", montant: salarie.salaireBrutMensuel },
-        { compte: "431", sens: "debit", montant: cotisations },
-        { compte: "512", sens: "credit", montant: totalAPayer },
-      ],
-    });
+    enr(
+      ecriturePaiementPaie({
+        idEcriture: `salaire_pmt_${mois}_${salarie.id}`,
+        mois,
+        libelle: `Paiement salaire ${salarie.id}`,
+        salaireBrutMensuel: salarie.salaireBrutMensuel,
+        cotisationsPatronales: cotisations,
+      }),
+    );
 
     totalSalairesBruts += salarie.salaireBrutMensuel;
   }

@@ -87,7 +87,12 @@ export async function POST(request: Request) {
     .maybeSingle();
   const estrLu = Number((estrLigne as { valeur?: unknown } | null)?.valeur);
   const estr = Number.isFinite(estrLu) ? estrLu : regles.estrDeSecoursAnnuel;
-  const taux = tauxPret(objet, estr, regles);
+  // Taux = €STR + marge de l'objet + prime de risque (endettement après prêt, découvert).
+  const taux = tauxPret(objet, estr, regles, {
+    tresorerie: centimes(ctx.companyTresorerie),
+    detteApresPret: centimes(detteEnCours + capital),
+    moisDecouvertConsecutifs: ctx.companyMoisDecouvert,
+  });
 
   const echeancier = genererEcheancier(centimes(capital), taux, duree);
   const minutesParMoisJeu = chargerParametresV1()["temps_minutes_reelles_par_mois_jeu"]?.valeur;

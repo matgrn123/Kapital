@@ -75,7 +75,7 @@ export type ApercuPret = {
 };
 
 export function apercuPret(a: {
-  situation: { tresorerie: number; detteEnCours: number };
+  situation: { tresorerie: number; detteEnCours: number; moisDecouvertConsecutifs?: number };
   objet: ObjetPret;
   capital: number;
   dureeMois: number;
@@ -95,7 +95,12 @@ export function apercuPret(a: {
     Number.isInteger(a.dureeMois) && a.dureeMois >= regle.dureeMinMois && a.dureeMois <= regle.dureeMaxMois;
   if (!simulable) return { evaluation, simulation: null };
 
-  const taux = tauxPret(a.objet, a.estrAnnuel, a.regles);
+  // Même taux que la route demander-pret : €STR + marge de l'objet + prime de risque.
+  const taux = tauxPret(a.objet, a.estrAnnuel, a.regles, {
+    tresorerie: centimes(a.situation.tresorerie),
+    detteApresPret: centimes(a.situation.detteEnCours + a.capital),
+    moisDecouvertConsecutifs: a.situation.moisDecouvertConsecutifs ?? 0,
+  });
   const echeancier = genererEcheancier(centimes(a.capital), taux, a.dureeMois);
   const total = echeancier.reduce((s, e) => s + e.montant, 0);
   // Même écriture que la fonction SQL creer_pret : 512 au débit, 164 au crédit.
@@ -172,6 +177,7 @@ export function apercuAchat(a: {
   estrAnnuel: number;
   tresorerie: number;
   detteEnCours: number;
+  moisDecouvertConsecutifs?: number;
   mois: number;
   params: Parametres;
 }): ApercuAchat {
@@ -192,6 +198,7 @@ export function apercuAchat(a: {
     tauxEstrAnnuel: a.estrAnnuel,
     tresorerie: centimes(a.tresorerie),
     detteEnCours: centimes(a.detteEnCours),
+    moisDecouvertConsecutifs: a.moisDecouvertConsecutifs ?? 0,
     aDejaUnLocal: false,
     params: a.params,
   });

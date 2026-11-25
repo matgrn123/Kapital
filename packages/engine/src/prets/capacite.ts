@@ -30,8 +30,21 @@ export type RegleObjetPret = {
   readonly plafondEndettementMultipleTresorerie: number;
 };
 
+/** Prime de risque ajoutée à la marge de l'objet (cahier des charges : « marge selon le risque »). */
+export type ReglesPrimeRisque = {
+  /** Prime maximale due à l'endettement (ratio annuel). */
+  readonly primeEndettementMax: number;
+  /** Ratio dette après prêt / trésorerie à partir duquel la prime d'endettement est pleine. */
+  readonly ratioEndettementPrimePleine: number;
+  /** Prime par mois de découvert consécutif (ratio annuel). */
+  readonly primeParMoisDecouvert: number;
+  /** Plafond de la prime de risque totale (ratio annuel). */
+  readonly primeTotaleMax: number;
+};
+
 export type ReglesPret = {
   readonly parObjet: Readonly<Record<ObjetPret, RegleObjetPret>>;
+  readonly primeRisque: ReglesPrimeRisque;
   /** €STR annuel utilisé si la table market_data n'en donne aucun. */
   readonly estrDeSecoursAnnuel: number;
 };
@@ -83,13 +96,57 @@ export function reglesPretDepuis(params: Parametres): ReglesPret {
       equipement: regleDepuis(params, "equipement"),
       immobilier: regleDepuis(params, "immobilier"),
     },
+    primeRisque: {
+      primeEndettementMax: lirePositifOuNul(params, "pret_prime_risque_endettement_max"),
+      ratioEndettementPrimePleine: positif(params, "pret_prime_risque_ratio_endettement_prime_pleine"),
+      primeParMoisDecouvert: lirePositifOuNul(params, "pret_prime_risque_par_mois_decouvert"),
+      primeTotaleMax: lirePositifOuNul(params, "pret_prime_risque_totale_max"),
+    },
     estrDeSecoursAnnuel: estr,
   };
 }
 
-/** Taux annuel d'un prêt : €STR du mois (plancher à 0) + marge de l'objet. */
-export function tauxPret(objet: ObjetPret, tauxEstrAnnuel: number, regles: ReglesPret): number {
-  return Math.max(tauxEstrAnnuel, 0) + regles.parObjet[objet].margeSurEstr;
+function lirePositifOuNul(params: Parametres, cle: string): number {
+  const v = lire(params, cle);
+  if (v < 0) throw new ErreurPrets(`${cle} ne peut pas être négatif, reçu ${v}.`);
+  return v;
+}
+
+/** Ce que la banque regarde pour fixer la prime de risque. */
+export type SituationRisque = {
+  readonly tresorerie: Centimes;
+  /** Dette totale APRÈS le prêt demandé (capital restant dû + nouveau capital). */
+  readonly detteApresPret: Centimes;
+  /** Mois de découvert consécutifs (companies.mois_decouvert_consecutifs). */
+  readonly moisDecouvertConsecutifs: number;
+};
+
+/**
+ * Prime de risque (ratio annuel) : croît avec l'endettement (dette après prêt / trésorerie,
+ * pleine au ratio paramétré) et avec chaque mois de découvert, plafonnée.
+ */
+export function primeRisque(s: SituationRisque, regles: ReglesPret): number {
+  const r = regles.primeRisque;
+  const dette = Math.max(s.detteApresPret, 0);
+  const ratio = s.tresorerie > 0 ? dette / s.tresorerie : dette > 0 ? Infinity : 0;
+  const partEndettement = Math.min(ratio / r.ratioEndettementPrimePleine, 1);
+  const primeEndettement = r.primeEndettementMax * partEndettement;
+  const primeDecouvert = r.primeParMoisDecouvert * Math.max(Math.trunc(s.moisDecouvertConsecutifs), 0);
+  return Math.min(primeEndettement + primeDecouvert, r.primeTotaleMax);
+}
+
+/**
+ * Taux annuel d'un prêt : €STR du mois (plancher à 0) + marge de l'objet
+ * + prime de risque de l'entreprise (si sa situation est donnée).
+ */
+export function tauxPret(
+  objet: ObjetPret,
+  tauxEstrAnnuel: number,
+  regles: ReglesPret,
+  risque?: SituationRisque,
+): number {
+  const prime = risque ? primeRisque(risque, regles) : 0;
+  return Math.max(tauxEstrAnnuel, 0) + regles.parObjet[objet].margeSurEstr + prime;
 }
 
 /** Ce que la décision lit de l'entreprise. */
