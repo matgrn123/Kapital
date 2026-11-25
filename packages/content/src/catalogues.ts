@@ -1,4 +1,29 @@
-export type CategorieBatiment = "atelier" | "entrepot" | "bureau" | "prestige";
+export type CategorieBatiment = "atelier" | "entrepot" | "bureau" | "prestige" | "boutique";
+
+/**
+ * Grille d'aménagement d'un bâtiment (cases de 1 m × 1 m, docs/batiments-3d-groupe.md section 4).
+ * L'entrée est une case du bord : c'est d'elle que part le contrôle « chaque poste est atteignable ».
+ */
+export type GrilleBatiment = {
+  largeur: number;
+  hauteur: number;
+  entree_x: number;
+  entree_y: number;
+};
+
+/**
+ * Effet économique d'un bâtiment dans le moteur.
+ * - production : la grille accueille les postes de travail et le stockage ; elle plafonne la production.
+ * - point_de_vente : boutique (canal boutique, AE-9) ; les passants nourrissent la demande du point de vente,
+ *   le bonus s'ajoute chaque mois à la désirabilité de la marque (jauge de 0 à 100).
+ */
+export type EffetBatiment =
+  | { type: "production" }
+  | {
+      type: "point_de_vente";
+      passants_par_jour: number;
+      bonus_desirabilite_points_par_mois: number;
+    };
 
 export type TypeBatiment = {
   id: string;
@@ -12,7 +37,13 @@ export type TypeBatiment = {
   charges_mensuelles_centimes: number;
   etape_debloquee: number;
   source_prix: string;
-  modele_path: string;
+  grille: GrilleBatiment;
+  effet: EffetBatiment;
+  /** D'où viennent les chiffres de l'effet (passants, bonus) ou la règle qu'il applique. */
+  source_effet: string;
+  /** Chemin d'un modèle externe sous /models/, ou null quand le dessin est fait en code (SVG). */
+  modele_path: string | null;
+  /** Licence du rendu : CC0 pour un modèle externe, ou la licence du dessin SVG original du projet. */
   modele_licence: string;
 };
 
@@ -37,6 +68,8 @@ export type TypeModule = {
   amortissement_mois: number;
   effet: EffetModule;
   source_prix: string;
+  /** Chemin d'un modèle externe sous /models/, ou null quand le dessin est fait en code (SVG). */
   modele_path: string | null;
-  modele_licence: string | null;
+  /** Licence du rendu : CC0 pour un modèle externe, ou la licence du dessin SVG original du projet. */
+  modele_licence: string;
 };

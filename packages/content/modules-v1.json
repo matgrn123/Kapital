@@ -10,7 +10,7 @@
     "effet": { "type": "poste_artisan" },
     "source_prix": "docs/referentiel-couts.md section 7 — piqueuse plate industrielle 840–1 750 € HT, Atelier Machine à Coudre / Glasman ; milieu de fourchette",
     "modele_path": null,
-    "modele_licence": null
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
   },
   {
     "id": "poste_couture_surjeteuse",
@@ -26,7 +26,7 @@
     },
     "source_prix": "docs/referentiel-couts.md section 7 — machines industrielles spécialisées 800–9 000 € HT, Hellopro ; estimation basse-gamme pour surjeteuse industrielle",
     "modele_path": null,
-    "modele_licence": null
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
   },
   {
     "id": "table_coupe_simple",
@@ -43,7 +43,7 @@
     },
     "source_prix": "docs/referentiel-couts.md section 7 — machines industrielles spécialisées, estimation table de coupe professionnelle 800–1 500 €",
     "modele_path": null,
-    "modele_licence": null
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
   },
   {
     "id": "zone_stockage_etageres",
@@ -59,7 +59,7 @@
     },
     "source_prix": "estimation mobilier industriel de stockage 300–500 € l'unité",
     "modele_path": null,
-    "modele_licence": null
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
   },
   {
     "id": "bureau_simple",
@@ -72,7 +72,7 @@
     "effet": { "type": "bureau" },
     "source_prix": "estimation poste de travail bureau 400–600 € (bureau + chaise + rangement)",
     "modele_path": null,
-    "modele_licence": null
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
   },
   {
     "id": "salle_reunion_petite",
@@ -85,7 +85,7 @@
     "effet": { "type": "salle_reunion" },
     "source_prix": "estimation mobilier salle de réunion 4 personnes 2 000–3 000 €",
     "modele_path": null,
-    "modele_licence": null
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
   },
   {
     "id": "showroom_compact",
@@ -101,7 +101,7 @@
     },
     "source_prix": "estimation aménagement showroom professionnel textile 3 000–8 000 € ; milieu de fourchette",
     "modele_path": null,
-    "modele_licence": null
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
   },
   {
     "id": "salle_pause",
@@ -117,6 +117,6 @@
     },
     "source_prix": "estimation mobilier salle de pause 1 000–2 000 € (réfrigérateur, table, chaises, micro-ondes)",
     "modele_path": null,
-    "modele_licence": null
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
   }
 ]

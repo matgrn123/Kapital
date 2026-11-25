@@ -105,6 +105,19 @@ Comparaison : au Portugal, 8 à 14 € de l'heure donnent 0,13 à 0,23 € la mi
 | Machines industrielles spécialisées | 800 – 9 000 € | [Hellopro](https://www.hellopro.fr/machine-a-coudre-industrielle-9000518-fr-1-feuille.html) |
 | Électricité professionnelle (tarif bleu, base) | ≈ 0,16 € / kWh hors TVA | [Capitole Énergie](https://capitole-energie.com/2026/02/26/tarif-electricite-professionnel/) |
 
+## 7 bis. Boutique (tranche AE-9, relevé du 25 novembre 2026)
+
+| Poste | Montant | Source |
+| --- | --- | --- |
+| Local commercial, France | 90 – 600 € / m² / an, moyenne 204 € | [UnEmplacement](https://unemplacement.com/local-commercial), estimation au 1er novembre 2026 sur plus de 98 000 annonces |
+| Charges en galerie couverte / hors galerie | ≈ 80 – 120 / ≈ 20 – 40 € / m² / an | [Qoridor](https://blog.qoridor.fr/article/retail-park) (site spécialisé, ordre de grandeur à confirmer) |
+| Dépôt de garantie du bail commercial | 3 mois de loyer au plus (baux conclus ou renouvelés depuis le 26 mai 2026) | Code de commerce, art. L145-40, modifié par la loi n° 2026-403 du 26 mai 2026 ([notaires.fr](https://www.notaires.fr/fr/actualites/baux-commerciaux-les-nouveautes-de-la-loi-ndeg-2026-403-du-26-mai-2026-de-simplification-de-la-vie-economique-sve)) |
+| Travaux et aménagement d'une boutique de vêtements | ≈ 480 € / m² (55 000 € pour ≈ 115 m²) ; 1 000 – 1 500 € / m² pour une rénovation complète | [Modèles de business plan](https://modelesdebusinessplan.com/blogs/infos/budget-ouvrir-magasin-vetement) (2026), [Companeo](https://www.companeo.com/travaux-et-amenagement/guide/devis-travaux-:-l-evaluation-de-votre-budget) (2021) |
+| Commerce spécialisé d'habillement-chaussures | 31,6 Md€ de chiffre d'affaires, 154 800 salariés en équivalent temps plein, magasin moyen de 170 m² et ≈ 500 000 € de chiffre d'affaires (2010) ; soit ≈ 17 000 € par mois et par vendeur (calcul) | [Insee Première n° 1459](https://www.insee.fr/fr/statistiques/1281038) (2013) |
+| Salaire d'un vendeur | SMIC (1 867,02 € brut), même coût qu'un artisan ; convention collective du commerce de détail de l'habillement (IDCC 1483), avenant n° 29 applicable au 1er avril 2026 | [Urssaf](https://www.urssaf.fr/accueil/outils-documentation/taux-baremes/montant-smic.html), [Légisocial](https://www.legisocial.fr/conventions-collectives-nationales/1483-commerce-de-detail-habillement-et-textiles/) |
+
+Ce que ça change dans le jeu : la boutique ajoute des frais fixes (loyer, charges, vendeur) et une immobilisation (les travaux, amortis). Le dépôt de garantie n'est pas une charge : il reste à l'actif et revient en fin de bail. Les passants par emplacement et l'effet sur la désirabilité n'ont pas de source publique précise : ce sont des valeurs de départ, à régler au banc d'essai.
+
 ## 8. Vente et logistique
 
 | Poste | Montant | Source |
@@ -133,3 +146,4 @@ Comparaison : au Portugal, 8 à 14 € de l'heure donnent 0,13 à 0,23 € la mi
 - Les temps de fabrication en maroquinerie et les prix des cuirs haut de gamme.
 - Les consommations de tissu par modèle et les taux de chute.
 - Le coût minute de 0,60 € est un calcul : le confronter à des devis d'ateliers français.
+- Boutique : grille de l'avenant n° 29 (IDCC 1483) pour le premier niveau de vendeur ; texte officiel de l'article L145-40 sur Légifrance ; loyers par type d'emplacement (rue n° 1, galerie, quartier) dans une étude de valeurs locatives ; passants par jour par emplacement.

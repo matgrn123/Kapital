@@ -11,8 +11,18 @@
     "charges_mensuelles_centimes": 105000,
     "etape_debloquee": 0,
     "source_prix": "docs/referentiel-couts.md section 7 — local d'activité IDF 200 €/m²/an, Arthur Loyd / SeLoger Bureaux & Commerces ; achat estimé au taux de capitalisation 7 % sur loyer annuel",
-    "modele_path": "/models/Building_Small_1.gltf",
-    "modele_licence": "CC0 - Quaternius Downtown City MegaKit (https://quaternius.com/packs/downtowncitymegakit.html)"
+    "grille": {
+      "largeur": 10,
+      "hauteur": 5,
+      "entree_x": 0,
+      "entree_y": 3
+    },
+    "effet": {
+      "type": "production"
+    },
+    "source_effet": "docs/plan-architecture-entreprise.md section 3 (la surface plafonne les postes et le stock ; un poste de couture posé = un artisan qui produit) ; docs/batiments-3d-groupe.md section 4.1 ; grille : valeurs par défaut de public.workshops (supabase/migrations/0019_plan_atelier.sql, 10 × 5 cases, entrée en 0,3), appliquées à tout atelier créé par signer_bail (0027) ou acheter_local (0028)",
+    "modele_path": null,
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
   },
   {
     "id": "atelier_specialise",
@@ -26,8 +36,18 @@
     "charges_mensuelles_centimes": 140000,
     "etape_debloquee": 1,
     "source_prix": "docs/referentiel-couts.md section 7 — local d'activité IDF 180 €/m²/an, Arthur Loyd / SeLoger Bureaux & Commerces ; achat estimé au taux de capitalisation 7 % sur loyer annuel",
-    "modele_path": "/models/Building_Medium_2_001.gltf",
-    "modele_licence": "CC0 - Quaternius Downtown City MegaKit (https://quaternius.com/packs/downtowncitymegakit.html)"
+    "grille": {
+      "largeur": 10,
+      "hauteur": 5,
+      "entree_x": 0,
+      "entree_y": 3
+    },
+    "effet": {
+      "type": "production"
+    },
+    "source_effet": "docs/plan-architecture-entreprise.md section 3 (la surface plafonne les postes et le stock ; un poste de couture posé = un artisan qui produit) ; docs/batiments-3d-groupe.md section 4.1 ; grille : valeurs par défaut de public.workshops (supabase/migrations/0019_plan_atelier.sql, 10 × 5 cases, entrée en 0,3), appliquées à tout atelier créé par signer_bail (0027) ou acheter_local (0028)",
+    "modele_path": null,
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
   },
   {
     "id": "batiment_industriel",
@@ -41,7 +61,98 @@
     "charges_mensuelles_centimes": 224000,
     "etape_debloquee": 2,
     "source_prix": "docs/referentiel-couts.md section 7 — local d'activité IDF 180 €/m²/an, Arthur Loyd / SeLoger Bureaux & Commerces ; achat estimé au taux de capitalisation 7 % sur loyer annuel",
-    "modele_path": "/models/Building_Large_2.gltf",
-    "modele_licence": "CC0 - Quaternius Downtown City MegaKit (https://quaternius.com/packs/downtowncitymegakit.html)"
+    "grille": {
+      "largeur": 10,
+      "hauteur": 5,
+      "entree_x": 0,
+      "entree_y": 3
+    },
+    "effet": {
+      "type": "production"
+    },
+    "source_effet": "docs/plan-architecture-entreprise.md section 3 (la surface plafonne les postes et le stock ; un poste de couture posé = un artisan qui produit) ; docs/batiments-3d-groupe.md section 4.1 ; grille : valeurs par défaut de public.workshops (supabase/migrations/0019_plan_atelier.sql, 10 × 5 cases, entrée en 0,3), appliquées à tout atelier créé par signer_bail (0027) ou acheter_local (0028)",
+    "modele_path": null,
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
+  },
+  {
+    "id": "boutique_quartier_createurs",
+    "nom": "Boutique, quartier des créateurs",
+    "categorie": "boutique",
+    "surface_m2": 45,
+    "nb_etages": 1,
+    "zones_amenageables": ["vente", "reserve"],
+    "prix_achat_centimes": 13114286,
+    "loyer_mensuel_centimes": 76500,
+    "charges_mensuelles_centimes": 11250,
+    "etape_debloquee": 3,
+    "source_prix": "loyer 204 €/m²/an : moyenne nationale, docs/referentiel-couts.md section 7 — local commercial (boutique), France : 90 – 600 €/m²/an, moyenne 204 €/m²/an (UnEmplacement.com, estimation au 1er novembre 2026, https://unemplacement.com/local-commercial) ; charges 30 €/m²/an : valeur provisoire à calibrer, bas de l'ordre de grandeur 20 – 40 €/m²/an relevé pour les commerces hors galerie couverte (Qoridor, « Retail park : définition, loyers et investissement 2026 », https://blog.qoridor.fr/article/retail-park) ; achat estimé au taux de capitalisation 7 % sur loyer annuel (même méthode que les ateliers) ; grille : formule de la migration 0019 (largeur = ⌈√(2 × surface)⌉, hauteur = ⌈surface / largeur⌉, entrée au milieu du mur gauche)",
+    "grille": {
+      "largeur": 10,
+      "hauteur": 5,
+      "entree_x": 0,
+      "entree_y": 3
+    },
+    "effet": {
+      "type": "point_de_vente",
+      "passants_par_jour": 2500,
+      "bonus_desirabilite_points_par_mois": 0.8
+    },
+    "source_effet": "Passants par jour : valeur provisoire à calibrer, aucune source publique par emplacement ; ordre de grandeur tiré de l'Observatoire des mobilités ANCT 2023 (Mytraffic, centres-villes Action cœur de ville : environ 1 million de visites par mois, soit ≈ 33 000 par jour pour tout un centre-ville, https://agence-cohesion-territoires.gouv.fr/sites/default/files/2024-04/Observatoire%20des%20mobilit%C3%A9s%202023%20%2817%29.pdf), réparti entre les rues. Rue calme mais recherchée : peu de passants (≈ 2 500), plus d'image. Bonus de désirabilité : valeur provisoire à calibrer ; avec la décroissance de 2 % par mois (decroissance_desirabilite_mois), un bonus de b points par mois plafonne son apport à b / 0,02 points (0,8 → 40 ; 0,6 → 30 ; 0,2 → 10).",
+    "modele_path": null,
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
+  },
+  {
+    "id": "boutique_galerie_marchande",
+    "nom": "Boutique en galerie marchande",
+    "categorie": "boutique",
+    "surface_m2": 50,
+    "nb_etages": 1,
+    "zones_amenageables": ["vente", "reserve"],
+    "prix_achat_centimes": 28571429,
+    "loyer_mensuel_centimes": 166667,
+    "charges_mensuelles_centimes": 41667,
+    "etape_debloquee": 3,
+    "source_prix": "loyer 400 €/m²/an : valeur provisoire à calibrer, entre la moyenne (204) et le haut (600) de la fourchette, docs/referentiel-couts.md section 7 — local commercial (boutique), France : 90 – 600 €/m²/an, moyenne 204 €/m²/an (UnEmplacement.com, estimation au 1er novembre 2026, https://unemplacement.com/local-commercial) ; charges 100 €/m²/an : milieu de la fourchette 80 – 120 €/m²/an des galeries couvertes (Qoridor, « Retail park : définition, loyers et investissement 2026 », https://blog.qoridor.fr/article/retail-park) ; ordre de grandeur d'un site spécialisé, à confirmer ; achat estimé au taux de capitalisation 7 % sur loyer annuel (même méthode que les ateliers) ; grille : formule de la migration 0019 (largeur = ⌈√(2 × surface)⌉, hauteur = ⌈surface / largeur⌉, entrée au milieu du mur gauche)",
+    "grille": {
+      "largeur": 10,
+      "hauteur": 5,
+      "entree_x": 0,
+      "entree_y": 3
+    },
+    "effet": {
+      "type": "point_de_vente",
+      "passants_par_jour": 6000,
+      "bonus_desirabilite_points_par_mois": 0.2
+    },
+    "source_effet": "Passants par jour : valeur provisoire à calibrer, aucune source publique par emplacement ; ordre de grandeur tiré de l'Observatoire des mobilités ANCT 2023 (Mytraffic, centres-villes Action cœur de ville : environ 1 million de visites par mois, soit ≈ 33 000 par jour pour tout un centre-ville, https://agence-cohesion-territoires.gouv.fr/sites/default/files/2024-04/Observatoire%20des%20mobilit%C3%A9s%202023%20%2817%29.pdf), réparti entre les rues. Galerie : flux régulier (≈ 6 000), peu d'effet d'image. Bonus de désirabilité : valeur provisoire à calibrer ; avec la décroissance de 2 % par mois (decroissance_desirabilite_mois), un bonus de b points par mois plafonne son apport à b / 0,02 points (0,8 → 40 ; 0,6 → 30 ; 0,2 → 10).",
+    "modele_path": null,
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
+  },
+  {
+    "id": "boutique_rue_commercante",
+    "nom": "Boutique, rue commerçante (emplacement n° 1)",
+    "categorie": "boutique",
+    "surface_m2": 60,
+    "nb_etages": 1,
+    "zones_amenageables": ["vente", "reserve"],
+    "prix_achat_centimes": 51428571,
+    "loyer_mensuel_centimes": 300000,
+    "charges_mensuelles_centimes": 15000,
+    "etape_debloquee": 3,
+    "source_prix": "loyer 600 €/m²/an : haut de la fourchette, docs/referentiel-couts.md section 7 — local commercial (boutique), France : 90 – 600 €/m²/an, moyenne 204 €/m²/an (UnEmplacement.com, estimation au 1er novembre 2026, https://unemplacement.com/local-commercial) ; charges 30 €/m²/an : valeur provisoire à calibrer, bas de l'ordre de grandeur 20 – 40 €/m²/an relevé pour les commerces hors galerie couverte (Qoridor, « Retail park : définition, loyers et investissement 2026 », https://blog.qoridor.fr/article/retail-park) ; achat estimé au taux de capitalisation 7 % sur loyer annuel (même méthode que les ateliers) ; grille : formule de la migration 0019 (largeur = ⌈√(2 × surface)⌉, hauteur = ⌈surface / largeur⌉, entrée au milieu du mur gauche)",
+    "grille": {
+      "largeur": 11,
+      "hauteur": 6,
+      "entree_x": 0,
+      "entree_y": 3
+    },
+    "effet": {
+      "type": "point_de_vente",
+      "passants_par_jour": 10000,
+      "bonus_desirabilite_points_par_mois": 0.6
+    },
+    "source_effet": "Passants par jour : valeur provisoire à calibrer, aucune source publique par emplacement ; ordre de grandeur tiré de l'Observatoire des mobilités ANCT 2023 (Mytraffic, centres-villes Action cœur de ville : environ 1 million de visites par mois, soit ≈ 33 000 par jour pour tout un centre-ville, https://agence-cohesion-territoires.gouv.fr/sites/default/files/2024-04/Observatoire%20des%20mobilit%C3%A9s%202023%20%2817%29.pdf), réparti entre les rues. Emplacement n° 1 : le plus de passants (≈ 10 000). Bonus de désirabilité : valeur provisoire à calibrer ; avec la décroissance de 2 % par mois (decroissance_desirabilite_mois), un bonus de b points par mois plafonne son apport à b / 0,02 points (0,8 → 40 ; 0,6 → 30 ; 0,2 → 10).",
+    "modele_path": null,
+    "modele_licence": "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe"
   }
 ]
