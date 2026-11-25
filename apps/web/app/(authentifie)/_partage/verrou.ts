@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { chargerParametresV1 } from "@kapital/content";
 import {
   centimes,
+  etapeEffective,
   seuilsEtapesDepuis,
   verrouPour,
   type ActionVerrouillable,
@@ -26,7 +27,9 @@ export async function lireVerrou(
     .select("etape, tresorerie_centimes, pieces_vendues_total, chiffre_affaires_cumule_ht_centimes")
     .eq("id", companyId)
     .maybeSingle();
-  const etape = Number(data?.etape ?? 0);
+  const params = chargerParametresV1();
+  // Réglage de développement : peut compter la société comme étant à l'étape 2.
+  const etape = etapeEffective(Number(data?.etape ?? 0) as EtapeEntreprise, params);
   const tresorerie = Number(data?.tresorerie_centimes ?? 0);
   const v = verrouPour(
     action,
@@ -38,7 +41,7 @@ export async function lireVerrou(
       },
       tresorerie: centimes(tresorerie),
     },
-    seuilsEtapesDepuis(chargerParametresV1()),
+    seuilsEtapesDepuis(params),
   );
   return {
     verrou: v

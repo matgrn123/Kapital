@@ -4,6 +4,8 @@ import { centimes } from "../types/primitifs.js";
 import {
   ACTIONS_VERROUILLABLES,
   conditionsManquantes,
+  deblocageTotalActif,
+  etapeEffective,
   constaterEtape,
   etapeRequisePour,
   ErreurEtapes,
@@ -131,5 +133,44 @@ describe("déblocages par étape", () => {
   it("action débloquée : aucun verrou", () => {
     expect(verrouPour("action_marketing", etat({ etape: 1 }), SEUILS)).toBeNull();
     expect(verrouPour("embauche", etat({ etape: 2 }), SEUILS)).toBeNull();
+  });
+});
+
+describe("déblocage total de développement", () => {
+  const AVEC = { ...PARAMS, deblocage_total_developpement: { ...PARAMS["seuil_etape_1_pieces_vendues"]!, valeur: 1 } };
+  const SANS = { ...PARAMS, deblocage_total_developpement: { ...PARAMS["seuil_etape_1_pieces_vendues"]!, valeur: 0 } };
+
+  it("est lu dans les paramètres, jamais en dur", () => {
+    expect(deblocageTotalActif(AVEC)).toBe(true);
+    expect(deblocageTotalActif(SANS)).toBe(false);
+  });
+
+  it("est inactif si le paramètre est absent (comportement normal du jeu)", () => {
+    const { deblocage_total_developpement: _retire, ...autres } = AVEC;
+    expect(deblocageTotalActif(autres)).toBe(false);
+  });
+
+  it("actif : toute société compte comme étant à l'étape 2, donc plus aucune action verrouillée", () => {
+    expect(etapeEffective(0, AVEC)).toBe(2);
+    for (const action of ACTIONS_VERROUILLABLES) {
+      expect(verrouPour(action, etat({ etape: etapeEffective(0, AVEC) }), SEUILS)).toBeNull();
+    }
+  });
+
+  it("inactif : l'étape réelle est conservée et les verrous s'appliquent", () => {
+    expect(etapeEffective(0, SANS)).toBe(0);
+    expect(etapeEffective(1, SANS)).toBe(1);
+    expect(verrouPour("demande_pret", etat({ etape: etapeEffective(0, SANS) }), SEUILS)).not.toBeNull();
+  });
+
+  it("ne fait jamais descendre une étape", () => {
+    expect(etapeEffective(2, AVEC)).toBe(2);
+    expect(etapeEffective(2, SANS)).toBe(2);
+  });
+
+  it("le fichier de paramètres livré porte le réglage, avec une source", () => {
+    const p = PARAMS["deblocage_total_developpement"];
+    expect(p).toBeDefined();
+    expect(p!.source.length).toBeGreaterThan(10);
   });
 });
