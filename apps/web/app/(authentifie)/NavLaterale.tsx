@@ -70,8 +70,8 @@ export function NavLaterale() {
                     aria-current={actif ? "page" : undefined}
                     className={`flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition ${
                       actif
-                        ? "bg-[color:var(--color-accent)] font-medium text-white"
-                        : "text-[color:var(--color-nav-texte)] hover:bg-white/10 hover:text-white"
+                        ? "bg-accent-soft font-semibold text-accent"
+                        : "text-[color:var(--color-nav-texte)] hover:bg-surface-2"
                     }`}
                   >
                     <svg

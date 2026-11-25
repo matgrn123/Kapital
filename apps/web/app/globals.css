@@ -1,51 +1,155 @@
 @import "tailwindcss";
 
+/* Design V2 (docs/maquette/kapital-maquette-v2.html) : denim (indigo) et fil
+   d'or (ocre). Les jetons de la maquette sont des variables CSS qui changent
+   avec le thème ; Tailwind les expose sous forme de couleurs (bg-surface,
+   text-accent...). Les anciens noms (noir, g-200...) pointent vers les
+   nouveaux, pour que tous les écrans existants suivent le thème. */
+:root {
+  --bg: #eceff3;
+  --surface: #ffffff;
+  --surface-2: #f4f6f9;
+  --ink: #17202e;
+  --muted: #5b6576;
+  --line: #d6dce4;
+  --accent: #2d4a9e;
+  --accent-soft: #e2e8f7;
+  --on-accent: #ffffff;
+  --thread: #9a6410;
+  --thread-soft: #f5ead3;
+  --good: #1f7a49;
+  --good-soft: #ddf0e4;
+  --bad: #b0362a;
+  --bad-soft: #f7e0dc;
+  --shadow: 0 1px 2px rgb(23 32 46 / 0.06), 0 6px 20px rgb(23 32 46 / 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f131a;
+    --surface: #171d26;
+    --surface-2: #1d2430;
+    --ink: #e5e9f0;
+    --muted: #9aa3b2;
+    --line: #2b3443;
+    --accent: #8ea6f2;
+    --accent-soft: #222c48;
+    --on-accent: #0f131a;
+    --thread: #e2ac52;
+    --thread-soft: #352a17;
+    --good: #5cc48b;
+    --good-soft: #163525;
+    --bad: #f08575;
+    --bad-soft: #3b1e1a;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.25);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f131a;
+  --surface: #171d26;
+  --surface-2: #1d2430;
+  --ink: #e5e9f0;
+  --muted: #9aa3b2;
+  --line: #2b3443;
+  --accent: #8ea6f2;
+  --accent-soft: #222c48;
+  --on-accent: #0f131a;
+  --thread: #e2ac52;
+  --thread-soft: #352a17;
+  --good: #5cc48b;
+  --good-soft: #163525;
+  --bad: #f08575;
+  --bad-soft: #3b1e1a;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.25);
+  color-scheme: dark;
+}
+
 @theme inline {
-  /* Encre bleu nuit plutôt que noir pur, fonds légèrement chauds : un
-     tableau de bord de jeu de gestion, pas un formulaire administratif. */
-  --color-noir: #14213d;
-  --color-blanc: #ffffff;
-  --color-g-100: #f3f1ec;
-  --color-g-200: #e4e0d8;
-  --color-g-300: #cfcabf;
-  --color-g-500: #6f6b63;
-  --color-g-700: #3f3c37;
-  --color-g-900: #1c1a17;
-  --color-erreur: #b42318;
-  --color-succes: #18794e;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-thread: var(--thread);
+  --color-thread-soft: var(--thread-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --shadow-carte: var(--shadow);
 
-  --color-fond: #faf8f4;
-  --color-carte: #ffffff;
-  --color-accent: #1f7a5c;
-  --color-accent-clair: #7fd1b0;
-  --color-nav: #14213d;
-  --color-nav-texte: #c3cbdb;
-  --color-nav-discret: #7d89a3;
+  /* Anciens noms, conservés pour les écrans pas encore repris. */
+  --color-noir: var(--ink);
+  --color-blanc: var(--surface);
+  --color-g-100: var(--surface-2);
+  --color-g-200: var(--line);
+  --color-g-300: var(--line);
+  --color-g-500: var(--muted);
+  --color-g-700: var(--muted);
+  --color-g-900: var(--ink);
+  --color-erreur: var(--bad);
+  --color-succes: var(--good);
+  --color-fond: var(--bg);
+  --color-carte: var(--surface);
+  --color-accent-clair: var(--thread);
+  --color-nav: var(--surface);
+  --color-nav-texte: var(--ink);
+  --color-nav-discret: var(--muted);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-bricolage), "Segoe UI", system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, Menlo, monospace;
 }
 
 html,
 body {
-  background: var(--color-blanc);
-  color: var(--color-noir);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 /* Dans la couche de base, pour qu'une couleur de bordure demandée par un
    écran (erreur, menu sombre) ne soit pas écrasée par cette valeur par défaut. */
 @layer base {
   * {
-    border-color: var(--color-g-200);
+    border-color: var(--line);
   }
 }
 
 /* Les cartes se détachent du fond : blanches, avec une ombre très légère. */
 main .rounded-md.border:not([class*="bg-"]):not(.border-dashed) {
-  background: var(--color-carte);
-  box-shadow: 0 1px 2px rgb(20 33 61 / 0.04);
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 input,
@@ -56,6 +160,6 @@ button {
 /* Les chiffres passent en mono partout */
 .chiffre,
 .mono {
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }

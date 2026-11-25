@@ -60,17 +60,17 @@ export default async function LayoutAuthentifie({
   return (
     <div className="flex h-screen overflow-hidden">
       <aside className="flex w-56 shrink-0 flex-col bg-[color:var(--color-nav)] text-[color:var(--color-nav-texte)]">
-        <div className="border-b border-white/10 px-5 py-4">
+        <div className="border-b border-line px-5 py-4">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-[color:var(--color-accent-clair)]">
             Kapital
           </p>
-          <p className="truncate text-sm font-semibold text-white">{entreprise.nom}</p>
+          <p className="truncate text-sm font-semibold text-ink">{entreprise.nom}</p>
         </div>
         <NavLaterale />
-        <div className="border-t border-white/10 px-5 py-3 text-xs">
+        <div className="border-t border-line px-5 py-3 text-xs">
           <p className="truncate">{profil?.pseudo ?? user.email}</p>
           {profil?.role === "admin" && (
-            <Link href="/admin" className="mt-2 block underline hover:text-white">
+            <Link href="/admin" className="mt-2 block underline hover:text-ink">
               Administration
             </Link>
           )}
@@ -79,7 +79,7 @@ export default async function LayoutAuthentifie({
               href={process.env.NEXT_PUBLIC_RETOUR_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 block underline hover:text-white"
+              className="mt-2 block underline hover:text-ink"
             >
               Signaler un problème
             </a>
