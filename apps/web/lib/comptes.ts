@@ -23,6 +23,7 @@ export const PLAN_COMPTABLE: readonly CompteV1[] = [
   { numero: "444", libelle: "État - impôts sur bénéfices", type: "passif" },
   { numero: "44566", libelle: "TVA déductible", type: "actif" },
   { numero: "44571", libelle: "TVA collectée", type: "passif" },
+  { numero: "2154", libelle: "Matériel industriel", type: "actif" },
   { numero: "512", libelle: "Banque", type: "actif" },
   { numero: "6228", libelle: "Charges externes diverses", type: "charges" },
   { numero: "623", libelle: "Publicité, publications, relations publiques", type: "charges" },
