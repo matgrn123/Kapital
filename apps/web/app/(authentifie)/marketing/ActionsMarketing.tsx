@@ -3,9 +3,10 @@
 import type { CoefficientsMarketing } from "@kapital/engine";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Bouton, Choix, Curseur, EcritureComptable, Jauge, Ligne, Note, Refus, Succes } from "../../../components/ui";
+import { Bouton, Choix, Curseur, EcritureComptable, Jauge, Ligne, Message, Note, Refus, Succes } from "../../../components/ui";
 import { apercuMarketing, bornesQuantite, effetsMarketing, type TypeActionMarketing } from "../../../lib/apercus";
 import { formaterEuros } from "../../../lib/formatage";
+import { confirmationDepense } from "../../../lib/marketing";
 import { ACTIONS } from "./actions";
 
 type Marque = { notoriete: number; desirabilite: number };
@@ -38,6 +39,8 @@ export function ActionsMarketing({
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  // Montant pour lequel le joueur a confirmé une grosse dépense (toute autre valeur redemande).
+  const [confirmePour, setConfirmePour] = useState<number | null>(null);
 
   const montantCentimes = Math.min(Math.max(euros, bornes.min), bornes.max) * 100;
   const effets = useMemo(
@@ -49,6 +52,8 @@ export function ActionsMarketing({
     [action, montantCentimes, tresorerie, marque, coefficients],
   );
   const libelle = ACTIONS.find((a) => a.type === action)?.libelle ?? "";
+  const avertissement = confirmationDepense(montantCentimes, tresorerie);
+  const attendConfirmation = avertissement !== null && confirmePour !== montantCentimes;
 
   async function lancer(e: React.FormEvent) {
     e.preventDefault();
@@ -58,6 +63,7 @@ export function ActionsMarketing({
       setErreur(apercu.message);
       return;
     }
+    if (attendConfirmation) return;
     setEnCours(true);
     try {
       const reponse = await fetch("/api/actions/action-marketing", {
@@ -71,6 +77,7 @@ export function ActionsMarketing({
         return;
       }
       setOk(`${libelle} lancée pour ${formaterEuros(montantCentimes)} €.`);
+      setConfirmePour(null);
       router.refresh();
     } catch {
       setErreur("Impossible de joindre le serveur. Vérifie ta connexion et réessaie.");
@@ -145,8 +152,20 @@ export function ActionsMarketing({
 
       {erreur && <Refus>{erreur}</Refus>}
       {ok && <Succes>{ok}</Succes>}
+      {apercu.ok && avertissement && (
+        <Message ton="erreur">
+          <p>{avertissement}</p>
+          {attendConfirmation && (
+            <div className="mt-2">
+              <Bouton petit onClick={() => setConfirmePour(montantCentimes)}>
+                Je confirme cette dépense
+              </Bouton>
+            </div>
+          )}
+        </Message>
+      )}
       <div className="flex justify-end">
-        <Bouton type="submit" variante="principal" disabled={enCours || !apercu.ok}>
+        <Bouton type="submit" variante="principal" disabled={enCours || !apercu.ok || attendConfirmation}>
           {enCours ? "Lancement…" : `Lancer : ${libelle.toLowerCase()}`}
         </Bouton>
       </div>

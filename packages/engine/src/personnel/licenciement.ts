@@ -1,3 +1,4 @@
+import { eurosTexte } from "../types/euros.js";
 import type { Parametres } from "@kapital/content";
 import type { EcritureComptable } from "../comptabilite/types.js";
 import type { Salarie } from "../types/entreprise.js";
@@ -93,8 +94,8 @@ export function evaluerLicenciement(
       ok: false,
       code: "tresorerie_insuffisante",
       message:
-        `L'indemnité de licenciement légale est de ${(indemnite / 100).toFixed(2).replace(".", ",")} € ` +
-        `et votre trésorerie ne la couvre pas : il manque ${(manque / 100).toFixed(2).replace(".", ",")} €.`,
+        `L'indemnité de licenciement légale est de ${eurosTexte(indemnite)} ` +
+        `et votre trésorerie ne la couvre pas : il manque ${eurosTexte(manque)}.`,
       indemnite,
       manque,
     };

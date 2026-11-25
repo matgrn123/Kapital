@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { chargerParametresV1 } from "@kapital/content";
-import { configTempsDepuis } from "@kapital/engine";
+import { configTempsDepuis, verifierQuantiteCommande } from "@kapital/engine";
 import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
@@ -21,8 +21,8 @@ export async function POST(request: Request) {
     );
   }
   const quantite = body.quantite ?? 0;
-  if (!Number.isFinite(quantite) || quantite <= 0) {
-    return NextResponse.json({ error: "Quantité invalide." }, { status: 400 });
+  if (!Number.isInteger(quantite) || quantite <= 0) {
+    return NextResponse.json({ error: "Quantité invalide.", code: "quantite_invalide" }, { status: 400 });
   }
 
   const [fournisseurR, catR] = await Promise.all([
@@ -51,13 +51,15 @@ export async function POST(request: Request) {
       { status: 404 },
     );
   }
-  if (quantite < fournisseur.minimum_commande) {
-    return NextResponse.json(
-      {
-        error: `Minimum du fournisseur : ${fournisseur.minimum_commande}. Vous avez demandé ${quantite}.`,
-      },
-      { status: 400 },
-    );
+  // Quantité entière, minimum du fournisseur, et pas plus que ce que la trésorerie peut payer.
+  const verif = verifierQuantiteCommande({
+    quantite,
+    minimum: fournisseur.minimum_commande,
+    prixUnitaire: catalogue.prix_centimes,
+    tresorerie: ctx.companyTresorerie,
+  });
+  if (!verif.ok) {
+    return NextResponse.json({ error: verif.message, code: verif.code }, { status: 400 });
   }
 
   // Durée réelle d'un mois de jeu : paramètre temps_minutes_reelles_par_mois_jeu.

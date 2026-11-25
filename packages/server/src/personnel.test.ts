@@ -62,7 +62,7 @@ describe("AE-7 : licenciement et indemnité", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.code).toBe("tresorerie_insuffisante");
-      expect(r.message).toContain("1000,00 €");
+      expect(r.message).toContain("1 000,00 €");
       expect(r.message).toContain("700,00 €");
     }
   });
