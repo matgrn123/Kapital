@@ -18,8 +18,9 @@ import {
   validerPlan,
   type DimensionsAtelier,
   type ModulePlace,
-  type SalarieAtelier,
 } from "./plan";
+import { FicheSalarie } from "./FicheSalarie";
+import { placerSalaries, type PosteAtelier, type SalarieFiche } from "./salaries";
 
 export type ProprietesAtelier = {
   societe: string;
@@ -29,7 +30,7 @@ export type ProprietesAtelier = {
   workshopId: string | null;
   atelier: DimensionsAtelier;
   planInitial: readonly ModulePlace[];
-  salaries: readonly SalarieAtelier[];
+  salaries: readonly SalarieFiche[];
   catalogue: readonly TypeModule[];
   parametres: Parametres;
 };
@@ -40,6 +41,7 @@ const heures = (min: number) => `${Math.round(min / 60).toLocaleString("fr-FR")}
 export function EcranAtelier(p: ProprietesAtelier) {
   const [plan, setPlan] = useState<ModulePlace[]>([...p.planInitial]);
   const [choisi, setChoisi] = useState<number | null>(null);
+  const [salarieChoisi, setSalarieChoisi] = useState<string | null>(null);
   const [placement, setPlacement] = useState<string | null>(null);
   const [survol, setSurvol] = useState<{ x: number; y: number } | null>(null);
   const [envoi, setEnvoi] = useState<{ etat: "attente" | "ok" | "refus"; texte?: string } | null>(null);
@@ -55,23 +57,26 @@ export function EcranAtelier(p: ProprietesAtelier) {
   const empCandidat = candidat ? empriseModule(candidat, p.catalogue) : null;
 
   const objets: ObjetIso[] = [];
-  const postesPlaces: { x: number; y: number; w: number; d: number }[] = [];
+  const postesPlaces: PosteAtelier[] = [];
+  const emprises: { x: number; y: number; w: number; d: number }[] = [];
   let tableCoupe: { x: number; y: number; w: number; d: number } | null = null;
   plan.forEach((m, i) => {
     const t = typeDe(m.module_type_id);
     const e = empriseModule(m, p.catalogue);
     if (!t || !e) return;
-    if (t.effet.type === "poste_artisan" || t.effet.type === "poste_artisan_specialise") postesPlaces.push(e);
+    emprises.push(e);
+    if (t.effet.type === "poste_artisan" || t.effet.type === "poste_artisan_specialise") postesPlaces.push({ emprise: e, nom: t.nom });
     if (t.effet.type === "table_coupe" && !tableCoupe) tableCoupe = e;
     meublesDuModule(t.effet.type, e).forEach((mb, k) =>
       objets.push({ type: "meuble", id: k === 0 ? `m${i}` : `m${i}-${k}`, meuble: mb.meuble, x: mb.x, y: mb.y, nom: t.nom, selectionnable: !placement }),
     );
   });
-  // Salariés au poste (moteur : artisansAuPoste), dessinés devant leur machine.
-  resume.auPoste.forEach((s, i) => {
-    const e = postesPlaces[i];
-    if (!e) return;
-    objets.push({ type: "personnage", id: `s-${s.id}`, x: e.x - 1 + e.w / 2, y: e.y - 1 + e.d - 0.2, haut: TENUES[i % TENUES.length], selectionnable: false });
+  // Chaque salarié recruté est dessiné : devant son poste (moteur : artisansAuPoste), sinon dans l'allée.
+  const salariesPlaces = placerSalaries({ salaries: p.salaries, auPoste: resume.auPoste, postes: postesPlaces, atelier: p.atelier, occupees: emprises });
+  salariesPlaces.forEach((s) => {
+    const i = p.salaries.findIndex((x) => x.id === s.id);
+    const nom = `${p.salaries[i]?.poste === "encadrement" ? "Encadrement" : "Artisan"}${s.poste ? "" : " sans poste"}`;
+    objets.push({ type: "personnage", id: `s-${s.id}`, x: s.x, y: s.y, haut: TENUES[i % TENUES.length], nom, selectionnable: !placement });
   });
   const coupe = tableCoupe as { x: number; y: number; w: number; d: number } | null;
   if (coupe) objets.push({ type: "personnage", id: "toi", x: coupe.x - 1 + coupe.w + 0.3, y: coupe.y - 1 + coupe.d / 2, haut: "#17202E", etiquette: "Toi", aToi: true, selectionnable: false });
@@ -114,6 +119,7 @@ export function EcranAtelier(p: ProprietesAtelier) {
   };
 
   const sel = choisi !== null && plan[choisi] ? typeDe(plan[choisi]!.module_type_id) : undefined;
+  const salarieSel = salarieChoisi ? p.salaries.find((s) => s.id === salarieChoisi) : undefined;
   const W = p.atelier.largeur;
   const D = p.atelier.hauteur;
 
@@ -133,7 +139,7 @@ export function EcranAtelier(p: ProprietesAtelier) {
                 <Bouton petit onClick={() => setPlacement(null)}>Annuler</Bouton>
               </>
             ) : (
-              <Puce>Clique un objet pour voir son effet</Puce>
+              <Puce>Clique un objet pour voir son effet, ou un salarié pour sa fiche</Puce>
             )}
           </div>
           <SceneIso
@@ -141,10 +147,17 @@ export function EcranAtelier(p: ProprietesAtelier) {
             sol={<Piece W={W} D={D} enseigne={p.societe.toUpperCase()} />}
             grille={{ W, D, traits: true, couleur: couleurCase }}
             objets={objets}
-            selection={choisi !== null ? `m${choisi}` : null}
+            selection={choisi !== null ? `m${choisi}` : salarieChoisi ? `s-${salarieChoisi}` : null}
             onSelect={(id) => {
+              // « s-<uuid> » : un salarié ; « m<index> » : un module du plan.
+              if (id.startsWith("s-")) {
+                setSalarieChoisi(id.slice(2));
+                setChoisi(null);
+                return;
+              }
               const n = Number(id.replace(/^m/, "").split("-")[0]);
               setChoisi(Number.isInteger(n) ? n : null);
+              setSalarieChoisi(null);
             }}
             onCaseSurvol={setSurvol}
             onCaseClic={poser}
@@ -164,8 +177,10 @@ export function EcranAtelier(p: ProprietesAtelier) {
             </div>
           </Carte>
 
-          <Carte titre="Objet sélectionné">
-            {sel ? (
+          <Carte titre={salarieSel ? "Salarié sélectionné" : "Objet sélectionné"}>
+            {salarieSel ? (
+              <FicheSalarie salarie={salarieSel} place={salariesPlaces.find((s) => s.id === salarieSel.id)} parametres={p.parametres} />
+            ) : sel ? (
               <div className="flex flex-col gap-2">
                 <Faits
                   lignes={[
@@ -179,7 +194,7 @@ export function EcranAtelier(p: ProprietesAtelier) {
                 <Bouton petit onClick={() => { setPlan(plan.filter((_, i) => i !== choisi)); setChoisi(null); setEnvoi(null); }}>Retirer du plan</Bouton>
               </div>
             ) : (
-              <p className="text-[0.85rem] text-muted">Aucun objet choisi.</p>
+              <p className="text-[0.85rem] text-muted">Aucun objet choisi. Clique une machine ou un salarié.</p>
             )}
           </Carte>
 
@@ -188,7 +203,7 @@ export function EcranAtelier(p: ProprietesAtelier) {
               <Catalogue
                 articles={p.catalogue.map((m) => ({ id: m.id, nom: m.nom, prix: `${formaterEuros(m.prix_centimes)} €`, effet: texteEffet(m.effet) }))}
                 choisi={placement}
-                onChoisir={(id) => { setPlacement(id); setChoisi(null); }}
+                onChoisir={(id) => { setPlacement(id); setChoisi(null); setSalarieChoisi(null); }}
               />
               {p.workshopId ? (
                 <Bouton variante="principal" disabled={!modifie || !planValide || envoi?.etat === "attente"} onClick={() => void enregistrer()}>

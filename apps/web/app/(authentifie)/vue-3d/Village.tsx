@@ -7,7 +7,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Lampadaire, Paves, Pelouse, Route, SceneIso, Sol, type ObjetIso } from "../../../components/iso";
 import { BoutonLien, Carte, EncadreNotion, FilRouge, SurTitre } from "../../../components/ui";
 import { Faits, Note } from "../../../components/ui/formulaire";
-import { PLAN, placerActeurs, raccourcirEnseigne, type ActeurPlace, type ActeurVillage, type GenreActeur } from "../../../lib/vue3d";
+import { PLAN, horsBatiments, placerActeurs, raccourcirEnseigne, type ActeurPlace, type ActeurVillage, type GenreActeur } from "../../../lib/vue3d";
 
 export type FicheActeur = {
   id: string;
@@ -74,6 +74,28 @@ function objetPour(p: ActeurPlace, f: FicheActeur, index: number, nomSociete: st
   switch (p.genre) {
     case "joueur":
       return { ...commun, type: "batiment", h: 1.5, couleur: "#A85B44", texture: "brique", toit: 0.95, couleurToit: "#3E4753", enseigne: raccourcirEnseigne(nomSociete), store: "#2D4A9E", cheminee: true, drapeau: true, etiquette: `Toi · ${nomSociete}`, aToi: true };
+    case "local2":
+      return { ...commun, type: "batiment", h: 1.2, couleur: "#A85B44", texture: "brique", toit: 0.7, couleurToit: "#3E4753", enseigne: raccourcirEnseigne(f.nom, 12), etiquette: `Toi · ${f.nom}`, aToi: true };
+    case "boutique":
+      // Maquette V2 : le terrain devient une boutique à store bleu, un peu en retrait du trottoir.
+      return {
+        ...commun,
+        type: "batiment",
+        x: p.x + 0.2,
+        y: p.y + 0.2,
+        w: p.w - 0.4,
+        d: p.d - 0.4,
+        h: 1.55,
+        couleur: "#EFE8DC",
+        style: "boutique",
+        texture: "pierre",
+        store: "#2D4A9E",
+        enseigne: "TON MAGASIN",
+        fondEnseigne: "#17202E",
+        encreEnseigne: "#F2D9A0",
+        etiquette: `Ton magasin · ${f.nom}`,
+        aToi: true,
+      };
     case "banque":
       return { ...commun, type: "batiment", h: 2.25, couleur: "#DDD5C4", style: "classique", texture: "pierre", enseigne: "BANQUE", fondEnseigne: "#F4EFE4", encreEnseigne: "#2D3646", drapeau: true, etiquette: "Banque" };
     case "terrain":
@@ -100,7 +122,11 @@ export function Village({ fiches, acteurs, nomSociete }: { fiches: readonly Fich
   const parId = useMemo(() => new Map(fiches.map((f) => [f.id, f])), [fiches]);
   const { places, nonPlaces } = useMemo(() => placerActeurs(acteurs), [acteurs]);
   const objets = useMemo<ObjetIso[]>(
-    () => [...DECOR, ...places.map((p, i) => objetPour(p, parId.get(p.id)!, i, nomSociete))],
+    () => [
+      ...DECOR.filter((o) => o.type !== "arbre"),
+      ...horsBatiments(DECOR.filter((o) => o.type === "arbre"), places),
+      ...places.map((p, i) => objetPour(p, parId.get(p.id)!, i, nomSociete)),
+    ],
     [places, parId, nomSociete],
   );
   const fiche = parId.get(choix) ?? fiches[0];
@@ -119,10 +145,11 @@ export function Village({ fiches, acteurs, nomSociete }: { fiches: readonly Fich
           className="border border-line"
         />
         {nonPlaces.length > 0 && (
-          <p className="mt-2 text-[0.8rem] text-muted">
-            Le plan montre quelques acteurs ; les {nonPlaces.length} autres t&apos;attendent dans Achats, Production et
-            Marché.
-          </p>
+          <AutresActeurs
+            fiches={nonPlaces.map((a) => parId.get(a.id)).filter((f): f is FicheActeur => !!f)}
+            choix={choix}
+            onChoix={setChoix}
+          />
         )}
       </div>
       <div className="flex flex-col gap-4">
@@ -137,6 +164,52 @@ export function Village({ fiches, acteurs, nomSociete }: { fiches: readonly Fich
   );
 }
 
+const LIBELLE_GENRE: Record<GenreActeur, string> = {
+  joueur: "Ta société",
+  local2: "Tes locaux",
+  boutique: "Tes magasins",
+  banque: "Banque",
+  terrain: "Terrain",
+  fournisseur: "Fournisseurs",
+  faconnier: "Façonniers",
+  concurrent: "Concurrents",
+};
+
+/** Acteurs sans place sur le plan : listés par genre, cliquables comme les bâtiments. */
+function AutresActeurs({ fiches, choix, onChoix }: { fiches: readonly FicheActeur[]; choix: string; onChoix: (id: string) => void }): ReactNode {
+  const genres = [...new Set(fiches.map((f) => f.genre))];
+  return (
+    <section className="mt-3 border border-line bg-surface p-3" aria-label="Autres acteurs du monde">
+      <SurTitre>
+        Hors du plan · {fiches.length} autre{fiches.length > 1 ? "s" : ""} acteur{fiches.length > 1 ? "s" : ""}
+      </SurTitre>
+      <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {genres.map((g) => (
+          <div key={g} className="min-w-0">
+            <p className="text-[0.8rem] font-semibold">{LIBELLE_GENRE[g]}</p>
+            <ul className="mt-1 flex flex-col gap-0.5">
+              {fiches
+                .filter((f) => f.genre === g)
+                .map((f) => (
+                  <li key={f.id}>
+                    <button
+                      type="button"
+                      onClick={() => onChoix(f.id)}
+                      aria-pressed={choix === f.id}
+                      className={`w-full truncate text-left text-[0.85rem] underline-offset-2 hover:underline ${choix === f.id ? "font-semibold text-accent" : ""}`}
+                    >
+                      {f.nom}
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function PanneauFiche({ fiche }: { fiche: FicheActeur }): ReactNode {
   return (
     <Carte>
@@ -146,7 +219,11 @@ function PanneauFiche({ fiche }: { fiche: FicheActeur }): ReactNode {
           <h2 className="text-[1.15rem] font-bold">{fiche.nom}</h2>
         </div>
         <p className="text-[0.9rem]">{fiche.description}</p>
-        {fiche.faits.length > 0 ? <Faits lignes={fiche.faits} /> : <Note>Pas encore débloqué.</Note>}
+        {fiche.faits.length > 0 ? (
+          <Faits lignes={fiche.faits} />
+        ) : fiche.genre === "terrain" ? (
+          <Note>Pas encore débloqué.</Note>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           {fiche.liens.map((l, i) => (
             <BoutonLien key={l.href} href={l.href} variante={i === 0 ? "principal" : "secondaire"}>

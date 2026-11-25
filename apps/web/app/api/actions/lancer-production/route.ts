@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { chargerParametresV1 } from "@kapital/content";
-import { besoinMatiere, centimes, configTempsDepuis, idMatiere, parametreObligatoire } from "@kapital/engine";
+import {
+  besoinMatiere,
+  centimes,
+  configTempsDepuis,
+  idMatiere,
+  parametreObligatoire,
+  verifierQuantiteCommande,
+} from "@kapital/engine";
 import { chargerContexte, estErreurAction, refuserSiVerrouille } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
@@ -22,8 +29,8 @@ export async function POST(request: Request) {
     );
   }
   const quantite = body.quantite ?? 0;
-  if (!Number.isFinite(quantite) || quantite <= 0) {
-    return NextResponse.json({ error: "Quantité invalide." }, { status: 400 });
+  if (!Number.isInteger(quantite) || quantite <= 0) {
+    return NextResponse.json({ error: "Quantité invalide.", code: "quantite_invalide" }, { status: 400 });
   }
 
   if (body.lieuType === "atelier") {
@@ -45,7 +52,7 @@ export async function POST(request: Request) {
     // moteur : la demande fixe donc l'objectif de production mensuelle du produit.
     const { data: ligne, error } = await ctx.supabaseAdmin
       .from("company_products")
-      .update({ production_mensuelle_cible: Math.floor(quantite) })
+      .update({ production_mensuelle_cible: quantite })
       .eq("company_id", ctx.companyId)
       .eq("product_id", body.productId)
       .select("product_id")
@@ -93,11 +100,16 @@ export async function POST(request: Request) {
       { status: 404 },
     );
   }
-  if (quantite < fac.minimum_commande) {
-    return NextResponse.json(
-      { error: `Minimum du façonnier : ${fac.minimum_commande}.` },
-      { status: 400 },
-    );
+  // Quantité entière, minimum du façonnier, et une facture que la trésorerie peut payer.
+  const verif = verifierQuantiteCommande({
+    quantite,
+    minimum: fac.minimum_commande,
+    prixUnitaire: catalogue.prix_par_piece_centimes,
+    tresorerie: ctx.companyTresorerie,
+  });
+  if (!verif.ok) {
+    const message = verif.code === "sous_minimum" ? `Minimum du façonnier : ${fac.minimum_commande}.` : verif.message;
+    return NextResponse.json({ error: message, code: verif.code }, { status: 400 });
   }
 
   // Le façonnier travaille la matière du joueur : elle doit être en stock à la commande

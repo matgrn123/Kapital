@@ -1,3 +1,4 @@
+import { eurosTexte } from "../types/euros.js";
 import type { Parametres } from "@kapital/content";
 import { enregistrer, planComptableV1 } from "../comptabilite/index.js";
 import type { EcritureComptable, GrandLivre } from "../comptabilite/types.js";
@@ -305,28 +306,28 @@ export function cloturerMois(
   const explications: Explication[] = [
     {
       cle: "tresorerie",
-      message: `Trésorerie : ${(cumul.tresorerieDebutMois / 100).toFixed(2)} € → ${(tresorerieFin / 100).toFixed(2)} € (variation : ${signVariation}${(variationTresorerie / 100).toFixed(2)} €)`,
+      message: `Trésorerie : ${eurosTexte(cumul.tresorerieDebutMois)} → ${eurosTexte(tresorerieFin)} (variation : ${signVariation}${eurosTexte(variationTresorerie)})`,
     },
   ];
 
   if (totalSalairesBruts > 0) {
     explications.push({
       cle: "salaires",
-      message: `Salaires bruts : ${(totalSalairesBruts / 100).toFixed(2)} €`,
+      message: `Salaires bruts : ${eurosTexte(totalSalairesBruts)}`,
     });
   }
 
   if (atelierDuMois !== null && atelierDuMois.loyerMensuel > 0) {
     explications.push({
       cle: "loyer",
-      message: `Loyer atelier : ${(atelierDuMois.loyerMensuel / 100).toFixed(2)} €`,
+      message: `Loyer atelier : ${eurosTexte(atelierDuMois.loyerMensuel)}`,
     });
   }
 
   if (cumul.chiffreAffairesHt > 0) {
     explications.push({
       cle: "ventes",
-      message: `Chiffre d'affaires HT : ${(cumul.chiffreAffairesHt / 100).toFixed(2)} €, ventes directes : ${cumul.piecesDirectes} pièces`,
+      message: `Chiffre d'affaires HT : ${eurosTexte(cumul.chiffreAffairesHt)}, ventes directes : ${cumul.piecesDirectes} pièces`,
     });
   }
 

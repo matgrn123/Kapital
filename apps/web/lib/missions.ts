@@ -1,7 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { chargerParametresV1, type Parametres } from "@kapital/content";
 import {
   centimes,
+  configTempsDepuis,
   evaluerMissions,
+  horlogeDepuis,
   type MetriquesMissions,
   type ProgressionMission,
 } from "@kapital/engine";
@@ -104,27 +107,46 @@ export function calculerMetriques(
   };
 }
 
+/**
+ * Mois de jeu où la société a été créée, lu sur l'horloge commune (début du monde + date de
+ * création). Sans l'une des deux dates, 0 : la société est comptée comme née au début du monde.
+ */
+export function moisDeCreation(params: Parametres, debutMondeIso: string | null, creeLeIso: string | null): number {
+  const debut = debutMondeIso ? Date.parse(debutMondeIso) : Number.NaN;
+  const cree = creeLeIso ? Date.parse(creeLeIso) : Number.NaN;
+  if (!Number.isFinite(debut) || !Number.isFinite(cree) || cree < debut) return 0;
+  return horlogeDepuis(configTempsDepuis(params), debut, cree).moisEnCours;
+}
+
 export async function chargerProgressionMissions(
   supabase: SupabaseClient,
   companyId: string,
 ): Promise<readonly ProgressionMission[] | null> {
-  const [compta, monde, lignesMiss] = await Promise.all([
+  const [compta, monde, lignesMiss, societe] = await Promise.all([
     supabase
       .from("ledger_entries")
       .select("mois_jeu, libelle, compte, sens, montant_centimes")
       .eq("company_id", companyId),
-    supabase.from("worlds").select("mois_courant").limit(1).maybeSingle(),
+    supabase.from("worlds").select("mois_courant, debut_reel").limit(1).maybeSingle(),
     supabase
       .from("mission_progress")
       .select("mission_id, etat, actuel, cible, validee_le")
       .eq("company_id", companyId),
+    supabase.from("companies").select("cree_le").eq("id", companyId).maybeSingle(),
   ]);
 
   const ecritures = (compta.data ?? []) as EcritureCompta[];
   const moisCourant = (monde.data?.mois_courant as number | undefined) ?? 0;
   const lignes = (lignesMiss.data ?? []) as LigneProgressionDb[];
 
-  const metriques = calculerMetriques(ecritures, 0, moisCourant);
+  // Le mois de création compte pour « Tenir six mois » : une société créée au mois 10
+  // n'a pas tenu six mois parce que le monde, lui, en a dix.
+  const moisCreation = moisDeCreation(
+    chargerParametresV1(),
+    (monde.data?.debut_reel as string | null | undefined) ?? null,
+    (societe.data?.cree_le as string | null | undefined) ?? null,
+  );
+  const metriques = calculerMetriques(ecritures, moisCreation, moisCourant);
   const progressions = evaluerMissions(metriques);
 
   // Verrou "une fois validée, toujours validée"

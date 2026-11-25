@@ -1,3 +1,4 @@
+import { eurosTexte } from "../types/euros.js";
 import type { Parametres } from "@kapital/content";
 import type { EcritureComptable } from "../comptabilite/types.js";
 import {
@@ -113,9 +114,7 @@ export type AchatAccepte = {
   readonly ecritures: readonly EcritureComptable[];
 };
 
-function euros(c: number): string {
-  return `${(c / 100).toFixed(2).replace(".", ",")} €`;
-}
+const euros = eurosTexte;
 
 export function acheterLocal(d: DemandeAchat): AchatAccepte | RefusAchat {
   const pa = parametresAchatDepuis(d.params);

@@ -128,7 +128,7 @@ export function CarteOffre({
   const b = offre.bail;
   return (
     <Carte
-      surTitre={`${offre.surfaceM2} m²${offre.etapeDebloquee > 0 ? ` · étape ${offre.etapeDebloquee}` : ""}`}
+      surTitre={`${offre.surfaceM2} m²${offre.verrouEtape ? ` · étape ${offre.etapeDebloquee}` : ""}`}
       titre={offre.nom}
       className="flex flex-col gap-3"
     >

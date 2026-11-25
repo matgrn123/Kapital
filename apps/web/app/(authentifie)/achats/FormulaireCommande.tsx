@@ -1,6 +1,7 @@
 "use client";
 
 import type { Parametres } from "@kapital/content";
+import { quantiteMaxPayable } from "@kapital/engine";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Bouton, Choix, Curseur, EcritureComptable, Ligne, Note, Refus, Resultat, Succes } from "../../../components/ui";
@@ -53,7 +54,7 @@ export function FormulaireCommande({
   // Du minimum du fournisseur à ce que ta trésorerie peut payer (plafond tiré des données).
   const bornes = bornesQuantite({
     minimum: fournisseur?.minimum_commande ?? 1,
-    plafonds: ligne && ligne.prix_centimes > 0 ? [tresorerie / ligne.prix_centimes] : [],
+    plafonds: ligne && ligne.prix_centimes > 0 ? [quantiteMaxPayable(tresorerie, ligne.prix_centimes)] : [],
   });
   const quantiteN = Math.min(Math.max(quantiteChoisie, bornes.min), bornes.max);
 

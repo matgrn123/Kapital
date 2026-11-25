@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { chargerParametresV1 } from "@kapital/content";
 import { planComptableV1 } from "@kapital/engine";
-import { COMPTE_MARKETING, marqueApresAction } from "./marketing";
+import { COMPTE_MARKETING, confirmationDepense, marqueApresAction } from "./marketing";
 import { PLAN_COMPTABLE } from "./comptes";
 
 const P = chargerParametresV1();
@@ -37,5 +37,19 @@ describe("compte marketing", () => {
     expect(COMPTE_MARKETING).toBe("623");
     expect(planComptableV1().comptes["623"]).toBeDefined();
     expect(PLAN_COMPTABLE.some((c) => c.numero === "623")).toBe(true);
+  });
+});
+
+describe("confirmationDepense", () => {
+  it("ne demande rien pour une petite dépense", () => {
+    expect(confirmationDepense(229100, 2291150)).toBeNull();
+  });
+  it("demande confirmation au-delà de la moitié de la trésorerie, avec le pourcentage", () => {
+    expect(confirmationDepense(2291100, 2291150)).toBe(
+      "Tu vas dépenser 22\u202f911,00 €, soit 100 % de ta trésorerie. Il ne te restera que 0,50 € pour payer salaires et loyers en fin de mois.",
+    );
+  });
+  it("ne demande rien quand la trésorerie est nulle (l'aperçu refuse déjà)", () => {
+    expect(confirmationDepense(100, 0)).toBeNull();
   });
 });

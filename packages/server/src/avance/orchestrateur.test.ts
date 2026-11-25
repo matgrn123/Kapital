@@ -358,7 +358,8 @@ describe("avancerMondeJusquA — constat d'étape à la clôture (AE-2)", () => 
     expect(milieu.etape).toBe(0);
     const ventesEnregistrees = s
       .ecrituresDe("e")
-      .filter((x) => x.id.startsWith("vente_"))
+      // ventes moins retours en ligne : le CA cumulé suit le solde du compte 707
+      .filter((x) => x.id.startsWith("vente_") || x.id.startsWith("retour_"))
       .flatMap((x) => x.lignes)
       .filter((l) => l.compte.startsWith("70"))
       .reduce((t, l) => t + (l.sens === "credit" ? l.montant : -l.montant), 0);

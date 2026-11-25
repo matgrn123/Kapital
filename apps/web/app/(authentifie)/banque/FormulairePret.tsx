@@ -81,6 +81,10 @@ export function FormulairePret({
     [tresorerieActuelle, detteActuelle, moisDecouvert, objet, capitalCentimes, dureeN, estrAnnuel, moisCourant, regles],
   );
   const sim = apercu.simulation;
+  // Le même prêt ne se signe pas deux fois d'un double clic : il faut changer l'objet, le montant ou la durée.
+  const cleOffre = `${objet}|${capitalCentimes ?? 0}|${dureeN}`;
+  const [offreSignee, setOffreSignee] = useState<string | null>(null);
+  const dejaSignee = offreSignee === cleOffre;
   const refus = capitalCentimes === null ? "Ta capacité d'emprunt est nulle aujourd'hui pour cet objet." : apercu.evaluation.ok ? null : apercu.evaluation.message;
 
   function choisirObjet(o: ObjetPret) {
@@ -105,6 +109,7 @@ export function FormulairePret({
       return;
     }
     const tauxObtenu = typeof r.data["tauxAnnuel"] === "number" ? r.data["tauxAnnuel"] : sim?.taux ?? 0;
+    setOffreSignee(cleOffre);
     setSucces(`Prêt accordé : ${formaterEuros(capitalCentimes)} € à ${pourcent(tauxObtenu)}. L'argent est sur ton compte.`);
     router.refresh();
   }
@@ -213,8 +218,8 @@ export function FormulairePret({
         {succes && <Message ton="succes">{succes}</Message>}
 
         <div className="flex flex-wrap items-center gap-3">
-          <Bouton type="submit" variante="principal" disabled={enCours || verrou !== null || refus !== null}>
-            {enCours ? "Signature…" : "Signer l'offre de prêt"}
+          <Bouton type="submit" variante="principal" disabled={enCours || dejaSignee || verrou !== null || refus !== null}>
+            {enCours ? "Signature…" : dejaSignee ? "Offre signée" : "Signer l'offre de prêt"}
           </Bouton>
           <Note>
             Le serveur revérifie ta capacité au moment de signer et prend l&apos;€STR du jour.
