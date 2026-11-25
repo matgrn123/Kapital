@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Bouton, Choix, Curseur, EcritureComptable, Ligne, Note, Refus, Resultat, Succes } from "../../../components/ui";
 import { apercuCommandeMatiere, bornesQuantite, texteDelai } from "../../../lib/apercus";
-import { formaterEuros } from "../../../lib/formatage";
+import { articleUnite, formaterEuros, prixParUnite, quantiteMatiere, symboleUnite } from "../../../lib/formatage";
 
 type Fournisseur = {
   id: string;
@@ -31,7 +31,8 @@ export function FormulaireCommande({
 }: {
   fournisseurs: readonly Fournisseur[];
   catalogue: readonly LigneCatalogue[];
-  materials: readonly { id: string; nom: string }[];
+  /** `unite` : « metre » ou « lot » (materials.unite). */
+  materials: readonly { id: string; nom: string; unite: string }[];
   /** Trésorerie du joueur : sert à borner le curseur de quantité. */
   tresorerie: number;
   params: Parametres;
@@ -51,6 +52,8 @@ export function FormulaireCommande({
 
   const ligne = catalogue.find((l) => l.supplier_id === fournisseurId && l.material_id === materialId);
   const nomMat = materials.find((m) => m.id === materialId)?.nom ?? "matière";
+  const uniteDe = (id: string | undefined) => materials.find((m) => m.id === id)?.unite ?? "metre";
+  const uniteMat = uniteDe(materialId);
   // Du minimum du fournisseur à ce que ta trésorerie peut payer (plafond tiré des données).
   const bornes = bornesQuantite({
     minimum: fournisseur?.minimum_commande ?? 1,
@@ -81,13 +84,21 @@ export function FormulaireCommande({
     if (prem) setMaterialId(prem.material_id);
   }
 
-  /** « 4,20 € l'unité · 1 mois de jeu » : le moins cher du catalogue de ce fournisseur, et son délai. */
+  /** « 4,20 € le mètre · 1 mois de jeu » : le moins cher du catalogue de ce fournisseur, et son délai. */
   function prixLigne(id: string): string {
     const f = fournisseurs.find((x) => x.id === id);
-    const prix = catalogue.filter((l) => l.supplier_id === id).map((l) => l.prix_centimes);
+    const lignes = catalogue.filter((l) => l.supplier_id === id);
     const delai = f ? texteDelai(f.delai_mois, params) : "";
-    if (prix.length === 0) return delai;
-    return `${prix.length > 1 ? "dès " : ""}${formaterEuros(Math.min(...prix))} € l'unité · ${delai}`;
+    if (lignes.length === 0) return delai;
+    const moinsChere = lignes.reduce((a, b) => (b.prix_centimes < a.prix_centimes ? b : a));
+    return `${lignes.length > 1 ? "dès " : ""}${prixParUnite(moinsChere.prix_centimes, uniteDe(moinsChere.material_id))} · ${delai}`;
+  }
+
+  /** Minimum de commande d'un fournisseur, dans l'unité de sa matière : « minimum 50 m ». */
+  function minimumLigne(f: Fournisseur): string {
+    const premiere = catalogue.find((l) => l.supplier_id === f.id);
+    const unite = premiere ? ` ${symboleUnite(uniteDe(premiere.material_id), f.minimum_commande)}` : "";
+    return `minimum ${f.minimum_commande.toLocaleString("fr-FR")}${unite}`;
   }
 
   async function commander(e: React.FormEvent) {
@@ -114,7 +125,7 @@ export function FormulaireCommande({
         setErreur(data.error ?? `Commande impossible (erreur ${reponse.status}).`);
         return;
       }
-      setOk(`Commande passée : ${quantiteN} de ${nomMat.toLowerCase()} chez ${fournisseur.nom}.`);
+      setOk(`Commande passée : ${quantiteMatiere(quantiteN, uniteMat, nomMat)} chez ${fournisseur.nom}.`);
       router.refresh();
     } catch {
       setErreur("Impossible de joindre le serveur. Vérifie ta connexion et réessaie.");
@@ -140,7 +151,7 @@ export function FormulaireCommande({
               titre={f.nom}
               prix={prixLigne(f.id)}
             >
-              {f.pays} · minimum {f.minimum_commande}
+              {f.pays} · {minimumLigne(f)}
             </Choix>
           ))}
         </div>
@@ -156,7 +167,7 @@ export function FormulaireCommande({
                 actif={l.material_id === materialId}
                 onClick={() => setMaterialId(l.material_id)}
                 titre={materials.find((m) => m.id === l.material_id)?.nom ?? "Matière"}
-                prix={`${formaterEuros(l.prix_centimes)} € l'unité`}
+                prix={prixParUnite(l.prix_centimes, uniteDe(l.material_id))}
               />
             ))}
           </div>
@@ -169,15 +180,20 @@ export function FormulaireCommande({
         min={bornes.min}
         max={bornes.max}
         onChange={setQuantite}
-        affichage={quantiteN.toLocaleString("fr-FR")}
-        aide={`De ${bornes.min} (minimum du fournisseur) à ${bornes.max.toLocaleString("fr-FR")} (ce que ta trésorerie peut payer).`}
+        saisie="nombre"
+        unite={symboleUnite(uniteMat, quantiteN)}
+        aide={`De ${quantiteMatiere(bornes.min, uniteMat, nomMat)} (minimum du fournisseur) à ${bornes.max.toLocaleString("fr-FR")} ${symboleUnite(uniteMat, bornes.max)} (ce que ta trésorerie peut payer).`}
       />
 
       {apercu && apercu.ok && ligne && (
         <div className="flex flex-col gap-3">
           <div className="grid gap-4 sm:grid-cols-3">
             <Resultat libelle="Coût total" valeur={`${formaterEuros(apercu.total)} €`} />
-            <Resultat libelle="Prix à l'unité" valeur={`${formaterEuros(ligne.prix_centimes)} €`} detail="figé à la commande" />
+            <Resultat
+              libelle="Prix unitaire"
+              valeur={`${formaterEuros(ligne.prix_centimes)} €`}
+              detail={`${articleUnite(uniteMat)}, figé à la commande`}
+            />
             <Resultat libelle="Livraison" valeur={`${apercu.delaiMois} mois`} detail={texteDelai(apercu.delaiMois, params)} />
           </div>
           <Ligne libelle="Sortie de trésorerie aujourd'hui">0,00 €</Ligne>
@@ -186,7 +202,7 @@ export function FormulaireCommande({
             au fournisseur :
           </Note>
           <EcritureComptable
-            libelle={`Livraison : ${nomMat.toLowerCase()}`}
+            libelle={`Livraison : ${quantiteMatiere(quantiteN, uniteMat, nomMat)}`}
             etiquette="à la livraison"
             lignes={apercu.ecritureLivraison}
           />
