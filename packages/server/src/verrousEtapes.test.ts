@@ -18,6 +18,10 @@ import {
   verifierDeblocage,
   verifierDeblocageEtape,
 } from "./validations/verrouEtape.js";
+import { postesALaSignature } from "@kapital/engine";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 const PROD = idProduit("prod_tshirt");
 const MAT = idMatiere("mat_jersey");
@@ -34,7 +38,7 @@ function entreprise(overrides: Partial<Entreprise> = {}): Entreprise {
     stocksMatiere: [{ matiere: MAT, quantite: 100, valeurTotale: centimes(50_000) }],
     stocksFinis: [],
     salaries: [],
-    atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), nombreMachines: 2 },
+    atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(2, MODULES_CATALOGUE) },
     marque: { notoriete: 40, desirabilite: 40 },
     prets: [],
     catalogue: [

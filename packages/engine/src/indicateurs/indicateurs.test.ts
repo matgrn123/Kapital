@@ -29,6 +29,10 @@ import {
   ventesMensuellesDepuisCumul,
 } from "./index.js";
 import { cumulDemarrantAuPas, cumulVide } from "../moteur/donneesMois.js";
+import { postesALaSignature } from "../atelier/effetsPlan.js";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 // Les valeurs de ces tests sont calculées à la main. Les paramètres qui entrent
 // dans les calculs sont fixés ici pour que les montants attendus ne bougent pas
@@ -70,7 +74,7 @@ function entreprise(o: Partial<Entreprise> = {}): Entreprise {
         experienceMois: 0,
       },
     ],
-    atelier: { surfaceM2: 50, loyerMensuel: centimes(50_000), nombreMachines: 2 },
+    atelier: { surfaceM2: 50, loyerMensuel: centimes(50_000), modules: postesALaSignature(2, MODULES_CATALOGUE) },
     marque: { notoriete: 0, desirabilite: 0 },
     prets: [
       {

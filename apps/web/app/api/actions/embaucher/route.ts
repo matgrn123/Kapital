@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { centimes, postesLibres } from "@kapital/engine";
+import { centimes } from "@kapital/engine";
 import { validerDecision } from "@kapital/server";
 import {
   chargerContexte,
@@ -10,9 +10,9 @@ import {
 
 export const runtime = "nodejs";
 
-// AE-7 : la décision passe par validerDecision (étape, salaire, réserve de deux mois de paie).
-// Embaucher sans poste libre est accepté mais le salarié ne produit pas (le moteur ne compte
-// que les artisans qui occupent une machine) : la réponse le signale au joueur.
+// AE-7 / 3D-3 : la décision passe par validerDecision (étape, poste libre pour un artisan,
+// salaire, réserve de deux mois de paie). Les postes sont ceux posés dans le plan de l'atelier
+// (chargerEntreprisePersonnel lit placed_modules) : sans poste libre, un artisan est refusé.
 
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
@@ -41,9 +41,6 @@ export async function POST(request: Request) {
   if (!decision.ok) {
     return NextResponse.json({ error: decision.message, code: decision.code }, { status: 400 });
   }
-  const posteLibre =
-    poste === "artisan" && postesLibres(entreprise.salaries, entreprise.atelier?.nombreMachines ?? 0) > 0;
-
   const { error } = await ctx.supabaseAdmin.from("employees").insert({
     company_id: ctx.companyId,
     poste,
@@ -53,14 +50,5 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({
-    ok: true,
-    ...(poste === "artisan" && !posteLibre
-      ? {
-          avertissement:
-            "Aucun poste de travail n'est libre : cet artisan est payé mais ne produit pas tant que vous n'avez pas une machine de plus.",
-          sansPosteLibre: true,
-        }
-      : {}),
-  });
+  return NextResponse.json({ ok: true });
 }

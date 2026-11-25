@@ -71,6 +71,12 @@
     "source": "https://capitole-energie.com/2026/02/26/tarif-electricite-professionnel/",
     "date": "2026-11-01"
   },
+  "energie_kwh_par_poste_mois": {
+    "valeur": 100,
+    "unite": "kwh_par_poste_et_par_mois",
+    "source": "valeur provisoire à calibrer : reprend les 100 kWh par machine et par mois écrits en dur dans moteur/cloture.ts avant 3D-3 (une piqueuse plate industrielle de 400 à 550 W, environ 150 h par mois, plus l'éclairage du poste)",
+    "date": "2026-11-25"
+  },
   "decroissance_notoriete_mois": {
     "valeur": 0.05,
     "unite": "ratio_par_mois",

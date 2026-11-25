@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { Entreprise, Salarie } from "../types/entreprise.js";
 import { centimes, idEntreprise, idMatiere, idProduit, idSalarie } from "../types/primitifs.js";
 import { planProductionDuMois } from "./flux.js";
+import { postesALaSignature, resoudreModules } from "../atelier/effetsPlan.js";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 const PARAMS = chargerParametresV1();
 
@@ -28,7 +32,7 @@ function entreprise(salaries: readonly Salarie[], machines: number): Entreprise 
     stocksMatiere: [],
     stocksFinis: [],
     salaries,
-    atelier: { surfaceM2: 100, loyerMensuel: centimes(100_000), nombreMachines: machines },
+    atelier: { surfaceM2: 100, loyerMensuel: centimes(100_000), modules: postesALaSignature(machines, MODULES_CATALOGUE) },
     marque: { notoriete: 50, desirabilite: 50 },
     prets: [],
     catalogue: [
@@ -78,5 +82,35 @@ describe("AE-7 : embauche et production", () => {
 
   it("sans machine, personne ne produit", () => {
     expect(total(entreprise([salarie("a", 12)], 0))).toBe(0);
+  });
+});
+
+describe("3D-3 : la production suit les postes posés dans le plan", () => {
+  it("0 poste posé : 0 production, même avec 3 artisans", () => {
+    expect(total(entreprise([salarie("a", 12), salarie("b", 12), salarie("c", 12)], 0))).toBe(0);
+  });
+
+  it("retirer un poste du plan fait baisser la production", () => {
+    const equipe = [salarie("a", 12), salarie("b", 12)];
+    const deux = entreprise(equipe, 2);
+    const un = { ...deux, atelier: { ...deux.atelier!, modules: deux.atelier!.modules.slice(1) } };
+    expect(total(un)).toBeLessThan(total(deux));
+    expect(total(un)).toBeGreaterThan(0);
+  });
+
+  it("un module qui n'est pas un poste (table de coupe) n'ajoute pas de capacité", () => {
+    const equipe = [salarie("a", 12), salarie("b", 12)];
+    const un = entreprise(equipe, 1);
+    const avecTable = {
+      ...un,
+      atelier: {
+        ...un.atelier!,
+        modules: [
+          ...un.atelier!.modules,
+          ...resoudreModules([{ id_type: "table_coupe_simple", x: 2, y: 4, pivote: true }], MODULES_CATALOGUE),
+        ],
+      },
+    };
+    expect(total(avecTable)).toBe(total(un));
   });
 });

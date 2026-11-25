@@ -23,6 +23,11 @@ import {
   ecritureRestitutionDepot,
   ecrituresMensuellesBail,
 } from "../locaux/bail.js";
+import {
+  amortissementMensuelModules,
+  effetsPlan,
+  modulesAchetes,
+} from "../atelier/effetsPlan.js";
 import { constaterEtape, seuilsEtapesDepuis } from "../etapes/etapes.js";
 import type { Entreprise, Pret } from "../types/entreprise.js";
 import { centimes, type MoisJeu } from "../types/primitifs.js";
@@ -35,6 +40,12 @@ import type {
 } from "./donneesMois.js";
 import { agregatsDe, sommeAgregats } from "./agregats.js";
 import { incrementerAnciennete, netMouvements512, sommeTvaCollectee } from "./flux.js";
+
+function lireParametre(params: Parametres, cle: string): number {
+  const v = params[cle]?.valeur;
+  if (v === undefined || !Number.isFinite(v)) throw new Error(`Paramètre manquant : ${cle}`);
+  return v;
+}
 
 /** Lignes de vente où la demande a dépassé le stock, directes d'abord. */
 function ventesPerduesDepuisCumul(cumul: CumulMois): readonly VentePerdueParProduit[] {
@@ -157,14 +168,16 @@ export function cloturerMois(
       if (amortConstruction) enr(amortConstruction);
     }
 
-    // Énergie : 100 kwh/machine/mois
-    const prixElecParKwh = centimes(Math.round(params["prix_electricite_pro"]?.valeur ?? 16));
-    const energieCentimes = centimes(atelier.nombreMachines * 100 * prixElecParKwh);
+    // 3D-3 : énergie par poste posé (paramètre energie_kwh_par_poste_mois × prix du kWh).
+    const postesPoses = effetsPlan(atelier.modules).postesEquipes;
+    const kwhParPoste = lireParametre(params, "energie_kwh_par_poste_mois");
+    const prixElecParKwh = lireParametre(params, "prix_electricite_pro");
+    const energieCentimes = centimes(Math.round(postesPoses * kwhParPoste * prixElecParKwh));
     if (energieCentimes > 0) {
       enr({
         id: `energie_${mois}_${ent.id}`,
         mois,
-        libelle: `Énergie atelier (${atelier.nombreMachines} machines)`,
+        libelle: `Énergie atelier (${postesPoses} poste${postesPoses > 1 ? "s" : ""})`,
         lignes: [
           { compte: "606", sens: "debit", montant: energieCentimes },
           { compte: "512", sens: "credit", montant: energieCentimes },
@@ -172,22 +185,35 @@ export function cloturerMois(
       });
     }
 
-    // Amortissement machines (non-cash) : 5000€ par machine, 5 ans = 60 mois
-    const valeurMachineUnitaire = centimes(500000);
-    const amortMensuel = centimes(
-      Math.round((valeurMachineUnitaire * atelier.nombreMachines) / 60),
-    );
+    // 3D-3 : amortissement linéaire du matériel réellement acheté (prix / amortissement_mois du
+    // catalogue), plafonné au matériel restant au bilan. Les postes fournis avec le local
+    // (bail_machines_a_la_signature) ne sont pas à l'actif, donc pas amortis.
+    const postesFournis = lireParametre(params, "bail_machines_a_la_signature");
+    const amortMensuel = amortissementMensuelModules(atelier.modules, postesFournis, atelier.materiel);
     if (amortMensuel > 0) {
       enr({
         id: `amort_${mois}_${ent.id}`,
         mois,
-        libelle: `Amortissement machines`,
+        libelle: `Amortissement du matériel de l'atelier`,
         lignes: [
           { compte: "681", sens: "debit", montant: amortMensuel },
           { compte: "2815", sens: "credit", montant: amortMensuel },
         ],
       });
     }
+    const valeurBrute =
+      atelier.materiel?.valeurBrute ??
+      centimes(modulesAchetes(atelier.modules, postesFournis).reduce((s, m) => s + m.prix, 0));
+    ent = {
+      ...ent,
+      atelier: {
+        ...atelier,
+        materiel: {
+          valeurBrute,
+          amortissementsCumules: centimes((atelier.materiel?.amortissementsCumules ?? 0) + amortMensuel),
+        },
+      },
+    };
   }
 
   // Fin de bail : dernier mois payé, le dépôt de garantie revient, le local est libéré.

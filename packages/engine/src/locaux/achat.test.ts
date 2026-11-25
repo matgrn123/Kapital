@@ -14,6 +14,10 @@ import {
   ecritureEntretienLocal,
   parametresAchatDepuis,
 } from "./achat.js";
+import { postesALaSignature } from "../atelier/effetsPlan.js";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 const PARAMS = chargerParametresV1();
 const REGLES = reglesPretDepuis(PARAMS);
@@ -274,7 +278,7 @@ describe("louer ou acheter le même local pendant 24 mois (calcul à la main)", 
     const gl = enregistrer(planComptableV1(), signature);
     const e = base({
       tresorerie: centimes(tresoDepart - bail.depotGarantie),
-      atelier: { surfaceM2: PETIT.surface_m2, loyerMensuel: centimes(PETIT.loyer_mensuel_centimes), nombreMachines: 0, bail },
+      atelier: { surfaceM2: PETIT.surface_m2, loyerMensuel: centimes(PETIT.loyer_mensuel_centimes), modules: postesALaSignature(0, MODULES_CATALOGUE), bail },
     });
     return derouler(e, gl);
   }
@@ -285,7 +289,7 @@ describe("louer ou acheter le même local pendant 24 mois (calcul à la main)", 
     for (const ec of r.ecritures) gl = enregistrer(gl, ec);
     const e = base({
       tresorerie: centimes(tresoDepart - r.apport),
-      atelier: { surfaceM2: PETIT.surface_m2, loyerMensuel: centimes(0), nombreMachines: 0, achat: r.achat },
+      atelier: { surfaceM2: PETIT.surface_m2, loyerMensuel: centimes(0), modules: postesALaSignature(0, MODULES_CATALOGUE), achat: r.achat },
       prets: [
         {
           id: idPret("pret_achat"),

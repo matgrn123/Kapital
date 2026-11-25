@@ -9,6 +9,7 @@ import {
 } from "@kapital/engine";
 import { BandeauEtape, Carte, EcritureComptable, EncadreNotion, EnTete, FilRouge, Tableau } from "../../../components/ui";
 import { apercuLicenciement, apercuPaieEquipe } from "../../../lib/apercu-lot4";
+import { COLONNES_MODULES_POSES, postesPoses, type AvecModulesPoses } from "../../../lib/api-helpers";
 import { formaterDate, formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { lireVerrou } from "../_partage/verrou";
@@ -46,17 +47,20 @@ export default async function PageSalaries() {
       .order("cree_le"),
     supabase.from("worlds").select("mois_courant").eq("etat", "actif").limit(1).maybeSingle(),
     lireVerrou(supabase, entreprise.id, "embauche"),
-    supabase.from("workshops").select("nombre_machines").eq("company_id", entreprise.id).maybeSingle(),
+    supabase.from("workshops").select(`id, ${COLONNES_MODULES_POSES}`).eq("company_id", entreprise.id).maybeSingle(),
   ]);
 
   const params = chargerParametresV1();
   const coefficients = coefficientsSalairesDepuisParametres(params);
   const paramsLicenciement = parametresLicenciementDepuis(params);
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
-  const postes = Number((atelier as { nombre_machines?: number } | null)?.nombre_machines ?? 0);
+  // 3D-3 : les postes sont les modules « poste » posés dans le plan de l'atelier.
+  const aUnAtelier = atelier !== null;
+  const postes = postesPoses(atelier as AvecModulesPoses | null);
 
   const employesTab = (employes ?? []) as Employee[];
   const artisans = employesTab.filter((e) => e.poste === "artisan").length;
+  const libres = Math.max(0, postes - artisans);
   const cout = (e: Employee) =>
     coutEmployeur({ ...coefficients, salaireBrutMensuel: centimes(e.salaire_brut_mensuel_centimes) });
   const paieEquipe = apercuPaieEquipe({
@@ -91,7 +95,8 @@ export default async function PageSalaries() {
         coefficients={coefficients}
         moisCourant={moisCourant}
         tresorerie={Number(entreprise.tresorerie_centimes)}
-        postesLibres={Math.max(0, postes - artisans)}
+        postesLibres={libres}
+        aUnAtelier={aUnAtelier}
         verrouille={verrou !== null}
       />
 
@@ -101,9 +106,11 @@ export default async function PageSalaries() {
             {employesTab.length === 0 ? (
               <p className="text-[0.88rem] text-muted">
                 Personne pour l&apos;instant.{" "}
-                {postes === 0
+                {!aUnAtelier
                   ? "Un artisan a besoin d'un poste de travail pour produire : loue d'abord un local dans Locaux."
-                  : `Tu as ${postes} poste(s) libre(s) : embauche un artisan pour produire toi-même.`}
+                  : libres === 0
+                    ? "Aucun poste de travail n'est posé dans ton atelier : pose-en un dans l'écran Atelier avant d'embaucher un artisan."
+                    : `Tu as ${libres} poste${libres > 1 ? "s" : ""} libre${libres > 1 ? "s" : ""} : embauche un artisan pour produire toi-même.`}
               </p>
             ) : (
               <>
@@ -158,9 +165,11 @@ export default async function PageSalaries() {
             jusqu&apos;à {pourcent(coefficients.tauxCotisationsPleines)} à partir de{" "}
             {coefficients.seuilCotisationsPleinesEnSmic.toLocaleString("fr-FR")} SMIC.
           </EncadreNotion>
-          <EncadreNotion titre="Un salarié sans poste ne produit pas">
-            Un artisan travaille sur une machine. S&apos;il n&apos;y a pas de poste libre, il est payé quand même,
-            mais ne fabrique rien. Embaucher avant d&apos;avoir la place, c&apos;est payer pour attendre.
+          <EncadreNotion titre="Pas de poste, pas d'artisan">
+            Un artisan travaille sur un poste équipé (une machine posée dans ton atelier). Ta capacité de
+            production, c&apos;est le plus petit des deux nombres : artisans ou postes. Tant qu&apos;aucun poste
+            n&apos;est libre, l&apos;embauche d&apos;un artisan est refusée : pose d&apos;abord une machine dans
+            l&apos;écran Atelier. Un encadrant, lui, n&apos;occupe pas de poste.
           </EncadreNotion>
           <EncadreNotion titre="Se séparer d'un salarié coûte">
             Après {paramsLicenciement.ancienneteMinimaleMois} mois d&apos;ancienneté, un licenciement donne droit à une

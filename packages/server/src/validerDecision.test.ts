@@ -23,6 +23,10 @@ import {
 } from "./validerDecision.js";
 import type { ContexteValidation } from "./types.js";
 import { reglesPretV1 } from "./validations/demandePret.js";
+import { postesALaSignature } from "@kapital/engine";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 const ENT = idEntreprise("ent_test");
 const PROD = idProduit("prod_tshirt");
@@ -56,7 +60,7 @@ function entreprise(overrides: Partial<Entreprise> = {}): Entreprise {
     atelier: {
       surfaceM2: 50,
       loyerMensuel: centimes(100_000),
-      nombreMachines: 2,
+      modules: postesALaSignature(2, MODULES_CATALOGUE),
     },
     marque: { notoriete: 40, desirabilite: 40 },
     prets: [],

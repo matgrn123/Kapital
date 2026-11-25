@@ -5,7 +5,7 @@ export { validerSaisiePrix, type ResultatSaisiePrix, type SaisiePrix } from "./v
 export { validerCommanderMatiere } from "./validations/commanderMatiere.js";
 export { validerOrdreProduction } from "./validations/ordreProduction.js";
 export { validerActionMarketing } from "./validations/actionMarketing.js";
-export { validerEmbauche } from "./validations/embauche.js";
+export { MESSAGE_AUCUN_POSTE_LIBRE, validerEmbauche } from "./validations/embauche.js";
 export { validerLicenciement } from "./validations/licenciement.js";
 export { reglesPretV1, validerDemandePret } from "./validations/demandePret.js";
 export * from "./avance/index.js";
