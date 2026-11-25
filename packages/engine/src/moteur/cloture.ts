@@ -29,6 +29,7 @@ import {
   modulesAchetes,
 } from "../atelier/effetsPlan.js";
 import { constaterEtape, seuilsEtapesDepuis } from "../etapes/etapes.js";
+import { ecrituresClotureBoutique } from "../boutique/boutique.js";
 import type { Entreprise, Pret } from "../types/entreprise.js";
 import { centimes, type MoisJeu } from "../types/primitifs.js";
 import type { Explication } from "../types/resultatMois.js";
@@ -49,10 +50,14 @@ function lireParametre(params: Parametres, cle: string): number {
 
 /** Lignes de vente où la demande a dépassé le stock, directes d'abord. */
 function ventesPerduesDepuisCumul(cumul: CumulMois): readonly VentePerdueParProduit[] {
-  const lignes = Object.keys(cumul.demandeParLigne).map((cle) => {
-    const [produit, canal] = cle.split("|") as [string, string];
-    return { cle, produit, direct: canal === "vente_directe" };
-  });
+  // AE-10 : la boutique est exclue : sa demande non servie vient aussi du plafond des
+  // vendeurs, pas seulement du stock (voir pointMortBoutique pour la capacité).
+  const lignes = Object.keys(cumul.demandeParLigne)
+    .map((cle) => {
+      const [produit, canal] = cle.split("|") as [string, string];
+      return { cle, produit, canal, direct: canal === "vente_directe" };
+    })
+    .filter((l) => l.canal !== "boutique");
   // tri stable : ventes directes avant revendeurs, sinon ordre d'apparition
   const triees = [...lignes].sort((a, b) => Number(b.direct) - Number(a.direct));
   const perdues: VentePerdueParProduit[] = [];
@@ -214,6 +219,16 @@ export function cloturerMois(
         },
       },
     };
+  }
+
+  // AE-10 : boutiques : loyer et charges dès la signature, amortissement des agencements dès l'ouverture.
+  if (ent.pointsDeVente !== undefined && ent.pointsDeVente.length > 0) {
+    const pointsDeVente = ent.pointsDeVente.map((pdv) => {
+      const r = ecrituresClotureBoutique(pdv, mois);
+      for (const ecriture of r.ecritures) enr(ecriture);
+      return r.pointDeVente;
+    });
+    ent = { ...ent, pointsDeVente };
   }
 
   // Fin de bail : dernier mois payé, le dépôt de garantie revient, le local est libéré.

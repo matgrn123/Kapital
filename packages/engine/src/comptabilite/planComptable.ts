@@ -17,6 +17,10 @@ export const PLAN_COMPTABLE_V1: readonly Compte[] = [
   { numero: "2154", libelle: "Matériel industriel", type: "actif" },
   // Comme 2815 : l'amortissement est typé passif (voir ci-dessus), l'équation reste exacte.
   { numero: "2813", libelle: "Amortissement des constructions", type: "passif" },
+  // AE-10 : travaux d'agencement de la boutique (route ouvrir-boutique, fonction SQL 0038).
+  { numero: "2135", libelle: "Installations générales, agencements, aménagements des constructions", type: "actif" },
+  // Comme 2815 et 2813 : l'amortissement est typé passif, l'équation reste exacte.
+  { numero: "28135", libelle: "Amortissement des agencements", type: "passif" },
   { numero: "275", libelle: "Dépôts et cautionnements versés", type: "actif" },
   { numero: "31", libelle: "Stocks de matières premières", type: "actif" },
   { numero: "35", libelle: "Stocks de produits finis", type: "actif" },

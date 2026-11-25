@@ -3,3 +3,4 @@ export * from "./catalogueBanc.js";
 export * from "./gardeFou.js";
 export * from "./pilote.js";
 export * from "./scenarioSolo.js";
+export * from "./scenarioBoutique.js";

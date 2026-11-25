@@ -28,9 +28,11 @@ export type Proprietaire =
   | { readonly type: "joueur"; readonly idProfil: string }
   | { readonly type: "pnj" };
 
-export type Canal = "vente_directe" | "revendeur";
+/** AE-10 : la boutique est un troisième canal, servi par le stock propre de chaque point de vente. */
+export type Canal = "vente_directe" | "revendeur" | "boutique";
 
-export type Poste = "artisan" | "encadrement";
+/** AE-10 : un vendeur ne produit pas et n'occupe pas de poste de l'atelier ; il plafonne les ventes de la boutique. */
+export type Poste = "artisan" | "encadrement" | "vendeur";
 
 export type Salarie = {
   readonly id: IdSalarie;
@@ -78,6 +80,39 @@ export type Atelier = {
   readonly achat?: AchatLocal;
 };
 
+/**
+ * AE-10 : boutique louée (table points_de_vente), distincte de l'atelier. Bail commercial
+ * (loyer, charges, dépôt), un mois de travaux d'agencement (2135, amortis en 28135), puis
+ * ouverture. Elle a son propre stock de produits finis, toujours au compte 35.
+ */
+export type PointDeVente = {
+  readonly id: string;
+  /** Emplacement du catalogue des bâtiments (catégorie boutique). */
+  readonly batimentId: string;
+  readonly surfaceM2: number;
+  readonly loyerMensuel: Centimes;
+  readonly chargesMensuelles: Centimes;
+  /** Dépôt versé à la signature (compte 275). */
+  readonly depotGarantie: Centimes;
+  readonly moisSignature: MoisJeu;
+  /** Premier mois de vente : signature + durée des travaux. Avant, aucune vente. */
+  readonly moisOuverture: MoisJeu;
+  /** Travaux d'agencement immobilisés (2135) et amortissements déjà passés (28135). */
+  readonly agencement: {
+    readonly valeurBrute: Centimes;
+    readonly amortissementsCumules: Centimes;
+    readonly dureeAmortissementMois: number;
+  };
+  /** Effet de l'emplacement (catalogue) : passants par jour. */
+  readonly passantsParJour: number;
+  /** Passants moyens des boutiques du catalogue : la demande est multipliée par passants / référence. */
+  readonly passantsReference: number;
+  /** Effet de l'emplacement (catalogue) : points de désirabilité ajoutés chaque mois d'ouverture. */
+  readonly bonusDesirabiliteParMois: number;
+  /** Stock propre de la boutique ; sa valeur reste au compte 35 de l'entreprise. */
+  readonly stock: readonly LigneStockFini[];
+};
+
 export type EtatMarque = {
   readonly notoriete: number;
   readonly desirabilite: number;
@@ -108,8 +143,14 @@ export type LigneStockFini = {
   readonly valeurTotale: Centimes;
 };
 
+/**
+ * Prix TTC par canal. AE-10 : le prix boutique est facultatif ; absent, la boutique vend au
+ * prix de la vente directe (voir prixBoutique dans boutique/).
+ */
 export type PrixParCanal = {
-  readonly [K in Canal]: Centimes;
+  readonly vente_directe: Centimes;
+  readonly revendeur: Centimes;
+  readonly boutique?: Centimes;
 };
 
 /** Nomenclature d'un produit (table products) : ce qu'une pièce consomme. */
@@ -150,4 +191,6 @@ export type Entreprise = {
   readonly marque: EtatMarque;
   readonly prets: readonly Pret[];
   readonly catalogue: readonly ProduitEntreprise[];
+  /** AE-10 : boutiques de l'entreprise (absent = aucune). */
+  readonly pointsDeVente?: readonly PointDeVente[];
 };

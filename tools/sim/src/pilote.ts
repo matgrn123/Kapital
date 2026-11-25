@@ -1,6 +1,12 @@
 import { chargerBatimentsV1, chargerModulesV1, type Parametres } from "@kapital/content";
 import {
   achatModulesAmenagement,
+  apercuOuvertureBoutique,
+  ecrituresOuvertureBoutique,
+  estEmplacementBoutique,
+  nouveauPointDeVente,
+  passantsReferenceBoutiques,
+  transfererStockVersBoutique,
   debutExercice,
   planComptableV1,
   postesEquipesAtelier,
@@ -76,6 +82,8 @@ export type BilanMensuel = {
   readonly chiffreAffairesHtCumule: number;
   readonly piecesVenduesCumulees: number;
   readonly stockFiniPieces: number;
+  /** AE-10 : pièces en stock dans les boutiques. */
+  readonly stockBoutiquePieces: number;
   readonly salaries: number;
   readonly postes: number;
   readonly ventesPerdues: readonly VentePerdueParProduit[];
@@ -438,10 +446,62 @@ export function poserModules(etat: EtatBanc, idType: string, nombre: number): Re
   });
 }
 
+/**
+ * AE-10 : ouverture d'une boutique. Comme la route ouvrir-boutique et la fonction SQL
+ * ouvrir_boutique : dépôt (275 / 512) et travaux d'agencement (2135 / 512), ouverture après
+ * les travaux. Le verrou d'étape (étape 3) arrive avec AE-11 : le banc ne le vérifie pas encore.
+ */
+export function ouvrirBoutique(etat: EtatBanc, batimentId: string): ResultatAction {
+  if ((etat.entreprise.pointsDeVente ?? []).length > 0) {
+    return refus("boutique_deja_ouverte", "La société a déjà une boutique.");
+  }
+  const catalogue = chargerBatimentsV1();
+  const batiment = catalogue.find((b) => b.id === batimentId);
+  if (!batiment || !estEmplacementBoutique(batiment)) return refus("batiment_inconnu", `Boutique inconnue : ${batimentId}.`);
+  const apercu = apercuOuvertureBoutique({
+    batiment,
+    params: etat.params,
+    mois: moisJeu(etat.mois),
+    tresorerie: etat.entreprise.tresorerie,
+  });
+  if (!apercu.tresorerieSuffisante) {
+    return refus("tresorerie_insuffisante", "Trésorerie insuffisante pour le dépôt et les travaux.");
+  }
+  const { id, etat: e2 } = suivant(etat, "boutique");
+  const pdv = nouveauPointDeVente({
+    id,
+    batiment,
+    mois: moisJeu(etat.mois),
+    params: etat.params,
+    passantsReference: passantsReferenceBoutiques(catalogue),
+  });
+  let apres = e2;
+  for (const ecriture of ecrituresOuvertureBoutique(pdv)) apres = passerEcriture(apres, ecriture);
+  return accepte({
+    ...apres,
+    entreprise: { ...apres.entreprise, pointsDeVente: [...(apres.entreprise.pointsDeVente ?? []), pdv] },
+  });
+}
+
+/** AE-10 : transfert de pièces de l'atelier vers la boutique, au coût moyen, sans écriture. */
+export function transfererStockBoutique(
+  etat: EtatBanc,
+  idPointDeVente: string,
+  produit: string,
+  quantite: number,
+): ResultatAction {
+  const r = transfererStockVersBoutique(etat.entreprise, idPointDeVente, produitDuMonde(produit).id, quantite);
+  if (!r.ok) return refus(r.code, r.message);
+  return accepte({ ...etat, entreprise: r.entreprise });
+}
+
 /** AE-7 : embauche (étape, salaire au moins au SMIC, réserve de mois de coût employeur). */
 export function embaucher(etat: EtatBanc, poste: Poste, salaireBrutMensuel: number): ResultatAction {
   const bloque = verrou(etat, "embauche");
   if (bloque) return bloque;
+  if (poste === "vendeur" && (etat.entreprise.pointsDeVente ?? []).length === 0) {
+    return refus("sans_boutique", "Un vendeur travaille en boutique : il faut d'abord ouvrir une boutique.");
+  }
   const moisReserve = etat.params["embauche_reserve_mois_cout_employeur"]?.valeur;
   if (moisReserve === undefined) return refus("parametre_manquant", "embauche_reserve_mois_cout_employeur manquant.");
   const r = evaluerEmbauche(
@@ -627,6 +687,7 @@ export function avancerMois(etat: EtatBanc, graine: number, options: OptionsAvan
     chiffreAffairesHtCumule: entreprise.cumulsEtape?.chiffreAffairesHt ?? 0,
     piecesVenduesCumulees: entreprise.cumulsEtape?.piecesVendues ?? 0,
     stockFiniPieces: entreprise.stocksFinis.reduce((s, l) => s + l.quantite, 0),
+    stockBoutiquePieces: (entreprise.pointsDeVente ?? []).flatMap((p) => p.stock).reduce((s, l) => s + l.quantite, 0),
     salaries: entreprise.salaries.length,
     postes: postesEquipesAtelier(entreprise.atelier ?? null),
     ventesPerdues: r.ventesPerdues,

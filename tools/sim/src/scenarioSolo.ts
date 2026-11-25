@@ -60,7 +60,7 @@ export type OptionsScenario = {
 };
 
 /** Applique une décision si elle est acceptée ; un refus est une décision non prise. */
-function essayer(etat: EtatBanc, r: ResultatAction, journal: string[], libelle: string): EtatBanc {
+export function essayer(etat: EtatBanc, r: ResultatAction, journal: string[], libelle: string): EtatBanc {
   if (r.ok) {
     journal.push(`mois ${etat.mois} : ${libelle}`);
     return r.etat;
@@ -73,7 +73,7 @@ function stockFini(etat: EtatBanc): number {
   return etat.entreprise.stocksFinis.reduce((s, l) => s + l.quantite, 0);
 }
 
-function decisionsDuMois(etat: EtatBanc, journal: string[]): EtatBanc {
+export function decisionsDuMois(etat: EtatBanc, journal: string[]): EtatBanc {
   const P = POLITIQUE;
   const params = etat.params;
   let e = etat;

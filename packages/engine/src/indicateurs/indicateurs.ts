@@ -13,6 +13,7 @@ import {
 } from "../salaires/calculs.js";
 import type { Canal, Entreprise, Pret } from "../types/entreprise.js";
 import { centimes, type Centimes, type MoisJeu } from "../types/primitifs.js";
+import { prixDuCanal } from "../marche/ventesMois.js";
 import {
   margeRevendeur,
   margeVenteDirecte,
@@ -87,6 +88,14 @@ export function coutRevientDepuisStocks(e: Entreprise): Readonly<Record<string, 
   for (const s of e.stocksFinis) {
     if (s.quantite > 0) couts[s.produit as string] = centimes(Math.round(s.valeurTotale / s.quantite));
   }
+  // AE-10 : un produit présent seulement en boutique prend le coût moyen du stock de la boutique.
+  for (const pdv of e.pointsDeVente ?? []) {
+    for (const s of pdv.stock) {
+      if (s.quantite > 0 && couts[s.produit as string] === undefined) {
+        couts[s.produit as string] = centimes(Math.round(s.valeurTotale / s.quantite));
+      }
+    }
+  }
   return couts;
 }
 
@@ -112,7 +121,7 @@ function separerCle(cle: string): { produit: string; canal: Canal } | null {
   const i = cle.lastIndexOf("|");
   if (i < 0) return null;
   const canal = cle.slice(i + 1);
-  if (canal !== "vente_directe" && canal !== "revendeur") return null;
+  if (canal !== "vente_directe" && canal !== "revendeur" && canal !== "boutique") return null;
   return { produit: cle.slice(0, i), canal };
 }
 
@@ -147,6 +156,7 @@ export function margeParCanal(
   const cumul: Record<Canal, { pieces: number; ca: number; marge: number }> = {
     vente_directe: { pieces: 0, ca: 0, marge: 0 },
     revendeur: { pieces: 0, ca: 0, marge: 0 },
+    boutique: { pieces: 0, ca: 0, marge: 0 },
   };
   const ignores = new Set<string>();
 
@@ -159,7 +169,8 @@ export function margeParCanal(
       ignores.add(k.produit);
       continue;
     }
-    const prixHt = prixHtDepuisTtc(ligne.prix[k.canal], p.tauxTva);
+    const prixHt = prixHtDepuisTtc(prixDuCanal(ligne, k.canal), p.tauxTva);
+    // Boutique (AE-10) : prix HT − coût de revient, sans retour (comme le revendeur, mais au prix boutique TTC).
     const margeUnitaire =
       k.canal === "vente_directe"
         ? margeVenteDirecte({
@@ -183,9 +194,14 @@ export function margeParCanal(
   });
   const d = cumul.vente_directe;
   const r = cumul.revendeur;
+  const b = cumul.boutique;
   return {
-    parCanal: { vente_directe: vers(d), revendeur: vers(r) },
-    total: vers({ pieces: d.pieces + r.pieces, ca: d.ca + r.ca, marge: d.marge + r.marge }),
+    parCanal: { vente_directe: vers(d), revendeur: vers(r), boutique: vers(b) },
+    total: vers({
+      pieces: d.pieces + r.pieces + b.pieces,
+      ca: d.ca + r.ca + b.ca,
+      marge: d.marge + r.marge + b.marge,
+    }),
     produitsIgnores: [...ignores].sort(),
   };
 }
@@ -208,6 +224,7 @@ function echeanceDuMois(pret: Pret, mois: MoisJeu): EcheancePret | null {
 export type ChargesFixesMensuelles = {
   /** Salaires bruts et cotisations patronales. */
   readonly salaires: Centimes;
+  /** Loyer de l'atelier, plus loyer et charges des boutiques (AE-10). */
   readonly loyer: Centimes;
   /** Intérêts de l'échéance du mois (le capital remboursé n'est pas une charge). */
   readonly interetsPrets: Centimes;
@@ -237,7 +254,11 @@ export function chargesFixesMensuelles(
       seuilCotisationsPleinesEnSmic: p.salaires.seuilCotisationsPleinesEnSmic,
     });
   }
-  const loyer = e.atelier?.loyerMensuel ?? 0;
+  // AE-10 : le loyer compte aussi le loyer et les charges des boutiques (payés dès la signature).
+  let loyer: number = e.atelier?.loyerMensuel ?? 0;
+  for (const pdv of e.pointsDeVente ?? []) {
+    if (mois >= pdv.moisSignature) loyer += pdv.loyerMensuel + pdv.chargesMensuelles;
+  }
   let interets = 0;
   for (const pret of e.prets) interets += echeanceDuMois(pret, mois)?.interets ?? 0;
   return {
@@ -381,9 +402,10 @@ export function previsionnelTresorerie(
 ): PrevisionnelTresorerie {
   const depart = soldeCompte(gl, "512");
   const fixes = chargesFixesMensuelles(e, moisCourant, p);
-  const directMensuel = Math.round(
-    marges.parCanal.vente_directe.chiffreAffairesHt * (1 - p.tauxRetour),
-  );
+  // Ventes en boutique (AE-10) : encaissées au comptoir, sans retour, avec la vente directe.
+  const directMensuel =
+    Math.round(marges.parCanal.vente_directe.chiffreAffairesHt * (1 - p.tauxRetour)) +
+    marges.parCanal.boutique.chiffreAffairesHt;
   const revendeurMensuel = marges.parCanal.revendeur.chiffreAffairesHt;
   const creancesEnCours = soldeCompte(gl, "411");
   const dettes = soldeCompte(gl, "401");
