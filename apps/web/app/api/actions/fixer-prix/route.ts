@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { validerSaisiePrix } from "@kapital/server";
 import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
@@ -17,19 +18,11 @@ export async function POST(request: Request) {
   if (!body.lignePrixId) {
     return NextResponse.json({ error: "lignePrixId requis." }, { status: 400 });
   }
-  const pd = body.prixVenteDirecteCentimes ?? 0;
-  const pr = body.prixRevendeurCentimes ?? 0;
-  const prod = body.productionMensuelleCible ?? 0;
-  const q = body.qualiteVisee ?? 60;
-  if (pd <= 0 || pr <= 0) {
-    return NextResponse.json(
-      { error: "Les prix doivent être strictement positifs." },
-      { status: 400 },
-    );
+  const saisie = validerSaisiePrix(body);
+  if (!saisie.ok) {
+    return NextResponse.json({ error: saisie.message, code: saisie.code }, { status: 400 });
   }
-  if (q < 0 || q > 100) {
-    return NextResponse.json({ error: "Qualité entre 0 et 100." }, { status: 400 });
-  }
+  const { pd, pr, prod, q } = saisie.valeurs;
 
   // Vérifie que la ligne appartient à l'entreprise du user
   const { data: ligne } = await ctx.supabaseAdmin
