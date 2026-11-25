@@ -12,7 +12,8 @@ import {
 import { BandeauEtape, Carte, EcritureComptable, EncadreNotion, EnTete, FilRouge, Tableau } from "../../../components/ui";
 import { apercuLicenciement, apercuPaieEquipe } from "../../../lib/apercu-lot4";
 import { COLONNES_MODULES_POSES, postesPosesTousLocaux, type AvecModulesPoses } from "../../../lib/api-helpers";
-import { formaterDate, formaterEuros } from "../../../lib/formatage";
+import { formaterEuros } from "../../../lib/formatage";
+import { formateurDateDeJeu } from "../_partage/monde";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { lireVerrou } from "../_partage/verrou";
 import { BoutonLicencier, FormulaireEmbauche } from "./FormulaireEmbauche";
@@ -35,6 +36,7 @@ const POSTES = { artisan: "Artisan", encadrement: "Encadrement", vendeur: "Vende
 
 export default async function PageSalaries() {
   const supabase = await creerClientServeur();
+  const dateJeu = await formateurDateDeJeu(supabase);
 
   const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes").limit(1);
   const entreprise = entreprises?.[0];
@@ -136,7 +138,7 @@ export default async function PageSalaries() {
                     return (
                       <tr key={e.id} className="align-top">
                         <td>{POSTES[e.poste]}</td>
-                        <td className="text-muted">{formaterDate(e.cree_le)}</td>
+                        <td className="text-muted">{dateJeu(e.cree_le)}</td>
                         <td className="text-right">{formaterEuros(e.salaire_brut_mensuel_centimes)} €</td>
                         <td className="text-right">{formaterEuros(cout(e))} €</td>
                         <td className="text-right">

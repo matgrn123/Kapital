@@ -5,7 +5,7 @@
 
 import type { Parametres } from "@kapital/content";
 import { Alerte, BoutonLien, Faits } from "../../../components/ui";
-import { formaterDate, formaterEuros } from "../../../lib/formatage";
+import { formaterEuros } from "../../../lib/formatage";
 import { chiffresFiche, type SalarieFiche, type SalariePlace } from "./salaries";
 
 const POSTES = { artisan: "Artisan", encadrement: "Encadrement" } as const;
@@ -22,7 +22,7 @@ export function FicheSalarie({ salarie, place, parametres }: { salarie: SalarieF
         lignes={[
           ["Fonction", POSTES[salarie.poste]],
           ["Poste occupé", poste ? `${poste.nom} (case ${poste.emprise.x}, ${poste.emprise.y})` : "Sans poste"],
-          ["Depuis", formaterDate(salarie.depuis)],
+          ["Depuis", salarie.depuis],
           ["Ancienneté", mois(salarie.ancienneteMois)],
           ["Expérience", mois(salarie.experienceMois)],
           ["Salaire brut", `${formaterEuros(salarie.salaireBrutCentimes)} € / mois`],

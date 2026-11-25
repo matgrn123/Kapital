@@ -2,7 +2,8 @@ import { chargerParametresV1 } from "@kapital/content";
 import { seuilsEtapesDepuis, type EtapeEntreprise } from "@kapital/engine";
 import { Carte, EcritureComptable, EncadreNotion, FilRouge, Puce } from "../../../components/ui";
 import { EnTete, Etapes, Faits, Vide } from "../../../components/ui/formulaire";
-import { formaterDate, formaterEuros } from "../../../lib/formatage";
+import { formaterEuros } from "../../../lib/formatage";
+import { formateurDateDeJeu } from "../_partage/monde";
 import { libelleGamme } from "../../../lib/lisible";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { capitalSocial, ecritureOuverture, etapesDuJeu, INTITULES_ETAPES } from "./donnees";
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PageSociete() {
   const supabase = await creerClientServeur();
+  const dateJeu = await formateurDateDeJeu(supabase);
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -58,7 +60,7 @@ export default async function PageSociete() {
               ["Activité", "Création et vente de vêtements"],
               ["Gamme", libelleGamme(entreprise.gamme)],
               ["Étape", `${etape} · ${INTITULES_ETAPES[etape]}`],
-              ["Créée le", formaterDate(entreprise.cree_le)],
+              ["Créée le", dateJeu(entreprise.cree_le)],
             ]}
           />
         </Carte>

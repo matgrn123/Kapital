@@ -4,6 +4,7 @@ import { postesFournisDepuisParametres, valeurNetteMaterielEnService } from "../
 import { postesPoses } from "../../../lib/api-helpers";
 import { localAffiche, salariesDuLocal } from "../../../lib/locaux";
 import { creerClientServeur } from "../../../lib/supabase/server";
+import { formateurDateDeJeu } from "../_partage/monde";
 import { EcranAtelier } from "./EcranAtelier";
 import type { ModulePlace } from "./plan";
 import type { SalarieFiche } from "./salaries";
@@ -99,6 +100,7 @@ export default async function PageAtelier({ searchParams }: { searchParams: Prom
   const parametres = chargerParametresV1();
 
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
+  const dateJeu = await formateurDateDeJeu(supabase);
   const tous: SalarieFiche[] = ((employes ?? []) as Employe[]).map((e) => {
     // Même calcul que la page des salariés : valeur de départ + mois passés dans l'entreprise.
     const service = Math.max(0, moisCourant - (e.mois_jeu_debut ?? 0));
@@ -107,7 +109,7 @@ export default async function PageAtelier({ searchParams }: { searchParams: Prom
       poste: e.poste,
       experienceMois: e.experience_mois_debut + service,
       ancienneteMois: e.anciennete_mois_debut + service,
-      depuis: e.cree_le,
+      depuis: dateJeu(e.cree_le),
       salaireBrutCentimes: e.salaire_brut_mensuel_centimes,
     };
   });

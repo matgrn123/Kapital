@@ -2,7 +2,8 @@ import { chargerParametresV1 } from "@kapital/content";
 import { coefficientsMarketingDepuisParametres } from "@kapital/engine";
 import { Carte, EncadreNotion, EnTete, FilRouge, Jauge, Tableau, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
-import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
+import { formaterEuros } from "../../../lib/formatage";
+import { formateurDateDeJeu } from "../_partage/monde";
 import { ActionsMarketing } from "./ActionsMarketing";
 import { ACTIONS } from "./actions";
 
@@ -16,6 +17,7 @@ function pourcent(x: number): string {
 
 export default async function PageMarketing() {
   const supabase = await creerClientServeur();
+  const dateJeu = await formateurDateDeJeu(supabase);
 
   const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes").limit(1);
   const entreprise = entreprises?.[0];
@@ -66,7 +68,7 @@ export default async function PageMarketing() {
                   <tr key={a.id}>
                     <td>{libelle(a.type)}</td>
                     <td className="text-right tabular-nums">{formaterEuros(a.montant_centimes)} €</td>
-                    <td className="text-muted">{formaterDateHeure(a.instant)}</td>
+                    <td className="text-muted">{dateJeu(a.instant)}</td>
                   </tr>
                 ))}
               </Tableau>

@@ -21,6 +21,7 @@ const GROUPES: ReadonlyArray<{ readonly titre: string; readonly liens: ReadonlyA
     titre: "Pilotage",
     liens: [
       { href: "/jeu", libelle: "Tableau de bord", icone: "M4 20V10M10 20V4M16 20v-7M22 20H2" },
+      { href: "/calendrier", libelle: "Calendrier", icone: "M4 6h16v15H4zM4 10h16M8 3v4M16 3v4M8 14h2M14 14h2M8 17h2" },
       { href: "/missions", libelle: "Missions et classement", icone: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4" },
       { href: "/indicateurs", libelle: "Indicateurs", icone: "M3 17l6-6 4 4 8-8M15 7h6v6" },
       { href: "/finances", libelle: "Finances", icone: "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7" },

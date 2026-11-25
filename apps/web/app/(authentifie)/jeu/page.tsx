@@ -13,7 +13,8 @@ import {
   Puce,
   SurTitre,
 } from "../../../components/ui";
-import { formaterDateHeure, formaterEuros } from "../../../lib/formatage";
+import { dateDeJeuDepuisInstant } from "../../../lib/cadre";
+import { formaterEuros } from "../../../lib/formatage";
 import { libelleGamme, libelleLisible } from "../../../lib/lisible";
 import { chargerProgressionMissions } from "../../../lib/missions";
 import { creerClientServeur } from "../../../lib/supabase/server";
@@ -49,7 +50,7 @@ export default async function PageJeu() {
   if (!entreprise) return null;
 
   const [monde, grandLivre, marque, stocks, catalogue, produits, classement, progressions] = await Promise.all([
-    supabase.from("worlds").select("mois_courant").limit(1).maybeSingle(),
+    supabase.from("worlds").select("mois_courant, debut_reel").limit(1).maybeSingle(),
     supabase
       .from("ledger_entries")
       .select("ecriture_id, mois_jeu, libelle, compte, sens, montant_centimes, cree_le")
@@ -281,7 +282,7 @@ export default async function PageJeu() {
                 <EcritureComptable
                   key={e.id}
                   libelle={libelleLisible(e.libelle, nomsProduits)}
-                  etiquette={formaterDateHeure(e.cree_le)}
+                  etiquette={dateDeJeuDepuisInstant(e.cree_le, monde.data?.debut_reel ?? null, Date.now())}
                   lignes={e.lignes}
                 />
               ))}

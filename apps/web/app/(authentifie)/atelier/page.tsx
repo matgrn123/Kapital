@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Carte, EncadreNotion, EnTete, FilRouge, Kpi, Puce, Tableau, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { COLONNES_MODULES_POSES, postesPoses, postesPosesTousLocaux, type AvecModulesPoses } from "../../../lib/api-helpers";
-import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
+import { formaterEuros } from "../../../lib/formatage";
+import { formateurDateDeJeu } from "../_partage/monde";
 import { chargerParametresV1 } from "@kapital/content";
 import { centimes, delaiGrossisteMinutes, prixGrossiste } from "@kapital/engine";
 import { coutUsineParPiece, ID_GROSSISTE_LOCAL } from "@kapital/server";
@@ -45,6 +46,7 @@ type ProductionOrder = {
 
 export default async function PageAtelier() {
   const supabase = await creerClientServeur();
+  const dateJeu = await formateurDateDeJeu(supabase);
 
   const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes").limit(1);
   const entreprise = entreprises?.[0];
@@ -185,7 +187,7 @@ export default async function PageAtelier() {
                       <td className="text-right tabular-nums">
                         {o.prix_facon_par_piece_centimes != null ? `${formaterEuros(o.prix_facon_par_piece_centimes)} €` : "—"}
                       </td>
-                      <td className="text-muted">{formaterDateHeure(o.instant_livraison_prevue)}</td>
+                      <td className="text-muted">{dateJeu(o.instant_livraison_prevue)}</td>
                     </tr>
                   );
                 })}

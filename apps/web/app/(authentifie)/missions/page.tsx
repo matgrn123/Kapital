@@ -3,7 +3,8 @@ import { DEFINITIONS_MISSIONS, ordonnerClassement, type EtatMission } from "@kap
 import { BoutonLien, Carte, EncadreNotion, EnTete, Jauge, Puce, TableauRang, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { chargerProgressionMissions } from "../../../lib/missions";
-import { formaterDateHeure, formaterEuros } from "../../../lib/formatage";
+import { formaterEuros } from "../../../lib/formatage";
+import { formateurDateDeJeu } from "../_partage/monde";
 
 type LigneClassement = {
   company_id: string;
@@ -33,6 +34,7 @@ const OU_AGIR: Record<string, { href: string; texte: string }> = {
 
 export default async function PageMissions() {
   const supabase = await creerClientServeur();
+  const dateJeu = await formateurDateDeJeu(supabase);
   const { data: entreprises } = await supabase.from("companies").select("id").limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
@@ -129,7 +131,7 @@ export default async function PageMissions() {
 
       <Carte
         titre="Classement du village"
-        action={dernierCalcul ? <Puce>Calculé le {formaterDateHeure(dernierCalcul)}</Puce> : undefined}
+        action={dernierCalcul ? <Puce>Calculé le {dateJeu(dernierCalcul)}</Puce> : undefined}
       >
         {classement.length === 0 ? (
           <Vide>Aucune entreprise active pour l&apos;instant.</Vide>

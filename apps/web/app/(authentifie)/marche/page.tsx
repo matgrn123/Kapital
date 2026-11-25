@@ -1,5 +1,6 @@
 import { creerClientServeur } from "../../../lib/supabase/server";
-import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
+import { formaterEuros } from "../../../lib/formatage";
+import { formateurDateDeJeu } from "../_partage/monde";
 import { libelleGamme, libelleLisible } from "../../../lib/lisible";
 import { Carte, Puce } from "../../../components/ui";
 import { EnTete, TableauRang, Vide } from "../../../components/ui/formulaire";
@@ -29,6 +30,7 @@ type VenteRecente = {
 
 export default async function PageMarche() {
   const supabase = await creerClientServeur();
+  const dateJeu = await formateurDateDeJeu(supabase);
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -204,7 +206,7 @@ export default async function PageMarche() {
               cle: v.id,
               moi: v.company_id === entreprise.id,
               cellules: [
-                <span key="d" className="text-[0.78rem] text-muted">{formaterDateHeure(v.cree_le)}</span>,
+                <span key="d" className="text-[0.78rem] text-muted">{dateJeu(v.cree_le)}</span>,
                 v.nom_entreprise,
                 libelleLisible(v.libelle, nomsProduits),
                 `${formaterEuros(v.montant_centimes)} €`,

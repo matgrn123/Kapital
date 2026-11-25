@@ -9,7 +9,7 @@ import type { DimensionsAtelier, Emprise, SalarieAtelier } from "./plan";
 
 /** Salarié tel que lu en base, avec ce qu'affiche sa fiche. */
 export type SalarieFiche = SalarieAtelier & {
-  /** Date d'embauche (employees.cree_le). */
+  /** Date d'embauche, déjà écrite en date de jeu (« 12 mars, an 1 (il y a 2 jours) »). */
   depuis: string;
   ancienneteMois: number;
   salaireBrutCentimes: number;
