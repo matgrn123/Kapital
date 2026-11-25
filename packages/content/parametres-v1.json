@@ -538,5 +538,53 @@
     "unite": "mois",
     "source": "hypothèse de jeu, à valider par Mathieu (réserve de trésorerie exigée avant une embauche : deux mois de coût employeur, valeur reprise de l'ancien garde-fou de packages/server/src/validations/embauche.ts)",
     "date": "2026-11-25"
+  },
+  "produit_defaut_prix_vente_directe_centimes_entree": {
+    "valeur": 2000,
+    "unite": "centimes_ttc",
+    "source": "hypothèse de jeu, à valider par Mathieu (valeur reprise de l'ancien défaut codé dans apps/web/app/api/actions/ajouter-produit/route.ts ; le joueur la change ensuite)",
+    "date": "2026-11-25"
+  },
+  "produit_defaut_prix_revendeur_centimes_entree": {
+    "valeur": 1000,
+    "unite": "centimes",
+    "source": "hypothèse de jeu, à valider par Mathieu (moitié du prix de vente directe, cohérent avec le coefficient revendeur ≈ ×2 de docs/referentiel-couts.md, BonneGueule) ; valeur reprise de l'ancien défaut de la route ajouter-produit",
+    "date": "2026-11-25"
+  },
+  "produit_defaut_prix_vente_directe_centimes_milieu": {
+    "valeur": 6000,
+    "unite": "centimes_ttc",
+    "source": "hypothèse de jeu, à valider par Mathieu (valeur reprise de l'ancien défaut codé dans apps/web/app/api/actions/ajouter-produit/route.ts ; le joueur la change ensuite)",
+    "date": "2026-11-25"
+  },
+  "produit_defaut_prix_revendeur_centimes_milieu": {
+    "valeur": 3000,
+    "unite": "centimes",
+    "source": "hypothèse de jeu, à valider par Mathieu (moitié du prix de vente directe, cohérent avec le coefficient revendeur ≈ ×2 de docs/referentiel-couts.md, BonneGueule) ; valeur reprise de l'ancien défaut de la route ajouter-produit",
+    "date": "2026-11-25"
+  },
+  "produit_defaut_prix_vente_directe_centimes_haut": {
+    "valeur": 15000,
+    "unite": "centimes_ttc",
+    "source": "hypothèse de jeu, à valider par Mathieu (valeur reprise de l'ancien défaut codé dans apps/web/app/api/actions/ajouter-produit/route.ts ; le joueur la change ensuite)",
+    "date": "2026-11-25"
+  },
+  "produit_defaut_prix_revendeur_centimes_haut": {
+    "valeur": 7500,
+    "unite": "centimes",
+    "source": "hypothèse de jeu, à valider par Mathieu (moitié du prix de vente directe, cohérent avec le coefficient revendeur ≈ ×2 de docs/referentiel-couts.md, BonneGueule) ; valeur reprise de l'ancien défaut de la route ajouter-produit",
+    "date": "2026-11-25"
+  },
+  "produit_defaut_qualite_visee": {
+    "valeur": 60,
+    "unite": "score_sur_100",
+    "source": "hypothèse de jeu, à valider par Mathieu (valeur reprise de l'ancien défaut codé dans apps/web/app/api/actions/ajouter-produit/route.ts ; le joueur la change ensuite)",
+    "date": "2026-11-25"
+  },
+  "produit_defaut_production_mensuelle_cible": {
+    "valeur": 100,
+    "unite": "pieces_par_mois",
+    "source": "hypothèse de jeu, à valider par Mathieu (valeur reprise de l'ancien défaut codé dans apps/web/app/api/actions/ajouter-produit/route.ts ; le joueur la change ensuite)",
+    "date": "2026-11-25"
   }
 }

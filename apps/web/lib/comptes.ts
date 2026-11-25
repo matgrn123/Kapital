@@ -25,6 +25,7 @@ export const PLAN_COMPTABLE: readonly CompteV1[] = [
   { numero: "44571", libelle: "TVA collectée", type: "passif" },
   { numero: "512", libelle: "Banque", type: "actif" },
   { numero: "6228", libelle: "Charges externes diverses", type: "charges" },
+  { numero: "623", libelle: "Publicité, publications, relations publiques", type: "charges" },
   { numero: "601", libelle: "Achats de matières premières", type: "charges" },
   { numero: "613", libelle: "Locations", type: "charges" },
   { numero: "614", libelle: "Charges locatives", type: "charges" },
