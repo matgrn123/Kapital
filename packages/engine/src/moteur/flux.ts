@@ -468,7 +468,7 @@ export function avancerFlux(
     if (quantiteServie <= 0) continue;
 
     // CMP avant sortie
-    const { coutRevientUnitaire, stocks: stocksApres } = diminuerStockFini(
+    const { coutRevientUnitaire, valeurTotale: coutRevientTotal, stocks: stocksApres } = diminuerStockFini(
       stocksFinis,
       vente.produit,
       quantiteServie,
@@ -484,6 +484,7 @@ export function avancerFlux(
         quantite: quantiteServie,
         prixTtcUnitaire: vente.prixUnitaireCentimes,
         coutRevientUnitaire,
+        coutRevientTotal,
         tauxTva: tvaStandard,
       });
       derniereEcritureDuGl();
@@ -529,6 +530,7 @@ export function avancerFlux(
         quantite: quantiteServie,
         prixGrosHtUnitaire: prixHtDepuisTtc(vente.prixUnitaireCentimes, tvaStandard),
         coutRevientUnitaire,
+        coutRevientTotal,
       });
       derniereEcritureDuGl();
       chiffreAffairesHt += prixHtDepuisTtc(vente.prixUnitaireCentimes, tvaStandard) * quantiteServie;
