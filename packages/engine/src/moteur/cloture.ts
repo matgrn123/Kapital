@@ -396,7 +396,7 @@ export function cloturerMois(
     chiffreAffairesHt: centimes(ent.cumulsEtape?.chiffreAffairesHt ?? 0),
   };
   const etapeApres = constaterEtape(
-    { etape: ent.etape, cumuls: cumulsEtape, tresorerie: tresorerieFin },
+    { etape: ent.etape, cumuls: cumulsEtape, tresorerie: tresorerieFin, notoriete: ent.marque.notoriete },
     seuilsEtapesDepuis(params),
   );
   ent = { ...ent, etape: etapeApres, cumulsEtape };

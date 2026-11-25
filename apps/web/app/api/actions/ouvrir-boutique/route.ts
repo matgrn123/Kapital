@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { chargerBatimentsV1, chargerParametresV1 } from "@kapital/content";
-import { apercuOuvertureBoutique, centimes, estEmplacementBoutique, moisJeu } from "@kapital/engine";
+import {
+  apercuOuvertureBoutique,
+  centimes,
+  estEmplacementBoutique,
+  moisJeu,
+  type EtapeEntreprise,
+} from "@kapital/engine";
+import { verifierDeblocageEtape } from "@kapital/server";
 import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
@@ -25,10 +32,29 @@ export async function POST(request: Request) {
   if (!batiment || !estEmplacementBoutique(batiment)) {
     return NextResponse.json({ error: "Emplacement de boutique inconnu.", code: "batiment_inconnu" }, { status: 400 });
   }
+  // AE-11 : l'ouverture se débloque à l'étape 3 (chiffre d'affaires, trésorerie, notoriété) ;
+  // le refus détaille ce qui manque. L'emplacement peut aussi demander une étape plus haute.
+  const { data: marque } = await ctx.supabaseAdmin
+    .from("brand_state")
+    .select("notoriete")
+    .eq("company_id", ctx.companyId)
+    .maybeSingle();
+  const verrou = verifierDeblocageEtape("ouverture_boutique", {
+    etape: ctx.companyEtape as EtapeEntreprise,
+    cumuls: { piecesVendues: ctx.companyPiecesVendues, chiffreAffairesHt: centimes(ctx.companyChiffreAffairesHt) },
+    tresorerie: ctx.companyTresorerie,
+    notoriete: Number(marque?.notoriete ?? 0),
+  });
+  if (!verrou.ok) {
+    return NextResponse.json(
+      { error: verrou.message, code: verrou.code, etapeRequise: verrou.etapeRequise, conditions: verrou.conditions },
+      { status: 403 },
+    );
+  }
   if (batiment.etape_debloquee > ctx.companyEtape) {
     return NextResponse.json(
       {
-        error: `La boutique se débloque à l'étape ${batiment.etape_debloquee} (vous êtes à l'étape ${ctx.companyEtape}).`,
+        error: `Cet emplacement se débloque à l'étape ${batiment.etape_debloquee} (vous êtes à l'étape ${ctx.companyEtape}).`,
         code: "etape_insuffisante",
         etapeRequise: batiment.etape_debloquee,
       },

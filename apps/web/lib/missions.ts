@@ -1,13 +1,17 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { chargerParametresV1, type Parametres } from "@kapital/content";
 import {
-  centimes,
   configTempsDepuis,
   evaluerMissions,
   horlogeDepuis,
+  metriquesDepuisGrandLivre,
+  type ComplementsMissions,
+  type LigneGrandLivreMission,
   type MetriquesMissions,
   type ProgressionMission,
 } from "@kapital/engine";
+
+export type { ComplementsMissions };
 
 function clientAdmin(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -15,14 +19,6 @@ function clientAdmin(): SupabaseClient | null {
   if (!url || !key) return null;
   return createClient(url, key);
 }
-
-type EcritureCompta = {
-  mois_jeu: number;
-  libelle: string;
-  compte: string;
-  sens: "debit" | "credit";
-  montant_centimes: number;
-};
 
 type LigneProgressionDb = {
   mission_id: string;
@@ -32,79 +28,14 @@ type LigneProgressionDb = {
   validee_le: string | null;
 };
 
-const COMPTE_TRESORERIE = "512";
-const COMPTE_VENTES = "707";
-const COMPTE_COUT_VENTES = "7135";
-const PREFIXE_VENTE = "Vente directe ";
-
-function piecesDepuisLibelle(libelle: string): number {
-  if (!libelle.startsWith(PREFIXE_VENTE)) return 0;
-  const reste = libelle.slice(PREFIXE_VENTE.length);
-  const premierNombre = reste.match(/^(\d+)/);
-  if (!premierNombre || !premierNombre[1]) return 0;
-  return parseInt(premierNombre[1], 10);
-}
-
+/** Métriques des missions depuis les lignes de ledger_entries (règle du moteur, partagée avec le banc). */
 export function calculerMetriques(
-  ecritures: readonly EcritureCompta[],
+  ecritures: readonly LigneGrandLivreMission[],
   moisJeuCreation: number,
   moisJeuCourant: number,
+  complements: ComplementsMissions = {},
 ): MetriquesMissions {
-  let pieces = 0;
-  let caCumul = 0;
-  let coutCumul = 0;
-
-  const caParMois = new Map<number, number>();
-  const soldeTresorerie = new Map<number, number>();
-
-  for (const e of ecritures) {
-    if (e.compte === COMPTE_VENTES && e.sens === "credit") {
-      caCumul += e.montant_centimes;
-      caParMois.set(e.mois_jeu, (caParMois.get(e.mois_jeu) ?? 0) + e.montant_centimes);
-      pieces += piecesDepuisLibelle(e.libelle);
-    }
-    if (e.compte === COMPTE_VENTES && e.sens === "debit") {
-      caCumul -= e.montant_centimes;
-      caParMois.set(e.mois_jeu, (caParMois.get(e.mois_jeu) ?? 0) - e.montant_centimes);
-    }
-    if (e.compte === COMPTE_COUT_VENTES && e.sens === "debit") {
-      coutCumul += e.montant_centimes;
-    }
-    if (e.compte === COMPTE_COUT_VENTES && e.sens === "credit") {
-      coutCumul -= e.montant_centimes;
-    }
-    if (e.compte === COMPTE_TRESORERIE) {
-      const delta = e.sens === "debit" ? e.montant_centimes : -e.montant_centimes;
-      soldeTresorerie.set(
-        e.mois_jeu,
-        (soldeTresorerie.get(e.mois_jeu) ?? 0) + delta,
-      );
-    }
-  }
-
-  const moisTries = [...soldeTresorerie.keys()].sort((a, b) => a - b);
-  let cumulTres = 0;
-  let aEuDecouvert = false;
-  for (const m of moisTries) {
-    cumulTres += soldeTresorerie.get(m) ?? 0;
-    if (cumulTres < 0) aEuDecouvert = true;
-  }
-
-  const moisAvecVentes = [...caParMois.entries()]
-    .filter(([, c]) => c > 0)
-    .sort(([a], [b]) => a - b);
-  const caMoisInitial = moisAvecVentes[0]?.[1] ?? 0;
-  const caMoisMax = moisAvecVentes.reduce((max, [, c]) => Math.max(max, c), 0);
-
-  return {
-    pieces_vendues_total: pieces,
-    marge_brute_cumul_centimes: centimes(caCumul - coutCumul),
-    mois_jeu_courant: moisJeuCourant,
-    mois_jeu_creation: moisJeuCreation,
-    a_eu_decouvert: aEuDecouvert,
-    ca_mois_initial_centimes: centimes(caMoisInitial),
-    ca_mois_max_centimes: centimes(caMoisMax),
-  };
+  return metriquesDepuisGrandLivre(ecritures, moisJeuCreation, moisJeuCourant, complements);
 }
 
 /**
@@ -122,10 +53,10 @@ export async function chargerProgressionMissions(
   supabase: SupabaseClient,
   companyId: string,
 ): Promise<readonly ProgressionMission[] | null> {
-  const [compta, monde, lignesMiss, societe] = await Promise.all([
+  const [compta, monde, lignesMiss, societe, boutiques, locaux] = await Promise.all([
     supabase
       .from("ledger_entries")
-      .select("mois_jeu, libelle, compte, sens, montant_centimes")
+      .select("ecriture_id, mois_jeu, libelle, compte, sens, montant_centimes")
       .eq("company_id", companyId),
     supabase.from("worlds").select("mois_courant, debut_reel").limit(1).maybeSingle(),
     supabase
@@ -133,9 +64,11 @@ export async function chargerProgressionMissions(
       .select("mission_id, etat, actuel, cible, validee_le")
       .eq("company_id", companyId),
     supabase.from("companies").select("cree_le").eq("id", companyId).maybeSingle(),
+    supabase.from("points_de_vente").select("mois_signature, mois_ouverture").eq("company_id", companyId),
+    supabase.from("workshops").select("id").eq("company_id", companyId).limit(1),
   ]);
 
-  const ecritures = (compta.data ?? []) as EcritureCompta[];
+  const ecritures = (compta.data ?? []) as LigneGrandLivreMission[];
   const moisCourant = (monde.data?.mois_courant as number | undefined) ?? 0;
   const lignes = (lignesMiss.data ?? []) as LigneProgressionDb[];
 
@@ -146,7 +79,13 @@ export async function chargerProgressionMissions(
     (monde.data?.debut_reel as string | null | undefined) ?? null,
     (societe.data?.cree_le as string | null | undefined) ?? null,
   );
-  const metriques = calculerMetriques(ecritures, moisCreation, moisCourant);
+  const metriques = calculerMetriques(ecritures, moisCreation, moisCourant, {
+    boutiques: ((boutiques.data ?? []) as { mois_signature: number; mois_ouverture: number }[]).map((b) => ({
+      mois_signature: Number(b.mois_signature),
+      mois_ouverture: Number(b.mois_ouverture),
+    })),
+    localEnregistre: (locaux.data ?? []).length > 0,
+  });
   const progressions = evaluerMissions(metriques);
 
   // Verrou "une fois validée, toujours validée"

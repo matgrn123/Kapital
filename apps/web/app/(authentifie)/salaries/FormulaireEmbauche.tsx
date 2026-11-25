@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { CoefficientsSalaires } from "@kapital/engine";
@@ -8,12 +9,13 @@ import { apercuEmbauche, bornesSalaire, type EcritureAffichee } from "../../../l
 import { formaterEuros } from "../../../lib/formatage";
 import { appelerAction } from "../_partage/reponses";
 
-type Poste = "artisan" | "encadrement";
+type Poste = "artisan" | "encadrement" | "vendeur";
 
-// Les deux postes de la V1 (pas de candidats fictifs : la V1 n'en a pas).
+// Les trois postes de la V1 (pas de candidats fictifs : la V1 n'en a pas).
 const POSTES: ReadonlyArray<{ id: Poste; nom: string; type: string; effet: string }> = [
   { id: "artisan", nom: "Artisan", type: "Production", effet: "Fait tourner un poste de travail de l'atelier : c'est lui qui produit." },
   { id: "encadrement", nom: "Encadrement", type: "Bureau", effet: "Organise l'équipe. N'occupe pas de machine et ne produit pas lui-même." },
+  { id: "vendeur", nom: "Vendeur", type: "Boutique", effet: "Accueille les clients de ta boutique : sans vendeur, la boutique ne vend rien." },
 ];
 
 export function FormulaireEmbauche({
@@ -23,6 +25,9 @@ export function FormulaireEmbauche({
   postesLibres,
   aUnAtelier,
   verrouille,
+  aUneBoutique,
+  ventesMaxParVendeur,
+  messageSansBoutique,
 }: {
   coefficients: CoefficientsSalaires;
   moisCourant: number;
@@ -32,6 +37,12 @@ export function FormulaireEmbauche({
   aUnAtelier: boolean;
   /** Embauche pas encore débloquée par l'étape : le bandeau de la page l'explique. */
   verrouille: boolean;
+  /** AE-10 : une boutique ouverte ou en travaux ; sans elle, le serveur refuse un vendeur (sans_boutique). */
+  aUneBoutique: boolean;
+  /** Pièces qu'un vendeur peut vendre par mois (paramètre vendeur_ventes_max_pieces_par_mois). */
+  ventesMaxParVendeur: number;
+  /** Le message du refus sans_boutique, tel que le renvoie le serveur. */
+  messageSansBoutique: string;
 }) {
   const router = useRouter();
   const bornes = bornesSalaire(coefficients);
@@ -75,9 +86,9 @@ export function FormulaireEmbauche({
         </div>
       </Carte>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {POSTES.map((p) => {
-          const sansPoste = p.id === "artisan" && postesLibres === 0;
+          const sansPoste = (p.id === "artisan" && postesLibres === 0) || (p.id === "vendeur" && !aUneBoutique);
           return (
             <Carte key={p.id} className="flex flex-col gap-2.5">
               <div className="flex items-center justify-between gap-2">
@@ -94,6 +105,20 @@ export function FormulaireEmbauche({
                       : "Aucun poste : loue d'abord un local (écran Locaux), il arrive avec ses postes de couture."}
                 </p>
               )}
+              {p.id === "vendeur" && (
+                <p className="text-[0.8rem] text-muted">
+                  {aUneBoutique ? (
+                    `Il vend jusqu'à ${ventesMaxParVendeur.toLocaleString("fr-FR")} pièces par mois en boutique.`
+                  ) : (
+                    <>
+                      {messageSansBoutique}{" "}
+                      <Link href="/magasin" className="font-semibold text-accent underline">
+                        Écran Magasin
+                      </Link>
+                    </>
+                  )}
+                </p>
+              )}
               <div>
                 <Ligne libelle="Salaire brut (641)">{formaterEuros(brut)} €</Ligne>
                 <Ligne libelle="Cotisations patronales (645)">{formaterEuros(apercu.cotisations)} €</Ligne>
@@ -105,7 +130,13 @@ export function FormulaireEmbauche({
                 variante={sansPoste ? "secondaire" : "principal"}
                 onClick={() => embaucher(p.id)}
                 disabled={enCours !== null || verrouille || sansPoste}
-                title={sansPoste ? "Aucun poste de travail libre dans ton atelier" : undefined}
+                title={
+                  sansPoste
+                    ? p.id === "vendeur"
+                      ? "Ouvre d'abord une boutique"
+                      : "Aucun poste de travail libre dans ton atelier"
+                    : undefined
+                }
               >
                 {enCours === p.id ? "Embauche…" : `Embaucher (${p.nom.toLowerCase()})`}
               </Bouton>

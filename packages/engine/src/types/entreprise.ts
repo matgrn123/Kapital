@@ -10,7 +10,7 @@ import type {
 import type { MaterielAtelier, ModulePose } from "../atelier/effetsPlan.js";
 
 export type Gamme = "entree" | "milieu" | "haut";
-export type EtapeEntreprise = 0 | 1 | 2;
+export type EtapeEntreprise = 0 | 1 | 2 | 3;
 /**
  * Compteurs depuis la création, mis à jour à chaque clôture : ils servent à
  * constater le passage d'étape. Absents = 0 (entreprise créée avant AE-2).

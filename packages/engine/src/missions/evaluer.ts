@@ -3,6 +3,7 @@ import type {
   IdMission,
   MetriquesMissions,
   ProgressionMission,
+  SoldeTresorerieMois,
 } from "./types.js";
 
 const CIBLE_PIECES_MISSION_1 = 50;
@@ -61,10 +62,62 @@ export function evaluerMission3(m: MetriquesMissions): ProgressionMission {
   };
 }
 
+/**
+ * Solde de trésorerie à la fin du mois `mois` : le dernier solde connu à ce mois ou avant
+ * (un mois sans écriture garde le solde du précédent ; avant toute écriture, 0).
+ */
+export function soldeFinDeMois(soldes: readonly SoldeTresorerieMois[], mois: number): number {
+  let solde = 0;
+  for (const s of soldes) {
+    if (s.mois > mois) break;
+    solde = s.solde_centimes;
+  }
+  return solde;
+}
+
+/**
+ * Mission 4 « Ouvrir ma boutique sans découvert » (AE-11). Règle : une boutique est signée, et
+ * le solde de trésorerie est positif ou nul à la fin de chaque mois de la « fenêtre d'ouverture »,
+ * du mois de signature du bail au mois d'ouverture inclus (les travaux, pendant lesquels le loyer
+ * court sans aucune vente, puis le premier mois de vente). La mission se valide quand le mois
+ * d'ouverture est clos (mois courant > mois d'ouverture). Un découvert dans la fenêtre la rend
+ * ratée pour cette boutique (retour « à faire »). Progression : mois clos de la fenêtre.
+ */
+export function evaluerMission4(m: MetriquesMissions): ProgressionMission {
+  let meilleure: ProgressionMission | null = null;
+  for (const b of m.boutiques) {
+    const cible = Math.max(1, b.mois_ouverture - b.mois_signature + 1);
+    const dernierClos = Math.min(m.mois_jeu_courant - 1, b.mois_ouverture);
+    let decouvert = false;
+    for (let mois = b.mois_signature; mois <= dernierClos; mois++) {
+      if (soldeFinDeMois(m.tresorerie_fin_mois, mois) < 0) decouvert = true;
+    }
+    const actuel = Math.max(0, Math.min(cible, dernierClos - b.mois_signature + 1));
+    const etat: EtatMission = decouvert
+      ? "a_faire"
+      : m.mois_jeu_courant > b.mois_ouverture
+        ? "validee"
+        : "en_cours";
+    const p: ProgressionMission = { id: "mission4", etat, actuel: decouvert ? 0 : actuel, cible };
+    if (etat === "validee") return p;
+    if (!meilleure || (etat === "en_cours" && meilleure.etat !== "en_cours")) meilleure = p;
+  }
+  return meilleure ?? { id: "mission4", etat: "a_faire", actuel: 0, cible: 0 };
+}
+
+/**
+ * Mission 5 « Louer ou acheter » (AE-11). Règle : la société a signé un bail ou acheté un local.
+ * Les deux choix se font sur l'écran Locaux, où chaque local montre le comparatif louer / acheter
+ * à côté des deux boutons ; le moteur ne mesure pas que le comparatif a été déplié.
+ */
+export function evaluerMission5(m: MetriquesMissions): ProgressionMission {
+  return { id: "mission5", etat: m.local_signe ? "validee" : "a_faire", actuel: m.local_signe ? 1 : 0, cible: 1 };
+}
+
 export function evaluerMissions(
   m: MetriquesMissions,
 ): readonly ProgressionMission[] {
-  return [evaluerMission1(m), evaluerMission2(m), evaluerMission3(m)];
+  return [evaluerMission1(m), evaluerMission2(m), evaluerMission3(m), evaluerMission4(m), evaluerMission5(m)];
 }
 
 export function progressionParId(

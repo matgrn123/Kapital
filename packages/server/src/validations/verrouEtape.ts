@@ -23,10 +23,16 @@ const LIBELLES: Record<ActionVerrouillable, string> = {
   production_atelier: "La production à l'atelier",
   embauche: "L'embauche",
   vente_revendeur: "La vente aux revendeurs",
+  ouverture_boutique: "L'ouverture d'une boutique",
 };
 
 function euros(centimesMontant: number): string {
   return `${(centimesMontant / 100).toFixed(2).replace(".", ",")} €`;
+}
+
+/** La notoriété est un nombre à virgule (jauge de 0 à 100) : affichée au dixième. */
+function arrondiPoints(n: number): string {
+  return (Math.round(n * 10) / 10).toString().replace(".", ",");
 }
 
 function phraseCondition(c: ConditionManquante): string {
@@ -37,6 +43,10 @@ function phraseCondition(c: ConditionManquante): string {
       return `il vous manque ${euros(c.manque)} de chiffre d'affaires hors taxes cumulé (${euros(c.actuel)} sur ${euros(c.requis)})`;
     case "tresorerie_positive":
       return `votre trésorerie doit être positive à la clôture du mois (${euros(c.actuel)} aujourd'hui)`;
+    case "tresorerie_minimale":
+      return `il vous manque ${euros(c.manque)} de trésorerie à la clôture du mois (${euros(c.actuel)} sur ${euros(c.requis)})`;
+    case "notoriete":
+      return `il vous manque ${arrondiPoints(c.manque)} points de notoriété (${arrondiPoints(c.actuel)} sur ${c.requis})`;
   }
 }
 
@@ -68,6 +78,7 @@ export function verifierDeblocageEtape(
     readonly etape: EtapeEntreprise;
     readonly cumuls?: CumulsEtape;
     readonly tresorerie: number;
+    readonly notoriete?: number;
   },
   seuilsEtapes?: SeuilsEtapes,
 ): Result {
@@ -77,6 +88,7 @@ export function verifierDeblocageEtape(
       etape: etat.etape,
       cumuls: etat.cumuls ?? { piecesVendues: 0, chiffreAffairesHt: centimes(0) },
       tresorerie: centimes(etat.tresorerie),
+      notoriete: etat.notoriete ?? 0,
     },
     seuilsDe({ seuilsEtapes }),
   );
@@ -90,6 +102,7 @@ export function verifierDeblocage(ctx: ContexteValidation, action: ActionVerroui
       etape: ctx.entreprise.etape,
       cumuls: ctx.entreprise.cumulsEtape,
       tresorerie: ctx.entreprise.tresorerie,
+      notoriete: ctx.entreprise.marque.notoriete,
     },
     ctx.seuilsEtapes,
   );

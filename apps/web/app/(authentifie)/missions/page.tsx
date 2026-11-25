@@ -27,6 +27,8 @@ const OU_AGIR: Record<string, { href: string; texte: string }> = {
   mission1: { href: "/produits", texte: "Fixer mes prix" },
   mission2: { href: "/banque", texte: "Voir ma trésorerie" },
   mission3: { href: "/atelier", texte: "Produire plus" },
+  mission4: { href: "/magasin", texte: "Ouvrir ma boutique" },
+  mission5: { href: "/locaux", texte: "Comparer louer et acheter" },
 };
 
 export default async function PageMissions() {
@@ -61,7 +63,7 @@ export default async function PageMissions() {
   return (
     <div className="flex flex-col gap-5">
       <EnTete surTitre="Progression" titre="Missions et classement">
-        Trois missions pour apprendre les notions clés du jeu. Elles avancent toutes seules pendant que tu joues. Le
+        {DEFINITIONS_MISSIONS.length} missions pour apprendre les notions clés du jeu. Elles avancent toutes seules pendant que tu joues. Le
         classement compare la valeur des entreprises du village.
       </EnTete>
 
@@ -80,7 +82,12 @@ export default async function PageMissions() {
           const etat: EtatMission = p?.etat ?? "a_faire";
           const actuel = p?.actuel ?? 0;
           const cible = p?.cible ?? 0;
-          const format = d.id === "mission3" ? (v: number) => `${formaterEuros(v)} €` : (v: number) => String(v);
+          const format =
+            d.id === "mission3"
+              ? (v: number) => `${formaterEuros(v)} €`
+              : d.id === "mission4"
+                ? (v: number) => `${v} mois`
+                : (v: number) => String(v);
           const agir = OU_AGIR[d.id];
           return (
             <Carte

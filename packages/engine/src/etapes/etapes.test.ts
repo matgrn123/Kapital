@@ -1,4 +1,4 @@
-import { chargerParametresV1 } from "@kapital/content";
+import { chargerBatimentsV1, chargerParametresV1 } from "@kapital/content";
 import { describe, expect, it } from "vitest";
 import { centimes } from "../types/primitifs.js";
 import {
@@ -106,7 +106,7 @@ describe("conditions manquantes", () => {
 describe("déblocages par étape", () => {
   it("chaque action verrouillable a une étape requise", () => {
     for (const a of ACTIONS_VERROUILLABLES) {
-      expect([0, 1, 2]).toContain(etapeRequisePour(a));
+      expect([0, 1, 2, 3]).toContain(etapeRequisePour(a));
     }
   });
 
@@ -150,8 +150,8 @@ describe("déblocage total de développement", () => {
     expect(deblocageTotalActif(autres)).toBe(false);
   });
 
-  it("actif : toute société compte comme étant à l'étape 2, donc plus aucune action verrouillée", () => {
-    expect(etapeEffective(0, AVEC)).toBe(2);
+  it("actif : toute société compte comme étant à la dernière étape (3), donc plus aucune action verrouillée", () => {
+    expect(etapeEffective(0, AVEC)).toBe(3);
     for (const action of ACTIONS_VERROUILLABLES) {
       expect(verrouPour(action, etat({ etape: etapeEffective(0, AVEC) }), SEUILS)).toBeNull();
     }
@@ -164,13 +164,96 @@ describe("déblocage total de développement", () => {
   });
 
   it("ne fait jamais descendre une étape", () => {
-    expect(etapeEffective(2, AVEC)).toBe(2);
+    expect(etapeEffective(2, AVEC)).toBe(3);
     expect(etapeEffective(2, SANS)).toBe(2);
+    expect(etapeEffective(3, SANS)).toBe(3);
   });
 
   it("le fichier de paramètres livré porte le réglage, avec une source", () => {
     const p = PARAMS["deblocage_total_developpement"];
     expect(p).toBeDefined();
     expect(p!.source.length).toBeGreaterThan(10);
+  });
+});
+
+describe("étape 3 : la boutique (AE-11)", () => {
+  const CUMULS_3 = { piecesVendues: 3000, chiffreAffairesHt: centimes(12_000_000) };
+
+  it("seuils lus dans les paramètres : 120 000 € de CA, 30 000 € de trésorerie, 30 points de notoriété", () => {
+    expect(SEUILS.chiffreAffairesHtEtape3).toBe(centimes(12_000_000));
+    expect(SEUILS.tresorerieMinimaleEtape3).toBe(centimes(3_000_000));
+    expect(SEUILS.notorieteMinimaleEtape3).toBe(30);
+  });
+
+  it("passe à 3 quand les trois conditions sont remplies à la clôture", () => {
+    expect(
+      constaterEtape(etat({ etape: 2, cumuls: CUMULS_3, tresorerie: centimes(3_000_000), notoriete: 30 }), SEUILS),
+    ).toBe(3);
+  });
+
+  it("peut sauter de 1 à 3 d'un coup si tout est rempli", () => {
+    expect(
+      constaterEtape(etat({ etape: 1, cumuls: CUMULS_3, tresorerie: centimes(5_000_000), notoriete: 50 }), SEUILS),
+    ).toBe(3);
+  });
+
+  it("reste à 2 s'il manque la trésorerie, la notoriété ou le chiffre d'affaires", () => {
+    expect(constaterEtape(etat({ etape: 2, cumuls: CUMULS_3, tresorerie: centimes(2_999_999), notoriete: 80 }), SEUILS)).toBe(2);
+    expect(constaterEtape(etat({ etape: 2, cumuls: CUMULS_3, tresorerie: centimes(9_000_000), notoriete: 29.9 }), SEUILS)).toBe(2);
+    expect(
+      constaterEtape(
+        etat({
+          etape: 2,
+          cumuls: { piecesVendues: 3000, chiffreAffairesHt: centimes(11_999_999) },
+          tresorerie: centimes(9_000_000),
+          notoriete: 80,
+        }),
+        SEUILS,
+      ),
+    ).toBe(2);
+  });
+
+  it("notoriété absente = 0 : l'étape 3 n'est pas atteinte", () => {
+    expect(constaterEtape(etat({ etape: 2, cumuls: CUMULS_3, tresorerie: centimes(9_000_000) }), SEUILS)).toBe(2);
+  });
+
+  it("ne redescend jamais depuis l'étape 3", () => {
+    expect(constaterEtape(etat({ etape: 3, tresorerie: centimes(-100) }), SEUILS)).toBe(3);
+  });
+
+  it("conditions manquantes chiffrées : chiffre d'affaires, trésorerie minimale, notoriété", () => {
+    const m = conditionsManquantes(
+      3,
+      etat({
+        etape: 2,
+        cumuls: { piecesVendues: 900, chiffreAffairesHt: centimes(5_000_000) },
+        tresorerie: centimes(1_000_000),
+        notoriete: 12,
+      }),
+      SEUILS,
+    );
+    expect(m).toEqual([
+      { cle: "chiffre_affaires_ht_cumule", unite: "centimes", actuel: 5_000_000, requis: 12_000_000, manque: 7_000_000 },
+      { cle: "tresorerie_minimale", unite: "centimes", actuel: 1_000_000, requis: 3_000_000, manque: 2_000_000 },
+      { cle: "notoriete", unite: "points", actuel: 12, requis: 30, manque: 18 },
+    ]);
+  });
+
+  it("aucune condition manquante quand l'étape 3 est remplie", () => {
+    expect(
+      conditionsManquantes(3, etat({ etape: 2, cumuls: CUMULS_3, tresorerie: centimes(3_000_000), notoriete: 30 }), SEUILS),
+    ).toEqual([]);
+  });
+
+  it("l'ouverture d'une boutique se débloque à l'étape 3", () => {
+    expect(etapeRequisePour("ouverture_boutique")).toBe(3);
+    expect(verrouPour("ouverture_boutique", etat({ etape: 2 }), SEUILS)).not.toBeNull();
+    expect(verrouPour("ouverture_boutique", etat({ etape: 3 }), SEUILS)).toBeNull();
+  });
+
+  it("concorde avec le catalogue : les emplacements boutique sont à l'étape requise pour l'ouverture", () => {
+    const boutiques = chargerBatimentsV1().filter((b) => b.categorie === "boutique");
+    expect(boutiques.length).toBeGreaterThan(0);
+    for (const b of boutiques) expect(b.etape_debloquee).toBe(etapeRequisePour("ouverture_boutique"));
   });
 });

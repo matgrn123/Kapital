@@ -14,11 +14,14 @@ const LIBELLES: Record<string, string> = {
   pieces_vendues: "Pièces vendues",
   chiffre_affaires_ht_cumule: "Chiffre d'affaires hors taxes cumulé",
   tresorerie_positive: "Trésorerie positive à la clôture du mois",
+  tresorerie_minimale: "Trésorerie à la clôture du mois",
+  notoriete: "Notoriété de la marque",
 };
 
 function valeur(n: number, unite?: string): string {
   if (unite === "centimes") return `${formaterEuros(n)} €`;
   if (unite === "pieces") return `${n} pièces`;
+  if (unite === "points") return `${Math.round(n)} points`;
   return unite ? `${n} ${unite}` : String(n);
 }
 
