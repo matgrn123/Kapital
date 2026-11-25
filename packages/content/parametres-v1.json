@@ -311,6 +311,24 @@
     "source": "docs/cahier-des-charges-v1.md section 4 (échéance de prêt tous les 30 jours = toutes les 24 h réelles)",
     "date": "2026-11-24"
   },
+  "calendrier_mois_depart_monde": {
+    "valeur": 1,
+    "unite": "mois_calendaire_1_a_12",
+    "source": "Hypothèse de jeu, à valider : le monde naît en janvier de l'an 1, pour que l'exercice comptable de 12 mois (clôture aux mois 11, 23… de moteur/cloture.ts) coïncide avec l'année civile, cas le plus courant (art. L123-12 du Code de commerce : comptes annuels établis à la clôture de l'exercice)",
+    "date": "2026-11-25"
+  },
+  "calendrier_mois_debut_collection_pe": {
+    "valeur": 2,
+    "unite": "mois_calendaire_1_a_12",
+    "source": "Hypothèse de jeu, à valider : la collection printemps-été arrive en boutique en février, à la fin des soldes d'hiver de janvier (soldes encadrés par l'art. L310-3 du Code de commerce)",
+    "date": "2026-11-25"
+  },
+  "calendrier_mois_debut_collection_ah": {
+    "valeur": 8,
+    "unite": "mois_calendaire_1_a_12",
+    "source": "Hypothèse de jeu, à valider : la collection automne-hiver arrive en boutique en août, à la fin des soldes d'été de juillet (soldes encadrés par l'art. L310-3 du Code de commerce)",
+    "date": "2026-11-25"
+  },
   "serie_lancement_pieces": {
     "valeur": 100,
     "unite": "pieces",
