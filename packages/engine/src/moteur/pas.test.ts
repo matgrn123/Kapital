@@ -52,6 +52,7 @@ function paramsNeutres(minutesParPas = 10): Parametres {
   fixer("decroissance_notoriete_mois", 0);
   fixer("decroissance_desirabilite_mois", 0);
   fixer("temps_minutes_reelles_par_pas", minutesParPas);
+  fixer("taux_chute_matiere_defaut", 0);
   return p;
 }
 
@@ -109,6 +110,13 @@ function entrepriseDeTest(surcharge: Partial<Entreprise> = {}): Entreprise {
         qualiteVisee: 60,
         prix: { vente_directe: centimes(3000), revendeur: centimes(1800) },
         productionMensuelleCible: 60,
+        // 1 unité par pièce, sans fournitures, 30 min : le coût moyen reste à 15 €.
+        fabrication: {
+          matiere: MATIERE,
+          consommationParPiece: 1,
+          fournituresParPiece: centimes(0),
+          tempsStandardMinutes: 30,
+        },
       },
     ],
     ...surcharge,
@@ -418,6 +426,27 @@ describe("simulerPas — flux à chaque pas, échéances en fin de mois", () => 
     expect(pas.entreprisesParPas[0]!.salaries[0]!.experienceMois).toBe(6);
     expect(pas.entreprisesParPas[NB_PAS - 2]!.salaries[0]!.experienceMois).toBe(6);
     expect(pas.entreprisesParPas[NB_PAS - 1]!.salaries[0]!.experienceMois).toBe(7);
+  });
+
+  it("le compteur de pièces vendues et le CA cumulé augmentent à chaque vente, sans double comptage à la clôture", () => {
+    const depart = entrepriseDeTest({ cumulsEtape: { piecesVendues: 5, chiffreAffairesHt: centimes(1000) } });
+    const pas = jouerUnMois(depart);
+    const servi = (c: CumulMois | null) => Object.values(c?.serviParLigne ?? {}).reduce((s, q) => s + q, 0);
+    const milieu = Math.floor(NB_PAS / 2);
+    const cumulMilieu = pas.cumulsParPas[milieu]!;
+    // En cours de mois : le compteur suit déjà les ventes enregistrées
+    expect(servi(cumulMilieu)).toBeGreaterThan(0);
+    expect(pas.entreprisesParPas[milieu]!.cumulsEtape).toEqual({
+      piecesVendues: 5 + servi(cumulMilieu),
+      chiffreAffairesHt: centimes(1000 + cumulMilieu.chiffreAffairesHt),
+    });
+    // À la clôture : exactement le total du mois, une seule fois
+    const avantDernier = pas.cumulsParPas[NB_PAS - 2]!;
+    const fin = pas.entreprisesParPas[NB_PAS - 1]!.cumulsEtape!;
+    expect(fin.piecesVendues).toBeGreaterThanOrEqual(5 + servi(avantDernier));
+    expect(fin.piecesVendues).toBeLessThan(5 + 2 * servi(avantDernier));
+    const bloc = simulerMoisEntreprise(depart, { ...FLUX_VIDE, ...FIN_VIDE } as DonneesReellesMois, MARKET, paramsNeutres(), G, moisJeu(1));
+    expect(fin).toEqual(bloc.entrepriseApres.cumulsEtape);
   });
 
   it("la production et les ventes avancent pendant le mois", () => {

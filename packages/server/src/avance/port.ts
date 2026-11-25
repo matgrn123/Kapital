@@ -1,6 +1,7 @@
 import type {
   CreanceAEncaisser,
   CumulMois,
+  DetteFournisseurEchue,
   DonneesFinMois,
   EcritureComptable,
   Entreprise,
@@ -77,6 +78,12 @@ export interface StockageMonde {
   chargerLivraisons(companyId: string, avantMs: number): Promise<LivraisonsEnAttente>;
   /** Créances revendeurs à encaisser au premier pas du mois. */
   chargerCreances(companyId: string, moisEnCours: number): Promise<readonly CreanceAEncaisser[]>;
+  /**
+   * Dettes fournisseurs et façonniers dont l'échéance (mois de livraison + délai de
+   * paiement) est atteinte au mois `moisEnCours` et pas encore réglées : payées au
+   * premier pas du mois.
+   */
+  chargerDettesEchues(companyId: string, moisEnCours: number): Promise<readonly DetteFournisseurEchue[]>;
   /** TVA à payer et compteur de découvert, lus pour la clôture du mois. */
   chargerFinDeMois(companyId: string, moisEnCours: number): Promise<DonneesFinMois>;
   /**

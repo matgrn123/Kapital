@@ -1,6 +1,6 @@
 import type { EcritureComptable } from "../comptabilite/types.js";
 import { AGREGATS_VIDES, type AgregatsMois } from "./agregats.js";
-import type { Entreprise, EtapeEntreprise } from "../types/entreprise.js";
+import type { Entreprise, EtapeEntreprise, FicheFabrication } from "../types/entreprise.js";
 import type { Centimes, IdMatiere, IdProduit, MoisJeu } from "../types/primitifs.js";
 import type { Explication } from "../types/resultatMois.js";
 
@@ -23,7 +23,25 @@ export type LivraisonFaconnier = {
   readonly produit: IdProduit;
   readonly quantite: number;
   readonly prixFaconParPiece: Centimes;
-  readonly coutMatiereParPiece: Centimes;
+  /**
+   * Nomenclature du produit quand le façonnier travaille la matière du joueur :
+   * à la livraison, matière × (1 + chute) sort du stock 31 (au coût moyen) et
+   * les fournitures s'ajoutent à la facture du façonnier.
+   * null : le façonnier fournit tout (grossiste), seule sa facture compte.
+   */
+  readonly matiereDuJoueur: FicheFabrication | null;
+};
+
+/**
+ * Dette fournisseur ou façonnier arrivée à échéance : réglée au premier pas du mois
+ * de l'échéance (401 débit / 512 crédit), même si la banque passe sous zéro
+ * (le découvert est alors facturé à la clôture, cahier des charges 6.1 étape 6).
+ */
+export type DetteFournisseurEchue = {
+  /** Identifiant de la commande (purchase_orders ou production_orders). */
+  readonly ordreId: string;
+  readonly nature: "matiere" | "faconnier";
+  readonly montant: Centimes;
 };
 
 /** Dépense marketing */
@@ -48,6 +66,8 @@ export type DonneesFlux = {
   readonly livraisonsFaconniers: readonly LivraisonFaconnier[];
   readonly depensesMarketing: readonly DepenseMarketingMois[];
   readonly creancesAEncaisser: readonly CreanceAEncaisser[];
+  /** Dettes fournisseurs et façonniers à régler dans ce flux (absent = aucune). */
+  readonly dettesEchues?: readonly DetteFournisseurEchue[];
 };
 
 /** Ce dont le moteur a besoin seulement à la clôture du mois. */

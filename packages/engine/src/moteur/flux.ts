@@ -23,6 +23,13 @@ import {
   prixHtDepuisTtc,
 } from "../ventes/ventes.js";
 import { agregatsDe, sommeAgregats } from "./agregats.js";
+import {
+  besoinMatiere,
+  montantFactureFaconnier,
+  montantLivraisonMatiere,
+  parametreObligatoire,
+  piecesPermisesParLaMatiere,
+} from "./fabrication.js";
 import type { CumulMois, DonneesFlux } from "./donneesMois.js";
 
 // ---------------------------------------------------------------------------
@@ -163,9 +170,6 @@ function diminuerStockFini(
 // Plan de production du mois
 // ---------------------------------------------------------------------------
 
-// Temps standard par pièce (simplification : 30 min/pièce si non disponible)
-const TEMPS_STANDARD_PAR_PIECE_MINUTES = 30;
-
 type LignePlanProduction = { readonly produit: IdProduit; readonly pieces: number };
 
 /**
@@ -182,10 +186,10 @@ export function planProductionDuMois(ent: Entreprise, params: Parametres): reado
   if (nbArtisans === 0) return [];
 
   const avgExperience = artisans.reduce((sum, s) => sum + s.experienceMois, 0) / nbArtisans;
-  const rMin = params["rendement_atelier_min"]?.valeur ?? 0.4;
-  const rMax = params["rendement_atelier_max"]?.valeur ?? 0.75;
-  const tau = params["rendement_tau_mois"]?.valeur ?? 6;
-  const heuresMensuelles = params["heures_mensuelles_legales"]?.valeur ?? 151.67;
+  const rMin = parametreObligatoire(params, "rendement_atelier_min");
+  const rMax = parametreObligatoire(params, "rendement_atelier_max");
+  const tau = parametreObligatoire(params, "rendement_tau_mois");
+  const heuresMensuelles = parametreObligatoire(params, "heures_mensuelles_legales");
   const rendementEffectif = rendement(avgExperience, rMin, rMax, tau);
   let capaciteRestante = capaciteMinutes(
     nbArtisans,
@@ -198,11 +202,20 @@ export function planProductionDuMois(ent: Entreprise, params: Parametres): reado
   for (const produitEnt of ent.catalogue) {
     if (produitEnt.productionMensuelleCible <= 0) continue;
     if (capaciteRestante <= 0) break;
-    const piecesProducibles = Math.floor(capaciteRestante / TEMPS_STANDARD_PAR_PIECE_MINUTES);
+    const fiche = produitEnt.fabrication;
+    if (fiche === undefined) {
+      throw new Error(
+        `Produit ${produitEnt.produit} sans nomenclature (matière, consommation, temps) : production atelier impossible.`,
+      );
+    }
+    if (!(fiche.tempsStandardMinutes > 0)) {
+      throw new Error(`Temps standard invalide pour ${produitEnt.produit} : ${fiche.tempsStandardMinutes}`);
+    }
+    const piecesProducibles = Math.floor(capaciteRestante / fiche.tempsStandardMinutes);
     const pieces = Math.min(produitEnt.productionMensuelleCible, piecesProducibles);
     if (pieces <= 0) continue;
     plan.push({ produit: produitEnt.produit, pieces });
-    capaciteRestante = minutes(capaciteRestante - pieces * TEMPS_STANDARD_PAR_PIECE_MINUTES);
+    capaciteRestante = minutes(capaciteRestante - pieces * fiche.tempsStandardMinutes);
   }
   return plan;
 }
@@ -275,7 +288,7 @@ export function avancerFlux(
 
   // Livraisons de matière arrivées
   for (const livraison of donnees.livraisonsMatiere) {
-    const montantTotal = centimes(livraison.quantite * livraison.prixUnitaire);
+    const montantTotal = montantLivraisonMatiere(livraison.quantite, livraison.prixUnitaire);
     ent = {
       ...ent,
       stocksMatiere: mettreAJourStockMatiere(
@@ -297,10 +310,26 @@ export function avancerFlux(
     });
   }
 
-  // Livraisons des façonniers arrivées
+  const tauxChute = parametreObligatoire(params, "taux_chute_matiere_defaut");
+
+  // Livraisons des façonniers arrivées. Coût complet de la pièce :
+  // matière × (1 + chute) prise dans le stock du joueur (au coût moyen) + fournitures + façon.
   for (const livraison of donnees.livraisonsFaconniers) {
-    const totalMatiere = centimes(livraison.coutMatiereParPiece * livraison.quantite);
-    const totalFacon = centimes(livraison.prixFaconParPiece * livraison.quantite);
+    let totalMatiere = centimes(0);
+    const fiche = livraison.matiereDuJoueur;
+    if (fiche !== null) {
+      // Si le stock ne couvre pas tout le besoin, on sort ce qu'il y a (le serveur refuse
+      // déjà la commande sans matière suffisante ; ce cas ne vient que d'une matière
+      // consommée entre-temps par l'atelier).
+      const sortie = consommerStockMatiere(
+        ent.stocksMatiere,
+        fiche.matiere,
+        besoinMatiere(livraison.quantite, fiche, tauxChute),
+      );
+      totalMatiere = sortie.valeur;
+      ent = { ...ent, stocksMatiere: sortie.stocks };
+    }
+    const totalFacon = montantFactureFaconnier(livraison.quantite, livraison.prixFaconParPiece, fiche);
     const totalPF = centimes(totalMatiere + totalFacon);
     ent = {
       ...ent,
@@ -329,40 +358,42 @@ export function avancerFlux(
     const piecesAProduire = Math.floor((ligne.pieces * pasVecus) / pasParMois) - dejaProduit;
     if (piecesAProduire <= 0) continue;
 
-    // Première matière disponible
-    const premierStock = ent.stocksMatiere.find((s) => s.quantite > 0);
-    if (!premierStock) break;
-
-    // Consommation : 1 unité de matière par pièce (simplification)
+    // Bonne matière, consommation de la nomenclature, chute comprise ; on ne produit
+    // que ce que la matière en stock permet (jamais de pièce à coût nul).
+    const fiche = ent.catalogue.find((p) => p.produit === ligne.produit)!.fabrication!;
+    const stockMatiere = ent.stocksMatiere.find((s) => s.matiere === fiche.matiere);
+    const pieces = Math.min(
+      piecesAProduire,
+      piecesPermisesParLaMatiere(stockMatiere?.quantite ?? 0, fiche, tauxChute),
+    );
+    if (pieces <= 0) continue;
     const { valeur: valeurMatiere, stocks: stocksApres } = consommerStockMatiere(
       ent.stocksMatiere,
-      premierStock.matiere,
-      piecesAProduire,
+      fiche.matiere,
+      besoinMatiere(pieces, fiche, tauxChute),
     );
-
-    if (valeurMatiere <= 0) {
-      // Pas de valeur matière : on produit quand même, à coût 0
-      ent = {
-        ...ent,
-        stocksFinis: augmenterStockFini(ent.stocksFinis, ligne.produit, piecesAProduire, centimes(0)),
-      };
-    } else {
-      ent = {
-        ...ent,
-        stocksMatiere: stocksApres,
-        stocksFinis: augmenterStockFini(ent.stocksFinis, ligne.produit, piecesAProduire, valeurMatiere),
-      };
-      enr({
-        id: `production_atelier_${mois}_${ent.id}_${ligne.produit}${suffixeId}`,
-        mois,
-        libelle: `Production atelier ${ligne.produit} ×${piecesAProduire}`,
-        lignes: [
-          { compte: "35", sens: "debit", montant: valeurMatiere },
-          { compte: "31", sens: "credit", montant: valeurMatiere },
-        ],
-      });
-    }
-    produitParProduit[ligne.produit] = dejaProduit + piecesAProduire;
+    if (valeurMatiere <= 0) continue; // matière sans valeur : on ne fabrique pas de pièce gratuite
+    const valeurFournitures = centimes(pieces * fiche.fournituresParPiece);
+    const valeurPieces = centimes(valeurMatiere + valeurFournitures);
+    ent = {
+      ...ent,
+      stocksMatiere: stocksApres,
+      stocksFinis: augmenterStockFini(ent.stocksFinis, ligne.produit, pieces, valeurPieces),
+    };
+    enr({
+      id: `production_atelier_${mois}_${ent.id}_${ligne.produit}${suffixeId}`,
+      mois,
+      libelle: `Production atelier ${ligne.produit} ×${pieces}`,
+      // Fournitures (boutons, étiquettes) achetées au fil de la production, payées comptant.
+      lignes: [
+        { compte: "35", sens: "debit", montant: valeurPieces },
+        { compte: "31", sens: "credit", montant: valeurMatiere },
+        ...(valeurFournitures > 0
+          ? [{ compte: "512", sens: "credit" as const, montant: valeurFournitures }]
+          : []),
+      ],
+    });
+    produitParProduit[ligne.produit] = dejaProduit + pieces;
   }
 
   // Marque : décroissance sur la durée écoulée + effet des dépenses de ce flux
@@ -393,9 +424,9 @@ export function avancerFlux(
   }
 
   // Ventes (plafonnées au stock) et retours en ligne
-  const tvaStandard = params["tva_standard"]?.valeur ?? 0.2;
-  const coutTraitementRetour = centimes(Math.round(params["cout_traitement_retour"]?.valeur ?? 1750));
-  const tauxRetourEnLigne = params["taux_retour_vente_en_ligne"]?.valeur ?? 0.19;
+  const tvaStandard = parametreObligatoire(params, "tva_standard");
+  const coutTraitementRetour = centimes(Math.round(parametreObligatoire(params, "cout_traitement_retour")));
+  const tauxRetourEnLigne = parametreObligatoire(params, "taux_retour_vente_en_ligne");
 
   const mondePourVentes: Monde = {
     moisCourant: mois,
@@ -510,6 +541,22 @@ export function avancerFlux(
       lignes: [
         { compte: "512", sens: "debit", montant: creance.montant },
         { compte: "411", sens: "credit", montant: creance.montant },
+      ],
+    });
+  }
+
+  // Règlement des fournisseurs et façonniers arrivés à échéance (401 débit / 512 crédit).
+  // Payé même si la banque passe sous zéro : le découvert est facturé à la clôture.
+  for (const dette of donnees.dettesEchues ?? []) {
+    if (dette.montant <= 0) continue;
+    enr({
+      id: `reglement_${dette.nature}_${dette.ordreId}`,
+      mois,
+      libelle:
+        dette.nature === "matiere" ? "Règlement fournisseur de matière" : "Règlement façonnier",
+      lignes: [
+        { compte: "401", sens: "debit", montant: dette.montant },
+        { compte: "512", sens: "credit", montant: dette.montant },
       ],
     });
   }

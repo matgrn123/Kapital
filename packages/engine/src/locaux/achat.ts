@@ -75,6 +75,8 @@ export type DemandeAchat = {
   readonly tauxEstrAnnuel: number;
   readonly tresorerie: Centimes;
   readonly detteEnCours: Centimes;
+  /** Mois de découvert consécutifs (prime de risque du taux) ; absent = 0. */
+  readonly moisDecouvertConsecutifs?: number | undefined;
   /** Une entreprise ne détient qu'un local à la fois (loué ou acheté). */
   readonly aDejaUnLocal: boolean;
   readonly params: Parametres;
@@ -164,7 +166,11 @@ export function acheterLocal(d: DemandeAchat): AchatAccepte | RefusAchat {
     }
   }
 
-  const tauxAnnuel = tauxPret("immobilier", d.tauxEstrAnnuel, regles);
+  const tauxAnnuel = tauxPret("immobilier", d.tauxEstrAnnuel, regles, {
+    tresorerie: d.tresorerie,
+    detteApresPret: centimes(d.detteEnCours + montantPret),
+    moisDecouvertConsecutifs: d.moisDecouvertConsecutifs ?? 0,
+  });
   const echeancier = montantPret > 0 ? genererEcheancier(montantPret, tauxAnnuel, dureePretMois) : [];
   const ecritures: EcritureComptable[] = [];
   if (montantPret > 0) {

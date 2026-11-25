@@ -159,7 +159,7 @@ async function avancerEntreprise(
       if (position.indexDansMois > 0) {
         const etat = await stockage.chargerEtat(e.id, position.mois);
         cumul = cumulDemarrantAuPas(
-          moisJeu(position.mois + 1),
+          moisJeu(position.mois), // une écriture porte le mois de jeu où elle a lieu
           etat.entreprise.tresorerie,
           position.indexDansMois,
         );
@@ -206,7 +206,9 @@ async function traiterLot(
   const { stockage, params, config, debutReelMs } = ctx;
   const position = positionDuPasAbsolu(config, premierPas);
   const moisEnCours = position.mois; // numéro du mois de jeu en cours, depuis 0
-  const moisFin = moisJeu(moisEnCours + 1); // les écritures portent le mois qu'elles clôturent
+  // Une seule convention : toute écriture porte le mois de jeu où elle a lieu, celui de
+  // worlds.mois_courant (compté depuis 0). Les écritures de clôture portent le mois qui se termine.
+  const moisFin = moisJeu(moisEnCours);
   const indexDernier = position.indexDansMois + nb - 1;
   const cloture = indexDernier === config.pasParMois - 1;
 
@@ -227,6 +229,9 @@ async function traiterLot(
   const livraisons: LivraisonsEnAttente = await stockage.chargerLivraisons(companyId, finDuLotMs);
   const creances =
     position.indexDansMois === 0 ? await stockage.chargerCreances(companyId, moisEnCours) : [];
+  // Fournisseurs et façonniers : réglés à leur échéance, au premier pas du mois.
+  const dettesEchues =
+    position.indexDansMois === 0 ? await stockage.chargerDettesEchues(companyId, moisEnCours) : [];
   const donneesFin: DonneesFinMois | null = cloture
     ? await stockage.chargerFinDeMois(companyId, moisEnCours)
     : null;
@@ -250,6 +255,7 @@ async function traiterLot(
       ),
       depensesMarketing: [], // le marketing s'enregistre à l'action du joueur
       creancesAEncaisser: index === 0 ? creances : [],
+      dettesEchues: index === 0 ? dettesEchues : [],
     };
     const r = simulerPas(
       entreprise,

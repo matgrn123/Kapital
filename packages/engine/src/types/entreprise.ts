@@ -105,11 +105,25 @@ export type PrixParCanal = {
   readonly [K in Canal]: Centimes;
 };
 
+/** Nomenclature d'un produit (table products) : ce qu'une pièce consomme. */
+export type FicheFabrication = {
+  readonly matiere: IdMatiere;
+  /** Unités de matière par pièce, avant chute. */
+  readonly consommationParPiece: number;
+  readonly fournituresParPiece: Centimes;
+  readonly tempsStandardMinutes: number;
+};
+
 export type ProduitEntreprise = {
   readonly produit: IdProduit;
   readonly qualiteVisee: number;
   readonly prix: PrixParCanal;
   readonly productionMensuelleCible: number;
+  /**
+   * Nomenclature, obligatoire pour produire en atelier : sans elle, le moteur
+   * refuse de produire (erreur explicite) plutôt que d'inventer une pièce à coût nul.
+   */
+  readonly fabrication?: FicheFabrication;
 };
 
 export type Entreprise = {

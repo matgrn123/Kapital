@@ -69,6 +69,12 @@ function entreprise(id: string): Entreprise {
         qualiteVisee: 60,
         prix: { vente_directe: centimes(3000), revendeur: centimes(1800) },
         productionMensuelleCible: 60,
+        fabrication: {
+          matiere: MATIERE,
+          consommationParPiece: 1,
+          fournituresParPiece: centimes(0),
+          tempsStandardMinutes: 30,
+        },
       },
     ],
   };
@@ -91,7 +97,7 @@ const idsEcritures = (s: StockageMemoire, id: string) => s.ecrituresDe(id).map((
 // ---------------------------------------------------------------------------
 
 describe("avancerMondeJusquA — les entreprises rattrapent le temps écoulé", () => {
-  it("une entreprise absente pendant 2 mois et demi est rattrapée, avec deux paies et deux prêts", async () => {
+  it("une entreprise absente pendant 2 mois et demi est rattrapée, avec deux paies et une échéance", async () => {
     const s = monde();
     const r = await avancerMondeJusquA(s, PARAMS, DEBUT + 2.5 * JOUR);
 
@@ -101,13 +107,16 @@ describe("avancerMondeJusquA — les entreprises rattrapent le temps écoulé", 
     expect(s.monde.moisCourant).toBe(2);
 
     const ids = idsEcritures(s, "a");
-    for (const mois of [1, 2]) {
+    // Les écritures portent le mois de jeu où elles ont lieu (mois 0 et 1 clos, mois 2 en cours).
+    for (const mois of [0, 1]) {
       expect(ids, `paie du mois ${mois}`).toContain(`salaire_${mois}_a_s1`);
-      expect(ids, `échéance du mois ${mois}`).toContain(`echeance_${mois}_a_p1`);
     }
-    expect(ids.some((id) => id.startsWith("salaire_3_"))).toBe(false);
-    // le mois 3 est en cours : son état est conservé pour le pas suivant
-    expect(s.entreprises.get("a")!.cumul).toMatchObject({ mois: 3, pasTraites: Math.floor(0.5 * N) });
+    // Prêt accordé au mois 0 : première échéance à la fin du mois 1 (comme loan_schedules).
+    expect(ids).not.toContain("echeance_0_a_p1");
+    expect(ids).toContain("echeance_1_a_p1");
+    expect(ids.some((id) => id.startsWith("salaire_2_"))).toBe(false);
+    // le mois 2 est en cours : son état est conservé pour le pas suivant
+    expect(s.entreprises.get("a")!.cumul).toMatchObject({ mois: 2, pasTraites: Math.floor(0.5 * N) });
   });
 
   it("la trésorerie est le solde de départ plus les mouvements de banque enregistrés", async () => {
@@ -151,7 +160,7 @@ describe("avancerMondeJusquA — les entreprises rattrapent le temps écoulé", 
     await avancerMondeJusquA(s, PARAMS, DEBUT + 1.1 * JOUR);
     for (const id of ["a", "b", "c"]) {
       expect(s.entreprises.get(id)!.pasTraites).toBe(Math.floor(1.1 * N));
-      expect(idsEcritures(s, id)).toContain(`salaire_1_${id}_s1`);
+      expect(idsEcritures(s, id)).toContain(`salaire_0_${id}_s1`);
     }
   });
 });
@@ -242,7 +251,7 @@ describe("avancerMondeJusquA — démarrages", () => {
     // minutes suivantes : le temps repart du début du mois 5, sans rafale
     await avancerMondeJusquA(s, PARAMS, maintenant + 3 * MIN);
     expect(s.entreprises.get("a")!.pasTraites).toBe(5 * N + 3);
-    expect(s.entreprises.get("a")!.cumul).toMatchObject({ mois: 6, pasTraites: 3, pasDemarrage: 0 });
+    expect(s.entreprises.get("a")!.cumul).toMatchObject({ mois: 5, pasTraites: 3, pasDemarrage: 0 });
   });
 
   it("une entreprise créée en cours de mois démarre au pas courant, sans rattraper le début du mois", async () => {
@@ -255,7 +264,7 @@ describe("avancerMondeJusquA — démarrages", () => {
     const nouvelle = r.entreprises.find((e) => e.entreprise === "nouvelle")!;
     expect(nouvelle.etat).toBe("demarree");
     expect(s.entreprises.get("nouvelle")!.pasTraites).toBe(N + 700);
-    expect(s.entreprises.get("nouvelle")!.cumul).toMatchObject({ mois: 2, pasTraites: 700, pasDemarrage: 700 });
+    expect(s.entreprises.get("nouvelle")!.cumul).toMatchObject({ mois: 1, pasTraites: 700, pasDemarrage: 700 });
     expect(s.ecrituresDe("nouvelle")).toHaveLength(0);
 
     // 30 minutes plus tard : quelques ventes au plus, pas la moitié d'un mois d'un coup
@@ -267,6 +276,26 @@ describe("avancerMondeJusquA — démarrages", () => {
       .reduce((a, b) => a + b, 0);
     expect(vendues).toBeLessThanOrEqual(3);
     expect(s.entreprises.get("nouvelle")!.pasTraites).toBe(N + 730);
+  });
+});
+
+describe("avancerMondeJusquA — règlement des fournisseurs à l'échéance", () => {
+  it("une dette échue est réglée une seule fois, au premier pas du mois, 401 débit / 512 crédit", async () => {
+    const s = monde();
+    s.dettesParMois.set("a|1", [{ ordreId: "po1", nature: "matiere", montant: centimes(42_000) }]);
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 0.5 * JOUR);
+    expect(idsEcritures(s, "a")).not.toContain("reglement_matiere_po1");
+    await avancerMondeJusquA(s, PARAMS, DEBUT + JOUR + 2 * MIN);
+    const reglements = s.ecrituresDe("a").filter((e) => e.id === "reglement_matiere_po1");
+    expect(reglements).toHaveLength(1);
+    expect(reglements[0]!.lignes).toEqual([
+      { compte: "401", sens: "debit", montant: 42_000 },
+      { compte: "512", sens: "credit", montant: 42_000 },
+    ]);
+    // Rejouer le mois suivant ne la repaie pas.
+    s.dettesParMois.set("a|2", s.dettesParMois.get("a|1")!);
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 2 * JOUR + 2 * MIN);
+    expect(s.ecrituresDe("a").filter((e) => e.id === "reglement_matiere_po1")).toHaveLength(1);
   });
 });
 
@@ -287,14 +316,14 @@ describe("avancerMondeJusquA — événements datés", () => {
     s.ajouterLivraison("a", livraison("cmd1", DEBUT + 10.5 * MIN));
 
     await avancerMondeJusquA(s, PARAMS, DEBUT + 10 * MIN);
-    expect(idsEcritures(s, "a")).not.toContain("livraison_mat_1_cmd1");
+    expect(idsEcritures(s, "a")).not.toContain("livraison_mat_0_cmd1");
 
     await avancerMondeJusquA(s, PARAMS, DEBUT + 11 * MIN);
-    expect(idsEcritures(s, "a").filter((id) => id === "livraison_mat_1_cmd1")).toHaveLength(1);
+    expect(idsEcritures(s, "a").filter((id) => id === "livraison_mat_0_cmd1")).toHaveLength(1);
     expect(s.livraisons.get("a")![0]!.statut).toBe("livree");
 
     await avancerMondeJusquA(s, PARAMS, DEBUT + 60 * MIN);
-    expect(idsEcritures(s, "a").filter((id) => id === "livraison_mat_1_cmd1")).toHaveLength(1);
+    expect(idsEcritures(s, "a").filter((id) => id === "livraison_mat_0_cmd1")).toHaveLength(1);
   });
 
   it("une livraison en retard (avant le lot en cours) est traitée dès le premier pas", async () => {
@@ -302,14 +331,14 @@ describe("avancerMondeJusquA — événements datés", () => {
     await avancerMondeJusquA(s, PARAMS, DEBUT + 30 * MIN);
     s.ajouterLivraison("a", livraison("retard", DEBUT + 5 * MIN)); // prévue il y a 25 minutes
     await avancerMondeJusquA(s, PARAMS, DEBUT + 31 * MIN);
-    expect(idsEcritures(s, "a")).toContain("livraison_mat_1_retard");
+    expect(idsEcritures(s, "a")).toContain("livraison_mat_0_retard");
   });
 
   it("une créance revendeur est encaissée au premier pas du mois concerné", async () => {
     const s = monde();
     s.creancesParMois.set("a|2", [{ ecritureId: "vente_x", montant: centimes(12_345) }]);
     await avancerMondeJusquA(s, PARAMS, DEBUT + 2 * JOUR + 5 * MIN);
-    const encaissement = s.ecrituresDe("a").find((e) => e.id === "encaissement_3_vente_x");
+    const encaissement = s.ecrituresDe("a").find((e) => e.id === "encaissement_2_vente_x");
     expect(encaissement).toBeDefined();
     expect(encaissement!.lignes).toEqual([
       { compte: "512", sens: "debit", montant: 12_345 },
@@ -324,9 +353,17 @@ describe("avancerMondeJusquA — constat d'étape à la clôture (AE-2)", () => 
     s.ajouterEntreprise({ ...entreprise("e"), etape: 0 }, 0);
 
     await avancerMondeJusquA(s, PARAMS, DEBUT + 0.5 * JOUR);
-    // mois pas encore clos : rien n'est constaté
-    expect(s.entreprises.get("e")!.entreprise.etape).toBe(0);
-    expect(s.entreprises.get("e")!.entreprise.cumulsEtape).toBeUndefined();
+    // mois pas encore clos : l'étape n'est pas constatée, mais les compteurs suivent déjà les ventes
+    const milieu = s.entreprises.get("e")!.entreprise;
+    expect(milieu.etape).toBe(0);
+    const ventesEnregistrees = s
+      .ecrituresDe("e")
+      .filter((x) => x.id.startsWith("vente_"))
+      .flatMap((x) => x.lignes)
+      .filter((l) => l.compte.startsWith("70"))
+      .reduce((t, l) => t + (l.sens === "credit" ? l.montant : -l.montant), 0);
+    expect(milieu.cumulsEtape!.piecesVendues).toBeGreaterThan(0);
+    expect(milieu.cumulsEtape!.chiffreAffairesHt).toBe(ventesEnregistrees);
 
     await avancerMondeJusquA(s, PARAMS, DEBUT + 1 * JOUR);
     const apres = s.entreprises.get("e")!.entreprise;
@@ -339,5 +376,33 @@ describe("avancerMondeJusquA — constat d'étape à la clôture (AE-2)", () => 
     const mois2 = s.entreprises.get("e")!.entreprise;
     expect(mois2.etape).toBeGreaterThanOrEqual(etapeMois1);
     expect(mois2.cumulsEtape!.piecesVendues).toBeGreaterThan(apres.cumulsEtape!.piecesVendues);
+  });
+});
+
+describe("avancerMondeJusquA — une seule convention de mois", () => {
+  it("une vente au pas N du mois M est écrite au mois M, celui de worlds.mois_courant", async () => {
+    const s = monde();
+    // mois 3, pas 600 : le monde est au mois 3
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 3 * JOUR + 600 * MIN);
+    expect(s.monde.moisCourant).toBe(3);
+    const avant = new Set(idsEcritures(s, "a"));
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 3 * JOUR + 720 * MIN);
+    const nouvelles = s.ecrituresDe("a").filter((e) => !avant.has(e.id));
+    const ventes = nouvelles.filter((e) => e.id.startsWith("vente_"));
+    expect(ventes.length).toBeGreaterThan(0);
+    for (const v of ventes) {
+      expect(v.mois).toBe(3);
+      expect(v.id.startsWith("vente_3_")).toBe(true);
+    }
+    // toutes les écritures passées pendant le mois 3 portent le mois 3
+    expect(nouvelles.every((e) => e.mois === 3)).toBe(true);
+  });
+
+  it("les écritures de clôture portent le mois qui se termine", async () => {
+    const s = monde();
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 1 * JOUR);
+    const paie = s.ecrituresDe("a").find((e) => e.id === "salaire_0_a_s1");
+    expect(paie?.mois).toBe(0);
+    expect(s.monde.moisCourant).toBe(1);
   });
 });

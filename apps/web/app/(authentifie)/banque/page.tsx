@@ -1,12 +1,17 @@
-import { creerClientServeur } from "../../../lib/supabase/server";
-import { formaterEuros, formaterDate } from "../../../lib/formatage";
 import { reglesPretV1 } from "@kapital/server";
-import { FormulairePret } from "./FormulairePret";
+import { Carte, EncadreNotion, EnTete, FilRouge, Ligne } from "../../../components/ui";
+import { formaterDate, formaterEuros } from "../../../lib/formatage";
+import { creerClientServeur } from "../../../lib/supabase/server";
 import { lireEstrAnnuel } from "../_partage/estr";
 import { lireVerrou } from "../_partage/verrou";
+import { FormulairePret } from "./FormulairePret";
+
+// Banque (design V2, docs/maquette V.banque) : simuler un prêt, voir l'écriture que le
+// serveur passera (512 / 164), suivre ses prêts et ses prochaines échéances.
 
 type Loan = {
   id: string;
+  objet: string | null;
   capital_initial_centimes: number;
   capital_restant_centimes: number;
   taux_annuel: number;
@@ -22,158 +27,130 @@ type Echeance = {
   interets_centimes: number;
   amortissement_centimes: number;
   instant_prevu: string;
-  statut: string;
 };
+
+const OBJETS: Record<string, string> = {
+  tresorerie: "Prêt de trésorerie",
+  equipement: "Prêt d'équipement",
+  immobilier: "Prêt immobilier",
+};
+
+const pourcent = (x: number) => `${(x * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %`;
 
 export default async function PageBanque() {
   const supabase = await creerClientServeur();
 
-  const { data: entreprises } = await supabase
-    .from("companies")
-    .select("id, tresorerie_centimes")
-    .limit(1);
+  const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes, mois_decouvert_consecutifs").limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
+  const tresorerie = Number(entreprise.tresorerie_centimes);
 
-  const { data: prets } = await supabase
-    .from("loans")
-    .select("id, capital_initial_centimes, capital_restant_centimes, taux_annuel, duree_mois, instant_debut, statut")
-    .eq("company_id", entreprise.id)
-    .order("instant_debut", { ascending: false });
+  const [{ data: prets }, { data: monde }] = await Promise.all([
+    supabase
+      .from("loans")
+      .select("id, objet, capital_initial_centimes, capital_restant_centimes, taux_annuel, duree_mois, instant_debut, statut")
+      .eq("company_id", entreprise.id)
+      .order("instant_debut", { ascending: false }),
+    supabase.from("worlds").select("mois_courant").eq("etat", "actif").limit(1).maybeSingle(),
+  ]);
+  const pretActifs = ((prets ?? []) as Loan[]).filter((p) => p.statut === "actif");
+  const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
 
-  const pretsTab = (prets ?? []) as Loan[];
-  const pretActifs = pretsTab.filter((p) => p.statut === "actif");
-
-  const idsActifs = pretActifs.map((p) => p.id);
   let echeances: Echeance[] = [];
-  if (idsActifs.length > 0) {
+  if (pretActifs.length > 0) {
     const { data } = await supabase
       .from("loan_schedules")
-      .select("loan_id, numero, mensualite_centimes, interets_centimes, amortissement_centimes, instant_prevu, statut")
-      .in("loan_id", idsActifs)
+      .select("loan_id, numero, mensualite_centimes, interets_centimes, amortissement_centimes, instant_prevu")
+      .in("loan_id", pretActifs.map((p) => p.id))
       .eq("statut", "a_venir")
       .order("instant_prevu", { ascending: true })
-      .limit(10);
+      .limit(6);
     echeances = (data ?? []) as Echeance[];
   }
 
-  const detteTotale = pretActifs.reduce((s, p) => s + p.capital_restant_centimes, 0);
+  const detteTotale = pretActifs.reduce((s, p) => s + Number(p.capital_restant_centimes), 0);
   const regles = reglesPretV1();
   const estrAnnuel = await lireEstrAnnuel(supabase, regles.estrDeSecoursAnnuel);
   const { verrou } = await lireVerrou(supabase, entreprise.id, "demande_pret");
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-10">
-      <header className="border-b border-[color:var(--color-g-200)] pb-6">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Financement
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Banque</h1>
-      </header>
+    <div className="flex flex-col gap-5">
+      <EnTete surTitre="Financement" titre="Banque et prêt">
+        Emprunter permet d&apos;investir sans attendre. La banque regarde l&apos;objet du prêt et ta
+        trésorerie : ta dette totale ne peut pas dépasser un multiple de ce que tu as en caisse.
+      </EnTete>
 
-      <section className="mt-10 grid grid-cols-3 gap-4">
-        <Carte libelle="Trésorerie">
-          <span className="chiffre">{formaterEuros(entreprise.tresorerie_centimes)}</span> €
-        </Carte>
-        <Carte libelle="Dette en cours">
-          <span className="chiffre">{formaterEuros(detteTotale)}</span> €
-        </Carte>
-        <Carte libelle="Prêts actifs">
-          <span className="chiffre">{pretActifs.length}</span>
-        </Carte>
-      </section>
-
-      <section className="mt-10 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider">Prêts actifs</h2>
-        {pretActifs.length === 0 ? (
-          <p className="rounded-md border border-dashed border-[color:var(--color-g-300)] px-5 py-6 text-center text-sm text-[color:var(--color-g-500)]">
-            Pas de prêt actif.
-          </p>
-        ) : (
-          <div className="overflow-hidden rounded-md border border-[color:var(--color-g-200)]">
-            <table className="w-full text-sm">
-              <thead className="bg-[color:var(--color-g-100)] text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-                <tr>
-                  <th className="px-4 py-2 text-right font-medium">Capital initial</th>
-                  <th className="px-4 py-2 text-right font-medium">Capital restant</th>
-                  <th className="px-4 py-2 text-right font-medium">Taux annuel</th>
-                  <th className="px-4 py-2 text-right font-medium">Durée</th>
-                  <th className="px-4 py-2 text-left font-medium">Début</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pretActifs.map((p) => (
-                  <tr key={p.id} className="border-t border-[color:var(--color-g-200)]">
-                    <td className="chiffre px-4 py-2 text-right">{formaterEuros(p.capital_initial_centimes)} €</td>
-                    <td className="chiffre px-4 py-2 text-right">{formaterEuros(p.capital_restant_centimes)} €</td>
-                    <td className="chiffre px-4 py-2 text-right">{(p.taux_annuel * 100).toFixed(2)} %</td>
-                    <td className="chiffre px-4 py-2 text-right">{p.duree_mois} mois</td>
-                    <td className="chiffre px-4 py-2 text-xs text-[color:var(--color-g-700)]">{formaterDate(p.instant_debut)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {echeances.length > 0 && (
-        <section className="mt-10 space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider">10 prochaines échéances</h2>
-          <div className="overflow-hidden rounded-md border border-[color:var(--color-g-200)]">
-            <table className="w-full text-sm">
-              <thead className="bg-[color:var(--color-g-100)] text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-                <tr>
-                  <th className="px-4 py-2 text-right font-medium">N°</th>
-                  <th className="px-4 py-2 text-right font-medium">Mensualité</th>
-                  <th className="px-4 py-2 text-right font-medium">Intérêts</th>
-                  <th className="px-4 py-2 text-right font-medium">Amort.</th>
-                  <th className="px-4 py-2 text-left font-medium">Date prévue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {echeances.map((e) => (
-                  <tr key={`${e.loan_id}_${e.numero}`} className="border-t border-[color:var(--color-g-200)]">
-                    <td className="chiffre px-4 py-2 text-right">{e.numero}</td>
-                    <td className="chiffre px-4 py-2 text-right">{formaterEuros(e.mensualite_centimes)} €</td>
-                    <td className="chiffre px-4 py-2 text-right text-[color:var(--color-g-500)]">{formaterEuros(e.interets_centimes)} €</td>
-                    <td className="chiffre px-4 py-2 text-right">{formaterEuros(e.amortissement_centimes)} €</td>
-                    <td className="chiffre px-4 py-2 text-xs text-[color:var(--color-g-700)]">{formaterDate(e.instant_prevu)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      <section className="mt-10 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider">Demander un prêt</h2>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <FormulairePret
-          tresorerieActuelle={entreprise.tresorerie_centimes}
+          tresorerieActuelle={tresorerie}
+          moisDecouvert={Number(entreprise.mois_decouvert_consecutifs ?? 0)}
           detteActuelle={detteTotale}
           regles={regles}
           estrAnnuel={estrAnnuel}
+          moisCourant={moisCourant}
           verrou={verrou}
         />
-      </section>
-    </div>
-  );
-}
 
-function Carte({
-  libelle,
-  children,
-}: {
-  libelle: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-md border border-[color:var(--color-g-200)] p-4">
-      <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-        {libelle}
-      </p>
-      <p className="mt-2 text-xl font-medium">{children}</p>
+        <div className="flex flex-col gap-4">
+          <Carte titre="Tes prêts en cours">
+            <Ligne libelle="Trésorerie (512)">{formaterEuros(tresorerie)} €</Ligne>
+            <Ligne libelle="Dette en cours (164)" fort>
+              {formaterEuros(detteTotale)} €
+            </Ligne>
+            {pretActifs.length === 0 ? (
+              <p className="mt-2 text-[0.88rem] text-muted">
+                Aucun prêt pour l&apos;instant. Simule un prêt à gauche : tu vois la mensualité et l&apos;écriture
+                avant de signer.
+              </p>
+            ) : (
+              pretActifs.map((p) => (
+                <Ligne
+                  key={p.id}
+                  libelle={`${OBJETS[p.objet ?? ""] ?? "Prêt"} de ${formaterEuros(p.capital_initial_centimes)} € sur ${p.duree_mois} mois à ${pourcent(p.taux_annuel)}`}
+                >
+                  {formaterEuros(p.capital_restant_centimes)} € restants
+                </Ligne>
+              ))
+            )}
+          </Carte>
+
+          {echeances.length > 0 && (
+            <Carte titre="Prochaines échéances">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[0.86rem]">
+                  <thead className="text-[0.7rem] uppercase tracking-[0.06em] text-muted">
+                    <tr>
+                      <th className="py-1 text-left font-semibold">Date</th>
+                      <th className="py-1 text-right font-semibold">Mensualité</th>
+                      <th className="py-1 text-right font-semibold">dont intérêts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {echeances.map((e) => (
+                      <tr key={`${e.loan_id}_${e.numero}`} className="border-t border-line">
+                        <td className="py-1.5">{formaterDate(e.instant_prevu)}</td>
+                        <td className="py-1.5 text-right tabular-nums">{formaterEuros(e.mensualite_centimes)} €</td>
+                        <td className="py-1.5 text-right tabular-nums text-muted">{formaterEuros(e.interets_centimes)} €</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Carte>
+          )}
+
+          <EncadreNotion titre="L'effet de levier">
+            Si ton activité rapporte plus que ce que coûte la dette, emprunter augmente la rentabilité de tes
+            capitaux propres : la différence entre ce que rapporte l&apos;argent emprunté et son taux revient aux
+            associés. Si l&apos;activité rapporte moins que le taux, le levier joue à l&apos;envers et creuse les pertes.
+          </EncadreNotion>
+          <EncadreNotion titre="Rembourser n'est pas une charge">
+            Seuls les intérêts sont une charge (compte 661). La part de capital remboursée diminue ta dette au
+            passif (164) et ta trésorerie à l&apos;actif (512) : le résultat ne bouge pas.
+          </EncadreNotion>
+          <FilRouge ecran="banque" />
+        </div>
+      </div>
     </div>
   );
 }

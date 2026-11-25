@@ -7,7 +7,8 @@ export default defineConfig({
       "**/dist/**",
       "**/.next/**",
       "**/e2e/**",
-      "**/apps/web/**",
+      // Copies de travail des sessions Claude Code (worktrees) : pas le projet.
+      "**/.claude/**",
     ],
   },
 });

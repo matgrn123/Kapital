@@ -1,106 +1,164 @@
-import { DEFINITIONS_MISSIONS, type EtatMission } from "@kapital/engine";
+import { DEFINITIONS_MISSIONS, ordonnerClassement, type EtatMission } from "@kapital/engine";
+import { BoutonLien, Carte, EncadreNotion, EnTete, Jauge, Puce, TableauRang, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { chargerProgressionMissions } from "../../../lib/missions";
-import { formaterEuros } from "../../../lib/formatage";
+import { formaterDateHeure, formaterEuros } from "../../../lib/formatage";
 
-const LIBELLES_ETAT: Record<EtatMission, string> = {
-  a_faire: "À faire",
-  en_cours: "En cours",
-  validee: "Validée",
+type LigneClassement = {
+  company_id: string;
+  nom: string;
+  gamme: string;
+  pseudo: string;
+  valeur_centimes: number;
+  calcule_le: string | null;
+};
+
+const LIBELLE_GAMME: Record<string, string> = { entree: "Entrée", milieu: "Milieu", haut: "Haut" };
+
+const ETATS: Record<EtatMission, { texte: string; ton: "neutre" | "alerte" | "bon" }> = {
+  a_faire: { texte: "À faire", ton: "neutre" },
+  en_cours: { texte: "En cours", ton: "alerte" },
+  validee: { texte: "Réussie", ton: "bon" },
+};
+
+/** Où aller pour faire avancer chaque mission. */
+const OU_AGIR: Record<string, { href: string; texte: string }> = {
+  mission1: { href: "/produits", texte: "Fixer mes prix" },
+  mission2: { href: "/banque", texte: "Voir ma trésorerie" },
+  mission3: { href: "/atelier", texte: "Produire plus" },
 };
 
 export default async function PageMissions() {
   const supabase = await creerClientServeur();
-  const { data: entreprises } = await supabase
-    .from("companies")
-    .select("id, nom")
-    .limit(1);
+  const { data: entreprises } = await supabase.from("companies").select("id").limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
-  const progressions = (await chargerProgressionMissions(supabase, entreprise.id)) ?? [];
+  const [progressionsBrutes, { data: classementBrut }] = await Promise.all([
+    chargerProgressionMissions(supabase, entreprise.id),
+    supabase.from("classement_publique").select("company_id, nom, gamme, pseudo, valeur_centimes, calcule_le"),
+  ]);
+  const progressions = progressionsBrutes ?? [];
+  const reussies = progressions.filter((p) => p.etat === "validee").length;
+
+  const brut = (classementBrut ?? []) as LigneClassement[];
+  const classement = ordonnerClassement(
+    brut.map((l) => ({
+      company_id: l.company_id,
+      nom: l.nom,
+      pseudo: l.pseudo,
+      gamme: l.gamme,
+      valeur_centimes: l.valeur_centimes,
+    })),
+  );
+  const dernierCalcul = brut
+    .map((l) => l.calcule_le)
+    .filter((d): d is string => d !== null)
+    .sort()
+    .at(-1);
 
   return (
-    <div className="mx-auto max-w-4xl px-8 py-10">
-      <header className="border-b border-[color:var(--color-g-200)] pb-6">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Tutoriel
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Missions</h1>
-        <p className="mt-2 text-sm text-[color:var(--color-g-500)]">
-          Trois étapes pour apprendre les notions clés du jeu : coût de revient,
-          trésorerie, besoin en fonds de roulement.
-        </p>
-      </header>
+    <div className="flex flex-col gap-5">
+      <EnTete surTitre="Progression" titre="Missions et classement">
+        Trois missions pour apprendre les notions clés du jeu. Elles avancent toutes seules pendant que tu joues. Le
+        classement compare la valeur des entreprises du village.
+      </EnTete>
 
-      <section className="mt-8 space-y-5">
+      <Carte>
+        <Jauge
+          libelle="Missions réussies"
+          valeur={reussies}
+          max={DEFINITIONS_MISSIONS.length}
+          ton={reussies === DEFINITIONS_MISSIONS.length ? "bon" : "accent"}
+        />
+      </Carte>
+
+      <div className="grid items-stretch gap-4 lg:grid-cols-3">
         {DEFINITIONS_MISSIONS.map((d) => {
           const p = progressions.find((x) => x.id === d.id);
           const etat: EtatMission = p?.etat ?? "a_faire";
           const actuel = p?.actuel ?? 0;
           const cible = p?.cible ?? 0;
-          const pourcentage =
-            cible > 0 ? Math.min(100, Math.round((actuel / cible) * 100)) : 0;
-          const formatValeur = d.id === "mission3"
-            ? (v: number) => `${formaterEuros(v)} €`
-            : (v: number) => String(v);
-
+          const format = d.id === "mission3" ? (v: number) => `${formaterEuros(v)} €` : (v: number) => String(v);
+          const agir = OU_AGIR[d.id];
           return (
-            <article
+            <Carte
               key={d.id}
-              className="rounded-md border border-[color:var(--color-g-200)] p-6"
+              className="flex h-full flex-col"
+              surTitre={`Mission ${d.numero}`}
+              titre={d.titre}
+              action={<Puce ton={ETATS[etat].ton}>{ETATS[etat].texte}</Puce>}
             >
-              <header className="flex items-start justify-between gap-6">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-                    Mission {d.numero}
-                  </p>
-                  <h2 className="mt-1 text-lg font-semibold">{d.titre}</h2>
-                  <p className="mt-2 text-sm text-[color:var(--color-g-700)]">
-                    {d.objectif}
-                  </p>
-                </div>
-                <span
-                  className={`whitespace-nowrap rounded-md border px-3 py-1 text-xs font-medium ${
-                    etat === "validee"
-                      ? "border-[color:var(--color-g-900)] bg-[color:var(--color-noir)] text-[color:var(--color-blanc)]"
-                      : etat === "en_cours"
-                        ? "border-[color:var(--color-g-500)] text-[color:var(--color-g-700)]"
-                        : "border-[color:var(--color-g-300)] text-[color:var(--color-g-500)]"
-                  }`}
-                >
-                  {LIBELLES_ETAT[etat]}
-                </span>
-              </header>
-
-              <div className="mt-5">
-                <div className="flex items-baseline justify-between text-xs text-[color:var(--color-g-500)]">
-                  <span>Avancement</span>
-                  <span className="chiffre">
-                    {formatValeur(actuel)}
-                    {cible > 0 && ` / ${formatValeur(cible)}`}
-                  </span>
-                </div>
-                <div className="mt-2 h-1.5 rounded-full bg-[color:var(--color-g-200)]">
-                  <div
-                    className="h-full rounded-full bg-[color:var(--color-noir)] transition-all"
-                    style={{ width: `${pourcentage}%` }}
-                  />
-                </div>
+              <div className="flex flex-1 flex-col gap-3">
+                <p className="text-[0.86rem] text-muted">{d.objectif}</p>
+                <Jauge
+                  libelle="Avancement"
+                  valeur={etat === "validee" ? Math.max(actuel, cible) : actuel}
+                  max={cible > 0 ? cible : 1}
+                  ton={etat === "validee" ? "bon" : "accent"}
+                  texte={cible > 0 ? `${format(actuel)} / ${format(cible)}` : etat === "validee" ? "Fait" : "Pas encore"}
+                />
+                <details className="group">
+                  <summary className="cursor-pointer text-[0.84rem] font-semibold text-accent">
+                    Ce que tu apprends : {d.notion}
+                  </summary>
+                  <div className="mt-2">
+                    <EncadreNotion titre={d.notion}>{d.explication}</EncadreNotion>
+                  </div>
+                </details>
+                {etat !== "validee" && agir && (
+                  <div className="mt-auto">
+                    <BoutonLien href={agir.href} petit>
+                      {agir.texte}
+                    </BoutonLien>
+                  </div>
+                )}
               </div>
-
-              <div className="mt-5 border-t border-[color:var(--color-g-200)] pt-4">
-                <p className="text-xs font-medium uppercase tracking-wider text-[color:var(--color-g-500)]">
-                  {d.notion}
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-[color:var(--color-g-700)]">
-                  {d.explication}
-                </p>
-              </div>
-            </article>
+            </Carte>
           );
         })}
-      </section>
+      </div>
+
+      <Carte
+        titre="Classement du village"
+        action={dernierCalcul ? <Puce>Calculé le {formaterDateHeure(dernierCalcul)}</Puce> : undefined}
+      >
+        {classement.length === 0 ? (
+          <Vide>Aucune entreprise active pour l&apos;instant.</Vide>
+        ) : (
+          <TableauRang
+            entetes={[
+              { texte: "Rang" },
+              { texte: "Société" },
+              { texte: "Joueur" },
+              { texte: "Gamme" },
+              { texte: "Valeur", droite: true },
+            ]}
+            lignes={classement.map((l) => {
+              const moi = l.company_id === entreprise.id;
+              return {
+                cle: l.company_id,
+                moi,
+                cellules: [
+                  l.rang,
+                  l.nom,
+                  moi ? "Toi" : l.pseudo,
+                  LIBELLE_GAMME[l.gamme] ?? "—",
+                  <span key="v" className="tabular-nums">
+                    {formaterEuros(l.valeur_centimes)} €
+                  </span>,
+                ],
+              };
+            })}
+          />
+        )}
+      </Carte>
+
+      <EncadreNotion titre="La valeur d'une entreprise">
+        Le classement retient ce que possède ton entreprise (trésorerie, stocks, machines…) moins ce qu&apos;elle doit à
+        l&apos;extérieur (banque, fournisseurs). Vendre beaucoup ne suffit pas : il faut garder de la marge et ne pas trop
+        s&apos;endetter.
+      </EncadreNotion>
     </div>
   );
 }

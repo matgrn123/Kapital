@@ -1,5 +1,3 @@
-import { creerClientServeur } from "../../../lib/supabase/server";
-import { formaterEuros, formaterDate } from "../../../lib/formatage";
 import { chargerParametresV1 } from "@kapital/content";
 import {
   centimes,
@@ -9,9 +7,15 @@ import {
   indemniteLicenciement,
   parametresLicenciementDepuis,
 } from "@kapital/engine";
-import { BandeauVerrou } from "../_partage/BandeauVerrou";
+import { BandeauEtape, Carte, EcritureComptable, EncadreNotion, EnTete, FilRouge, Tableau } from "../../../components/ui";
+import { apercuLicenciement, apercuPaieEquipe } from "../../../lib/apercu-lot4";
+import { formaterDate, formaterEuros } from "../../../lib/formatage";
+import { creerClientServeur } from "../../../lib/supabase/server";
 import { lireVerrou } from "../_partage/verrou";
-import { FormulaireEmbauche, BoutonLicencier } from "./FormulaireEmbauche";
+import { BoutonLicencier, FormulaireEmbauche } from "./FormulaireEmbauche";
+
+// Embauche et salariés (design V2, docs/maquette V.embauche). Les coûts viennent du moteur
+// (coutEmployeur, enregistrerPaieMensuelle, ecritureLicenciement) et des paramètres.
 
 type Employee = {
   id: string;
@@ -23,40 +27,44 @@ type Employee = {
   mois_jeu_debut: number | null;
 };
 
+const pourcent = (x: number) => `${(x * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
+const POSTES = { artisan: "Artisan", encadrement: "Encadrement" } as const;
+
 export default async function PageSalaries() {
   const supabase = await creerClientServeur();
 
-  const { data: entreprises } = await supabase
-    .from("companies")
-    .select("id")
-    .limit(1);
+  const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes").limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
-  const [{ data: employes }, { data: monde }, { verrou }] = await Promise.all([
+  const [{ data: employes }, { data: monde }, { verrou }, { data: atelier }] = await Promise.all([
     supabase
       .from("employees")
-      .select(
-        "id, poste, salaire_brut_mensuel_centimes, cree_le, anciennete_mois_debut, experience_mois_debut, mois_jeu_debut",
-      )
+      .select("id, poste, salaire_brut_mensuel_centimes, cree_le, anciennete_mois_debut, experience_mois_debut, mois_jeu_debut")
       .eq("company_id", entreprise.id)
       .eq("statut", "actif")
       .order("cree_le"),
     supabase.from("worlds").select("mois_courant").eq("etat", "actif").limit(1).maybeSingle(),
     lireVerrou(supabase, entreprise.id, "embauche"),
+    supabase.from("workshops").select("nombre_machines").eq("company_id", entreprise.id).maybeSingle(),
   ]);
 
   const params = chargerParametresV1();
   const coefficients = coefficientsSalairesDepuisParametres(params);
   const paramsLicenciement = parametresLicenciementDepuis(params);
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
+  const postes = Number((atelier as { nombre_machines?: number } | null)?.nombre_machines ?? 0);
 
   const employesTab = (employes ?? []) as Employee[];
-  const totalBrut = employesTab.reduce((s, e) => s + e.salaire_brut_mensuel_centimes, 0);
-  const totalCharge = employesTab.reduce(
-    (s, e) => s + coutEmployeur({ ...coefficients, salaireBrutMensuel: centimes(e.salaire_brut_mensuel_centimes) }),
-    0,
-  );
+  const artisans = employesTab.filter((e) => e.poste === "artisan").length;
+  const cout = (e: Employee) =>
+    coutEmployeur({ ...coefficients, salaireBrutMensuel: centimes(e.salaire_brut_mensuel_centimes) });
+  const paieEquipe = apercuPaieEquipe({
+    salairesBruts: employesTab.map((e) => e.salaire_brut_mensuel_centimes),
+    coefficients,
+    mois: moisCourant,
+  });
+  const totalCharge = employesTab.reduce((s, e) => s + cout(e), 0);
   // Même calcul que la route de licenciement : ancienneté de départ + mois passés dans l'entreprise.
   const indemnite = (e: Employee): number => {
     const service = Math.max(0, moisCourant - (e.mois_jeu_debut ?? 0));
@@ -73,91 +81,94 @@ export default async function PageSalaries() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-10">
-      <header className="border-b border-[color:var(--color-g-200)] pb-6">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Ressources humaines
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Salariés</h1>
-        <p className="mt-1 text-sm text-[color:var(--color-g-500)]">
-          L'embauche se débloque à l'étape 2 de votre entreprise.
-        </p>
-      </header>
+    <div className="flex flex-col gap-5">
+      <EnTete surTitre="Bureau de l'emploi" titre="Embauche et salariés">
+        Chaque salarié augmente ta capacité, mais ajoute un coût fixe chaque mois, que tu vendes ou non.
+      </EnTete>
 
-      <section className="mt-10 grid grid-cols-3 gap-4">
-        <Carte libelle="Effectif">
-          <span className="chiffre">{employesTab.length}</span>
-        </Carte>
-        <Carte libelle="Masse salariale brute">
-          <span className="chiffre">{formaterEuros(totalBrut)}</span> €
-          <span className="block text-xs text-[color:var(--color-g-500)]">par mois</span>
-        </Carte>
-        <Carte libelle="Coût employeur">
-          <span className="chiffre">{formaterEuros(totalCharge)}</span> €
-          <span className="block text-xs text-[color:var(--color-g-500)]">brut + cotisations patronales</span>
-        </Carte>
-      </section>
+      {verrou && <BandeauEtape verrou={verrou} action="L'embauche" />}
+      <FormulaireEmbauche
+        coefficients={coefficients}
+        moisCourant={moisCourant}
+        tresorerie={Number(entreprise.tresorerie_centimes)}
+        postesLibres={Math.max(0, postes - artisans)}
+        verrouille={verrou !== null}
+      />
 
-      <section className="mt-10 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider">Effectif</h2>
-        {employesTab.length === 0 ? (
-          <p className="rounded-md border border-dashed border-[color:var(--color-g-300)] px-5 py-6 text-center text-sm text-[color:var(--color-g-500)]">
-            Pas de salarié pour l'instant.
-          </p>
-        ) : (
-          <div className="overflow-hidden rounded-md border border-[color:var(--color-g-200)]">
-            <table className="w-full text-sm">
-              <thead className="bg-[color:var(--color-g-100)] text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">Poste</th>
-                  <th className="px-4 py-2 text-right font-medium">Salaire brut mensuel</th>
-                  <th className="px-4 py-2 text-left font-medium">Date d'embauche</th>
-                  <th className="px-4 py-2 text-right font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {employesTab.map((e) => (
-                  <tr key={e.id} className="border-t border-[color:var(--color-g-200)]">
-                    <td className="px-4 py-2 capitalize">{e.poste}</td>
-                    <td className="chiffre px-4 py-2 text-right">
-                      {formaterEuros(e.salaire_brut_mensuel_centimes)} €
-                    </td>
-                    <td className="chiffre px-4 py-2 text-xs text-[color:var(--color-g-700)]">
-                      {formaterDate(e.cree_le)}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <BoutonLicencier id={e.id} indemniteCentimes={indemnite(e)} />
-                    </td>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-4">
+          <Carte titre="Ton équipe">
+            {employesTab.length === 0 ? (
+              <p className="text-[0.88rem] text-muted">
+                Personne pour l&apos;instant.{" "}
+                {postes === 0
+                  ? "Un artisan a besoin d'un poste de travail pour produire : loue d'abord un local dans Locaux."
+                  : `Tu as ${postes} poste(s) libre(s) : embauche un artisan pour produire toi-même.`}
+              </p>
+            ) : (
+              <>
+                <Tableau
+                  entetes={[
+                    { texte: "Poste" },
+                    { texte: "Depuis" },
+                    { texte: "Brut", droite: true },
+                    { texte: "Coût employeur", droite: true },
+                    { texte: "" },
+                  ]}
+                >
+                  {employesTab.map((e) => {
+                    const ind = indemnite(e);
+                    return (
+                      <tr key={e.id} className="align-top">
+                        <td>{POSTES[e.poste]}</td>
+                        <td className="text-muted">{formaterDate(e.cree_le)}</td>
+                        <td className="text-right">{formaterEuros(e.salaire_brut_mensuel_centimes)} €</td>
+                        <td className="text-right">{formaterEuros(cout(e))} €</td>
+                        <td className="text-right">
+                          <BoutonLicencier
+                            id={e.id}
+                            indemniteCentimes={ind}
+                            ecriture={apercuLicenciement({ indemnite: ind, mois: moisCourant, idSalarie: e.id })}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="font-bold">
+                    <td colSpan={3}>Masse salariale chargée · {artisans} artisan(s) pour {postes} poste(s)</td>
+                    <td className="text-right">{formaterEuros(totalCharge)} € / mois</td>
+                    <td />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                </Tableau>
+                {paieEquipe && (
+                  <div className="mt-3">
+                    <EcritureComptable libelle="Paie du mois" etiquette="à la clôture" lignes={paieEquipe.paie.lignes} />
+                  </div>
+                )}
+              </>
+            )}
+          </Carte>
+        </div>
 
-      <section className="mt-10 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider">Embaucher</h2>
-        {verrou && <BandeauVerrou verrou={verrou} action="L'embauche" />}
-        <FormulaireEmbauche smicMensuelBrut={coefficients.smicMensuelBrut} verrouille={verrou !== null} />
-      </section>
-    </div>
-  );
-}
-
-function Carte({
-  libelle,
-  children,
-}: {
-  libelle: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-md border border-[color:var(--color-g-200)] p-4">
-      <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-        {libelle}
-      </p>
-      <p className="mt-2 text-xl font-medium">{children}</p>
+        <div className="flex flex-col gap-4">
+          <EncadreNotion titre="Brut, net, coût employeur">
+            Le salarié touche le net : son brut moins ses propres cotisations. L&apos;entreprise paie le brut
+            (compte 641) plus les cotisations patronales versées à l&apos;Urssaf (645). Au SMIC, ces cotisations
+            valent {pourcent(coefficients.tauxCotisationsSmic)} du brut grâce aux réductions ; elles montent
+            jusqu&apos;à {pourcent(coefficients.tauxCotisationsPleines)} à partir de{" "}
+            {coefficients.seuilCotisationsPleinesEnSmic.toLocaleString("fr-FR")} SMIC.
+          </EncadreNotion>
+          <EncadreNotion titre="Un salarié sans poste ne produit pas">
+            Un artisan travaille sur une machine. S&apos;il n&apos;y a pas de poste libre, il est payé quand même,
+            mais ne fabrique rien. Embaucher avant d&apos;avoir la place, c&apos;est payer pour attendre.
+          </EncadreNotion>
+          <EncadreNotion titre="Se séparer d'un salarié coûte">
+            Après {paramsLicenciement.ancienneteMinimaleMois} mois d&apos;ancienneté, un licenciement donne droit à une
+            indemnité légale, payée tout de suite par la banque. C&apos;est une charge de personnel (641).
+          </EncadreNotion>
+          <FilRouge ecran="embauche" />
+        </div>
+      </div>
     </div>
   );
 }

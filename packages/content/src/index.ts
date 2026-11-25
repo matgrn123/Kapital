@@ -13,3 +13,6 @@ export type {
   TypeBatiment,
   TypeModule,
 } from "./catalogues.js";
+
+export { chargerFilRougeLV, validerFilRouge, ECRANS_FIL_ROUGE } from "./fil-rouge.js";
+export type { EcranFilRouge, TexteFilRouge } from "./fil-rouge.js";

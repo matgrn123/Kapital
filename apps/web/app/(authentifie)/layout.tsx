@@ -57,42 +57,39 @@ export default async function LayoutAuthentifie({
   }
   const entreprise = entreprises[0]!;
 
+  // Ossature de la maquette (.shell) : barre collée en haut, rail de 200 px
+  // collé sous la barre, contenu en pleine largeur ; c'est la page qui défile.
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="flex w-56 shrink-0 flex-col bg-[color:var(--color-nav)] text-[color:var(--color-nav-texte)]">
-        <div className="border-b border-white/10 px-5 py-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-[color:var(--color-accent-clair)]">
-            Kapital
-          </p>
-          <p className="truncate text-sm font-semibold text-white">{entreprise.nom}</p>
-        </div>
-        <NavLaterale />
-        <div className="border-t border-white/10 px-5 py-3 text-xs">
-          <p className="truncate">{profil?.pseudo ?? user.email}</p>
-          {profil?.role === "admin" && (
-            <Link href="/admin" className="mt-2 block underline hover:text-white">
-              Administration
-            </Link>
-          )}
-          {process.env.NEXT_PUBLIC_RETOUR_URL && (
-            <a
-              href={process.env.NEXT_PUBLIC_RETOUR_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 block underline hover:text-white"
-            >
-              Signaler un problème
-            </a>
-          )}
-        </div>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <BarreJeu
-          companyId={entreprise.id}
-          tresorerieInitiale={entreprise.tresorerie_centimes}
-          etapeInitiale={entreprise.etape}
-        />
-        <main className="flex flex-1 flex-col overflow-y-auto bg-[color:var(--color-fond)]">{children}</main>
+    <div className="min-h-screen bg-bg px-4 pb-8">
+      <BarreJeu
+        companyId={entreprise.id}
+        nomEntreprise={entreprise.nom}
+        tresorerieInitiale={entreprise.tresorerie_centimes}
+        etapeInitiale={entreprise.etape}
+      />
+      <div className="grid grid-cols-[200px_minmax(0,1fr)] gap-6 pt-5 max-[900px]:grid-cols-1 max-[900px]:gap-3.5">
+        <aside className="sticky top-[84px] flex flex-col gap-4 self-start max-[900px]:static">
+          <NavLaterale />
+          <div className="border-t border-line px-2.5 pt-3 text-xs text-muted max-[900px]:hidden">
+            <p className="truncate">{profil?.pseudo ?? user.email}</p>
+            {profil?.role === "admin" && (
+              <Link href="/admin" className="mt-2 block underline hover:text-ink">
+                Administration
+              </Link>
+            )}
+            {process.env.NEXT_PUBLIC_RETOUR_URL && (
+              <a
+                href={process.env.NEXT_PUBLIC_RETOUR_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 block underline hover:text-ink"
+              >
+                Signaler un problème
+              </a>
+            )}
+          </div>
+        </aside>
+        <main className="flex min-w-0 flex-col gap-5">{children}</main>
       </div>
     </div>
   );

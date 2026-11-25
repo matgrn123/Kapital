@@ -1,61 +1,61 @@
 "use client";
 
+import type { CoefficientsMarketing } from "@kapital/engine";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Bouton, Choix, Curseur, EcritureComptable, Jauge, Ligne, Note, Refus, Succes } from "../../../components/ui";
+import { apercuMarketing, bornesQuantite, effetsMarketing, type TypeActionMarketing } from "../../../lib/apercus";
+import { formaterEuros } from "../../../lib/formatage";
+import { ACTIONS } from "./actions";
 
 type Marque = { notoriete: number; desirabilite: number };
 
-const ACTIONS = [
-  { type: "publicite" as const, libelle: "Publicité", desc: "Monte la notoriété. Sans effet sur la désirabilité." },
-  { type: "image_marque" as const, libelle: "Image de marque", desc: "Monte la désirabilité. Sans effet sur la notoriété." },
-  { type: "promotion" as const, libelle: "Promotion", desc: "Monte la notoriété mais abîme la désirabilité." },
-  { type: "relations_presse" as const, libelle: "Relations presse", desc: "Monte les deux jauges modérément." },
-];
 
-const K: Record<string, { n: number; d: number }> = {
-  publicite: { n: 2.0, d: 0 },
-  image_marque: { n: 0, d: 2.0 },
-  promotion: { n: 1.0, d: -1.5 },
-  relations_presse: { n: 1.5, d: 1.5 },
-};
 
-function clamp(x: number): number {
-  return Math.max(0, Math.min(100, x));
+function arrondi(x: number): string {
+  return x.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+}
+
+function ecart(apres: number, avant: number): string {
+  const d = apres - avant;
+  return `${d >= 0 ? "+" : "−"}${arrondi(Math.abs(d))}`;
 }
 
 export function ActionsMarketing({
   tresorerie,
   marque,
+  coefficients,
 }: {
   tresorerie: number;
   marque: Marque;
+  coefficients: CoefficientsMarketing;
 }) {
   const router = useRouter();
-  const [actionActive, setActionActive] = useState<string | null>(null);
-  const [montant, setMontant] = useState("500");
+  const [action, setAction] = useState<TypeActionMarketing>("publicite");
+  // Budget en euros entiers, du minimum d'un euro à toute la trésorerie disponible.
+  const bornes = bornesQuantite({ minimum: 1, plafonds: [tresorerie / 100] });
+  const [euros, setEuros] = useState<number>(Math.min(bornes.max, Math.max(bornes.min, Math.floor(bornes.max / 10))));
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
 
-  const montantCentimes = Math.round(parseFloat(montant) * 100);
-  const montantEuros = parseFloat(montant);
-  const simuler = (type: string) => {
-    if (!Number.isFinite(montantEuros) || montantEuros <= 0) return null;
-    const k = K[type]!;
-    const m = Math.log(1 + montantEuros);
-    return {
-      noto: clamp(marque.notoriete + k.n * m),
-      desi: clamp(marque.desirabilite + k.d * m),
-    };
-  };
+  const montantCentimes = Math.min(Math.max(euros, bornes.min), bornes.max) * 100;
+  const effets = useMemo(
+    () => effetsMarketing({ montant: montantCentimes, marque, coefficients }),
+    [montantCentimes, marque, coefficients],
+  );
+  const apercu = useMemo(
+    () => apercuMarketing({ action, montant: montantCentimes, tresorerie, marque, coefficients }),
+    [action, montantCentimes, tresorerie, marque, coefficients],
+  );
+  const libelle = ACTIONS.find((a) => a.type === action)?.libelle ?? "";
 
-  async function lancer(type: string) {
+  async function lancer(e: React.FormEvent) {
+    e.preventDefault();
     setErreur(null);
-    if (!Number.isFinite(montantCentimes) || montantCentimes <= 0) {
-      setErreur("Montant invalide.");
-      return;
-    }
-    if (montantCentimes > tresorerie) {
-      setErreur(`Trésorerie insuffisante (manque ${((montantCentimes - tresorerie) / 100).toFixed(2)} €).`);
+    setOk(null);
+    if (!apercu.ok) {
+      setErreur(apercu.message);
       return;
     }
     setEnCours(true);
@@ -63,75 +63,93 @@ export function ActionsMarketing({
       const reponse = await fetch("/api/actions/action-marketing", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ type, montantCentimes }),
+        body: JSON.stringify({ type: action, montantCentimes }),
       });
-      const data = (await reponse.json()) as { error?: string };
-      if (data.error) {
-        setErreur(data.error);
+      const data = (await reponse.json().catch(() => ({}))) as { error?: string };
+      if (!reponse.ok || data.error) {
+        setErreur(data.error ?? `Action impossible (erreur ${reponse.status}).`);
         return;
       }
+      setOk(`${libelle} lancée pour ${formaterEuros(montantCentimes)} €.`);
       router.refresh();
+    } catch {
+      setErreur("Impossible de joindre le serveur. Vérifie ta connexion et réessaie.");
     } finally {
       setEnCours(false);
     }
   }
 
   return (
-    <div className="space-y-4 rounded-md border border-[color:var(--color-g-200)] p-5">
-      <div className="space-y-1.5">
-        <span className="block text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Montant (€)
-        </span>
-        <input
-          type="text"
-          value={montant}
-          onChange={(e) => setMontant(e.target.value)}
-          className="chiffre w-32 rounded-md border border-[color:var(--color-g-300)] px-3 py-2 text-sm outline-none focus:border-[color:var(--color-noir)]"
-        />
+    <form onSubmit={lancer} className="flex flex-col gap-4">
+      <div className="grid gap-2 sm:grid-cols-2">
+        {ACTIONS.map((a) => (
+          <Choix
+            key={a.type}
+            actif={a.type === action}
+            onClick={() => setAction(a.type)}
+            titre={a.libelle}
+            prix={`notoriété ${ecart(marque.notoriete + effets[a.type].notoriete, marque.notoriete)} · désirabilité ${ecart(
+              marque.desirabilite + effets[a.type].desirabilite,
+              marque.desirabilite,
+            )}`}
+          >
+            {a.desc}
+          </Choix>
+        ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        {ACTIONS.map((a) => {
-          const sim = simuler(a.type);
-          const actif = actionActive === a.type;
-          return (
-            <div
-              key={a.type}
-              onMouseEnter={() => setActionActive(a.type)}
-              onMouseLeave={() => setActionActive(null)}
-              className={`rounded-md border p-4 transition ${
-                actif ? "border-[color:var(--color-noir)]" : "border-[color:var(--color-g-200)]"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold">{a.libelle}</h3>
-                  <p className="mt-1 text-xs text-[color:var(--color-g-500)]">{a.desc}</p>
-                </div>
-                <button
-                  onClick={() => lancer(a.type)}
-                  disabled={enCours}
-                  className="shrink-0 rounded-md bg-[color:var(--color-noir)] px-3 py-1.5 text-xs font-medium text-[color:var(--color-blanc)] hover:bg-[color:var(--color-g-900)] disabled:opacity-50"
-                >
-                  Lancer
-                </button>
-              </div>
-              {sim && (
-                <p className="chiffre mt-3 text-xs text-[color:var(--color-g-700)]">
-                  Après : noto <span className="font-medium">{sim.noto.toFixed(1)}</span>,
-                  désir <span className="font-medium">{sim.desi.toFixed(1)}</span>
-                </p>
-              )}
+      <Curseur
+        libelle="Budget"
+        valeur={montantCentimes / 100}
+        min={bornes.min}
+        max={bornes.max}
+        onChange={setEuros}
+        affichage={`${formaterEuros(montantCentimes)} €`}
+        aide={`Trésorerie disponible : ${formaterEuros(tresorerie)} €. L'effet de chaque action au budget choisi s'affiche sur sa tuile.`}
+      />
+
+      {apercu.ok ? (
+        <div className="flex flex-col gap-3">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Jauge libelle="Notoriété aujourd'hui" valeur={marque.notoriete} max={100} texte={arrondi(marque.notoriete)} />
+              <Jauge libelle="Après l'action" valeur={apercu.apres.notoriete} max={100} texte={arrondi(apercu.apres.notoriete)} />
             </div>
-          );
-        })}
-      </div>
-
-      {erreur && (
-        <p role="alert" className="text-sm text-[color:var(--color-erreur)]">
-          {erreur}
-        </p>
+            <div className="flex flex-col gap-2">
+              <Jauge libelle="Désirabilité aujourd'hui" valeur={marque.desirabilite} max={100} ton="or" texte={arrondi(marque.desirabilite)} />
+              <Jauge
+                libelle="Après l'action"
+                valeur={apercu.apres.desirabilite}
+                max={100}
+                ton={apercu.apres.desirabilite < marque.desirabilite ? "critique" : "or"}
+                texte={arrondi(apercu.apres.desirabilite)}
+              />
+            </div>
+          </div>
+          <div>
+            <Ligne libelle="Notoriété">
+              {arrondi(marque.notoriete)} → {arrondi(apercu.apres.notoriete)}
+            </Ligne>
+            <Ligne libelle="Désirabilité" ton={apercu.apres.desirabilite < marque.desirabilite ? "critique" : undefined}>
+              {arrondi(marque.desirabilite)} → {arrondi(apercu.apres.desirabilite)}
+            </Ligne>
+            <Ligne libelle="Sortie de trésorerie">tout de suite</Ligne>
+            <Ligne libelle="Trésorerie après l'action">{formaterEuros(apercu.tresorerieApres)} €</Ligne>
+          </div>
+          <Note>Cette écriture est passée dès que tu lances l&apos;action :</Note>
+          <EcritureComptable libelle={`Marketing : ${libelle.toLowerCase()}`} etiquette="aperçu" lignes={apercu.ecriture} />
+        </div>
+      ) : (
+        <Refus>{apercu.message}</Refus>
       )}
-    </div>
+
+      {erreur && <Refus>{erreur}</Refus>}
+      {ok && <Succes>{ok}</Succes>}
+      <div className="flex justify-end">
+        <Bouton type="submit" variante="principal" disabled={enCours || !apercu.ok}>
+          {enCours ? "Lancement…" : `Lancer : ${libelle.toLowerCase()}`}
+        </Bouton>
+      </div>
+    </form>
   );
 }

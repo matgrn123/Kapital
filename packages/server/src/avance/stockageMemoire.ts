@@ -1,6 +1,7 @@
 import {
   type CreanceAEncaisser,
   type CumulMois,
+  type DetteFournisseurEchue,
   type DonneesFinMois,
   type EcritureComptable,
   type Entreprise,
@@ -46,6 +47,8 @@ export class StockageMemoire implements StockageMonde {
   readonly ecritures: { companyId: string; ecriture: EcritureComptable }[] = [];
   readonly livraisons = new Map<string, LivraisonEnBase[]>();
   readonly creancesParMois = new Map<string, readonly CreanceAEncaisser[]>();
+  /** Dettes à régler, par « entreprise|mois » ; retirées une fois réglées (écriture reglement_*). */
+  readonly dettesParMois = new Map<string, readonly DetteFournisseurEchue[]>();
 
   /** Pannes simulées : nombre d'enregistrements qui échouent avant d'écrire quoi que ce soit. */
   pannesAEnregistrer = 0;
@@ -125,6 +128,18 @@ export class StockageMemoire implements StockageMonde {
 
   async chargerCreances(companyId: string, moisEnCours: number): Promise<readonly CreanceAEncaisser[]> {
     return this.creancesParMois.get(`${companyId}|${moisEnCours}`) ?? [];
+  }
+
+  async chargerDettesEchues(
+    companyId: string,
+    moisEnCours: number,
+  ): Promise<readonly DetteFournisseurEchue[]> {
+    const reglees = new Set(
+      this.ecritures.filter((e) => e.companyId === companyId).map((e) => e.ecriture.id),
+    );
+    return (this.dettesParMois.get(`${companyId}|${moisEnCours}`) ?? []).filter(
+      (d) => !reglees.has(`reglement_${d.nature}_${d.ordreId}`),
+    );
   }
 
   async chargerFinDeMois(companyId: string): Promise<DonneesFinMois> {

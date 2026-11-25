@@ -1,7 +1,7 @@
 import { chargerParametresV1 } from "@kapital/content";
 import { describe, expect, it } from "vitest";
 import type { Entreprise, Salarie } from "../types/entreprise.js";
-import { centimes, idEntreprise, idProduit, idSalarie } from "../types/primitifs.js";
+import { centimes, idEntreprise, idMatiere, idProduit, idSalarie } from "../types/primitifs.js";
 import { planProductionDuMois } from "./flux.js";
 
 const PARAMS = chargerParametresV1();
@@ -37,6 +37,12 @@ function entreprise(salaries: readonly Salarie[], machines: number): Entreprise 
         qualiteVisee: 3,
         prix: { vente_directe: centimes(3000), revendeur: centimes(2000) },
         productionMensuelleCible: 10_000,
+        fabrication: {
+          matiere: idMatiere("mat_jersey_coton"),
+          consommationParPiece: 0.8,
+          fournituresParPiece: centimes(60),
+          tempsStandardMinutes: 30,
+        },
       },
     ],
   };

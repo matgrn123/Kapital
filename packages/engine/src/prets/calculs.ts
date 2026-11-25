@@ -78,7 +78,7 @@ export function enregistrerDeblocagePret(
   return enregistrer(gl, {
     id: e.idEcriture,
     mois: e.mois,
-    libelle: `Déblocage prêt bancaire`,
+    libelle: "Mise à disposition du prêt",
     lignes: [
       { compte: "512", sens: "debit", montant: e.capital },
       { compte: "164", sens: "credit", montant: e.capital },

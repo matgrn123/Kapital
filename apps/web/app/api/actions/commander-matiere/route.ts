@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
+import { chargerParametresV1 } from "@kapital/content";
+import { configTempsDepuis } from "@kapital/engine";
 import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
-
-const HEURES_PAR_MOIS_JEU = 24;
 
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
@@ -60,10 +60,10 @@ export async function POST(request: Request) {
     );
   }
 
+  // Durée réelle d'un mois de jeu : paramètre temps_minutes_reelles_par_mois_jeu.
+  const msParMoisJeu = configTempsDepuis(chargerParametresV1()).minutesReellesParMoisJeu * 60_000;
   const maintenant = new Date();
-  const livraison = new Date(
-    maintenant.getTime() + fournisseur.delai_mois * HEURES_PAR_MOIS_JEU * 3600 * 1000,
-  );
+  const livraison = new Date(maintenant.getTime() + fournisseur.delai_mois * msParMoisJeu);
 
   const { error } = await ctx.supabaseAdmin.from("purchase_orders").insert({
     company_id: ctx.companyId,

@@ -8,6 +8,7 @@ import {
   type DonneesReellesMois,
   type ResultatClotureEntreprise,
 } from "./donneesMois.js";
+import { ajouterVentesAuxCumulsEtape } from "./cumulsEtape.js";
 import { avancerFlux } from "./flux.js";
 
 export type {
@@ -35,14 +36,15 @@ export function simulerMoisEntreprise(
   _graine: Graine,
   mois: MoisJeu,
 ): ResultatClotureEntreprise {
+  const cumulDepart = cumulVide(mois, entreprise.tresorerie);
   const flux = avancerFlux(
     entreprise,
-    cumulVide(mois, entreprise.tresorerie),
+    cumulDepart,
     donnees,
     { params, mois, pasDebut: 0, pasFin: 1, pasParMois: 1, suffixeId: "" },
   );
   const cloture = cloturerMois(
-    flux.entreprise,
+    ajouterVentesAuxCumulsEtape(flux.entreprise, cumulDepart, flux.cumul),
     flux.cumul,
     {
       tvaAPayerCeMois: donnees.tvaAPayerCeMois,

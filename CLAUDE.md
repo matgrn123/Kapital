@@ -43,14 +43,13 @@ Toujours avec accord : règles du jeu, chiffres et comptabilité (`packages/engi
 - Comptabilité en partie double : après chaque opération, actif = passif.
 - Temps : une seule horloge pour tous, sans pause ni accéléré. Le ratio (1 jour réel = 1 mois de jeu) et le pas d'avance du monde (1 minute réelle) sont des paramètres ; salaires et loyers sont payés en fin de mois de jeu.
 
-## Règles 3D
+## Règles de rendu (village et atelier)
 
-- 3D avec Three.js et React Three Fiber, uniquement côté navigateur. Pas de Babylon.js.
-- Toute la 3D a un effet économique, mais la 3D ne décide jamais d'un chiffre : elle affiche l'état calculé par le moteur et envoie des demandes au serveur.
+- Décision du 25 novembre 2026 : le village et l'atelier sont dessinés en **SVG isométrique**, d'après la maquette `docs/maquette/kapital-maquette-v2.html`, avec un rendu réaliste (textures, lumière par face, ombres douces), sans rotation de caméra. Moteur de rendu commun : `apps/web/components/iso`. Three.js et React Three Fiber ne sont plus utilisés pour ces écrans.
+- Tout ce qui est dessiné a un effet économique, mais le dessin ne décide jamais d'un chiffre : il affiche l'état calculé par le moteur et envoie des demandes au serveur.
 - La validation d'un plan d'aménagement est une fonction pure de `packages/engine`, utilisée par le navigateur pour l'aperçu et réexécutée par le serveur avant enregistrement.
-- Modèles glTF/GLB uniquement de sources à licence vérifiée (Quaternius = CC0), chaque modèle inscrit dans `assets/LICENCES.md`.
-- Ne committer que les modèles utilisés (dans `apps/web/public/models`), jamais les packs complets téléchargés.
-- Performance : fluide sur un portable récent ; instancier les objets répétés, compresser les textures.
+- Images, textures ou modèles externes : uniquement de sources à licence vérifiée (CC0), chacun inscrit dans `assets/LICENCES.md` ; ne committer que les fichiers utilisés, jamais les packs complets.
+- Performance : fluide sur un portable récent ; réutiliser les motifs SVG (`<defs>`) plutôt que dupliquer, pas d'animation hors `prefers-reduced-motion`.
 
 ## Structure du dépôt
 
