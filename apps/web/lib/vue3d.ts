@@ -165,7 +165,7 @@ export function etatPourVue3D(d: DonneesVue3D): ZoneVue3D[] {
       chiffre:
         d.marque === null
           ? "—"
-          : `Notoriété ${d.marque.notoriete} · Désirabilité ${d.marque.desirabilite}`,
+          : `Notoriété ${Math.round(d.marque.notoriete)} · Désirabilité ${Math.round(d.marque.desirabilite)} (sur 100)`,
       detail:
         d.marque === null
           ? "Aucune action marketing lancée"

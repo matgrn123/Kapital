@@ -2,6 +2,7 @@ import Link from "next/link";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
 import { chargerProgressionMissions } from "../../../lib/missions";
+import { libelleGamme, libelleLisible } from "../../../lib/lisible";
 import { DEFINITIONS_MISSIONS, type EtapeEntreprise } from "@kapital/engine";
 import { chargerParametresV1 } from "@kapital/content";
 import { CarteEtape } from "./CarteEtape";
@@ -37,10 +38,19 @@ export default async function PageJeu() {
     .from("ledger_entries")
     .select("id, mois_jeu, libelle, compte, sens, montant_centimes, cree_le")
     .eq("company_id", entreprise.id)
+    .eq("compte", "512")
     .order("cree_le", { ascending: false })
     .limit(10);
 
+  // Le joueur lit des mouvements d'argent (compte 512, la banque), pas des
+  // écritures en partie double : le détail comptable est dans Finances.
   const dernieres = (ecritures ?? []) as Ecriture[];
+
+  const { data: produitsCatalogue } = await supabase.from("products").select("id, nom");
+  const nomsProduits: Record<string, string> = {};
+  for (const p of (produitsCatalogue ?? []) as Array<{ id: string; nom: string }>) {
+    nomsProduits[p.id] = p.nom;
+  }
 
   // Agregats du mois en cours : CA (707 credit), coût (7135 debit), encaissement (512)
   const { data: ecrituresMois } = await supabase
@@ -103,7 +113,7 @@ export default async function PageJeu() {
           </h1>
         </div>
         <div className="text-right text-xs text-[color:var(--color-g-500)]">
-          <p>Gamme <span className="font-medium text-[color:var(--color-noir)] capitalize">{entreprise.gamme}</span></p>
+          <p><span className="font-medium text-[color:var(--color-noir)]">{libelleGamme(entreprise.gamme)}</span></p>
           <p>Étape <span className="chiffre font-medium text-[color:var(--color-noir)]">{entreprise.etape}</span></p>
           <p>Statut <span className="font-medium text-[color:var(--color-noir)]">{entreprise.statut}</span></p>
         </div>
@@ -130,38 +140,45 @@ export default async function PageJeu() {
       <section className="mt-10 grid grid-cols-5 gap-6">
         <div className="col-span-3 rounded-md border border-[color:var(--color-g-200)]">
           <header className="flex items-center justify-between border-b border-[color:var(--color-g-200)] px-5 py-3">
-            <h2 className="text-sm font-semibold">Dernières écritures</h2>
-            <p className="text-xs text-[color:var(--color-g-500)]">
-              {dernieres.length === 0 ? "aucune" : dernieres.length}
-            </p>
+            <h2 className="text-sm font-semibold">Derniers mouvements d'argent</h2>
+            <Link
+              href="/finances"
+              className="text-xs text-[color:var(--color-g-500)] underline hover:text-[color:var(--color-noir)]"
+            >
+              Toute la comptabilité
+            </Link>
           </header>
           {dernieres.length === 0 ? (
             <p className="px-5 py-10 text-center text-sm text-[color:var(--color-g-500)]">
-              Aucune activité encore. Commencez par passer une commande de
-              matière ou embaucher un artisan.
+              Aucun mouvement sur votre compte en banque pour l'instant. Ajoutez
+              un produit à votre catalogue pour lancer vos premières ventes.
             </p>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-[color:var(--color-g-100)] text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
                 <tr>
-                  <th className="px-5 py-2 text-left font-medium">Libellé</th>
-                  <th className="px-5 py-2 text-left font-medium">Compte</th>
-                  <th className="px-5 py-2 text-right font-medium">Montant</th>
+                  <th className="px-5 py-2 text-left font-medium">Opération</th>
+                  <th className="px-5 py-2 text-right font-medium">Sur le compte</th>
                 </tr>
               </thead>
               <tbody>
                 {dernieres.map((e) => (
                   <tr key={e.id} className="border-t border-[color:var(--color-g-200)]">
                     <td className="px-5 py-2">
-                      <p>{e.libelle}</p>
+                      <p>{libelleLisible(e.libelle, nomsProduits)}</p>
                       <p className="text-xs text-[color:var(--color-g-500)]">
                         {formaterDateHeure(e.cree_le)}
                       </p>
                     </td>
-                    <td className="chiffre px-5 py-2 text-[color:var(--color-g-700)]">{e.compte}</td>
-                    <td className="chiffre px-5 py-2 text-right">
-                      <span className={e.sens === "debit" ? "" : "text-[color:var(--color-g-500)]"}>
-                        {e.sens === "debit" ? "" : "-"}
+                    <td className="chiffre whitespace-nowrap px-5 py-2 text-right">
+                      <span
+                        className={
+                          e.sens === "debit"
+                            ? "text-[color:var(--color-succes)]"
+                            : "text-[color:var(--color-erreur)]"
+                        }
+                      >
+                        {e.sens === "debit" ? "+ " : "− "}
                         {formaterEuros(e.montant_centimes)} €
                       </span>
                     </td>
@@ -255,7 +272,9 @@ export default async function PageJeu() {
               </p>
               <p className="chiffre mt-3 text-xs text-[color:var(--color-g-500)]">
                 {missionACourante.cible > 0
-                  ? `${missionACourante.actuel} / ${missionACourante.cible}`
+                  ? defACourante.id === "mission3"
+                    ? `${formaterEuros(missionACourante.actuel)} € / ${formaterEuros(missionACourante.cible)} €`
+                    : `${missionACourante.actuel} / ${missionACourante.cible}`
                   : "voir le détail →"}
               </p>
             </Link>
