@@ -586,5 +586,59 @@
     "unite": "pieces_par_mois",
     "source": "hypothèse de jeu, à valider par Mathieu (valeur reprise de l'ancien défaut codé dans apps/web/app/api/actions/ajouter-produit/route.ts ; le joueur la change ensuite)",
     "date": "2026-11-25"
+  },
+  "boutique_travaux_amenagement_centimes_par_m2": {
+    "valeur": 50000,
+    "unite": "centimes_par_m2",
+    "source": "Proposition AE-9, à valider par Mathieu. Budget type d'une boutique de vêtements : « Travaux et aménagement du local : 55 000 € » pour environ 115 m², soit ≈ 478 €/m² (modelesdebusinessplan.com, « Budget pour ouvrir un magasin de vêtements », mis à jour le 14 septembre 2026, https://modelesdebusinessplan.com/blogs/infos/budget-ouvrir-magasin-vetement) ; une rénovation complète (façade, électricité, murs, plafonds) d'un magasin de prêt-à-porter va de 1 000 à 1 500 €/m² (Companeo, « Devis travaux : l'évaluation de votre budget », mis à jour le 18 juillet 2021). 500 €/m² retenu pour une boutique simple, arrondi du premier chiffre",
+    "date": "2026-11-25"
+  },
+  "boutique_travaux_duree_mois": {
+    "valeur": 1,
+    "unite": "mois_de_jeu",
+    "source": "docs/batiments-3d-groupe.md section 3.3 (des travaux prennent un mois de jeu, un jour réel ; l'espace concerné ne produit pas pendant ce temps) ; docs/cahier-des-charges-v1.md section 13 (AE-10 : un mois de travaux)",
+    "date": "2026-11-25"
+  },
+  "boutique_amortissement_agencement_mois": {
+    "valeur": 120,
+    "unite": "mois",
+    "source": "Proposition AE-9, valeur provisoire à calibrer : les travaux d'agencement sont une immobilisation amortie, pas une charge du mois ; 120 mois = 10 ans, haut de la durée d'usage courante des agencements et installations (5 à 10 ans), proche de la durée d'un bail commercial (9 ans, Code de commerce L145-4). À confirmer avec un expert-comptable",
+    "date": "2026-11-25"
+  },
+  "boutique_depot_garantie_mois_de_loyer": {
+    "valeur": 3,
+    "unite": "mois_de_loyer",
+    "source": "Code de commerce, article L145-40 alinéa 2, modifié par la loi n° 2026-403 du 26 mai 2026 de simplification de la vie économique : les garanties exigées du locataire « ne peuvent être supérieures à un montant équivalent à 3 mois de loyers » pour les baux conclus ou renouvelés depuis le 26 mai 2026 (notaires.fr, « Baux commerciaux : les nouveautés de la loi n° 2026-403 », https://www.notaires.fr/fr/actualites/baux-commerciaux-les-nouveautes-de-la-loi-ndeg-2026-403-du-26-mai-2026-de-simplification-de-la-vie-economique-sve). 3 mois = plafond légal et pratique courante ; texte officiel à relire sur Légifrance",
+    "date": "2026-11-25"
+  },
+  "vendeur_salaire_brut_mensuel_centimes": {
+    "valeur": 186702,
+    "unite": "centimes_par_mois",
+    "source": "docs/plan-architecture-entreprise.md section 3 (embauche d'un vendeur : même coût qu'un artisan, ≈ 1 933 € par mois chargé au SMIC) ; SMIC mensuel brut 35 h au 1er juin 2026 (https://www.urssaf.fr/accueil/outils-documentation/taux-baremes/montant-smic.html, paramètre smic_mensuel_brut). Convention collective du commerce de détail de l'habillement (IDCC 1483, avenant n° 29 du 16 décembre 2025, applicable au 1er avril 2026) : minimum du premier niveau à vérifier sur Légifrance, il ne peut être inférieur au SMIC",
+    "date": "2026-11-25"
+  },
+  "vendeur_ventes_max_pieces_par_mois": {
+    "valeur": 300,
+    "unite": "pieces_par_mois_par_vendeur",
+    "source": "Proposition AE-9, valeur provisoire à calibrer : commerce spécialisé d'habillement-chaussures, 31,6 Md€ de chiffre d'affaires pour 154 800 salariés en équivalent temps plein en 2010 (Insee Première n° 1459, 23 juillet 2013, https://www.insee.fr/fr/statistiques/1281038), soit ≈ 204 000 € par an et ≈ 17 000 € par mois et par vendeur (calcul) ; divisé par le prix de vente directe par défaut du milieu de gamme (60 €, produit_defaut_prix_vente_directe_centimes_milieu) ≈ 283 pièces, arrondi à 300",
+    "date": "2026-11-25"
+  },
+  "seuil_etape_3_chiffre_affaires_ht_cumule_centimes": {
+    "valeur": 12000000,
+    "unite": "centimes",
+    "source": "Proposition AE-9, valeur provisoire à calibrer au banc d'essai (AE-11, banc prolongé à 36 mois) : 4 fois le seuil de l'étape 2 (30 000 €) ; 120 000 € reste sous le quart du chiffre d'affaires annuel moyen d'un magasin d'habillement (≈ 500 000 €, Insee Première n° 1459, https://www.insee.fr/fr/statistiques/1281038). Comme pour l'étape 2, chiffre d'affaires cumulé hors taxes, tous canaux",
+    "date": "2026-11-25"
+  },
+  "seuil_etape_3_tresorerie_minimale_centimes": {
+    "valeur": 3000000,
+    "unite": "centimes",
+    "source": "Proposition AE-9, valeur provisoire à calibrer : de quoi ouvrir la boutique la moins chère sans découvert (mission AE-11) — dépôt de 3 mois de loyer (2 295 €) + travaux 45 m² × 500 € (22 500 €) + un mois de loyer, charges et vendeur (≈ 2 811 €) ≈ 27 600 €, arrondi à 30 000 € (calcul sur batiments-v1.json et les paramètres boutique_* et vendeur_*)",
+    "date": "2026-11-25"
+  },
+  "seuil_etape_3_notoriete_minimale": {
+    "valeur": 30,
+    "unite": "points_sur_100",
+    "source": "Proposition AE-9, valeur provisoire à calibrer : notoriété sur une jauge de 0 à 100 (docs/cahier-des-charges-v1.md section 6.2) ; une campagne de 1 000 € apporte ≈ 14 points (marketing_k_notoriete_publicite) et la notoriété perd 5 % par mois : 30 points demandent quelques mois de publicité régulière, une marque déjà connue au-delà de ses premiers clients",
+    "date": "2026-11-25"
   }
 }

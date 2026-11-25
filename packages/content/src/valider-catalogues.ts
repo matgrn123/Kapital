@@ -1,10 +1,19 @@
 import { ValidationError } from "./validate.js";
 import type {
   CategorieBatiment,
+  EffetBatiment,
   EffetModule,
+  GrilleBatiment,
   TypeBatiment,
   TypeModule,
 } from "./catalogues.js";
+
+/**
+ * Licence de tout ce qui est dessiné en code (SVG isométrique, apps/web/components/iso) :
+ * aucun fichier externe, donc rien à inscrire dans assets/LICENCES.md.
+ */
+export const LICENCE_DESSIN_SVG =
+  "Dessin SVG original du projet Kapital, tracé en code (apps/web/components/iso), sans fichier externe";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -160,6 +169,109 @@ function validerEffet(brut: unknown, contexte: string): EffetModule {
 }
 
 // ---------------------------------------------------------------------------
+// Rendu : chemin du modèle et licence (3D-1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Deux cas seulement :
+ * - modele_path null : dessin SVG fait en code, licence = LICENCE_DESSIN_SVG ;
+ * - modele_path sous /models/ : modèle externe, licence CC0 obligatoire (CLAUDE.md, règles de rendu).
+ */
+function validerRendu(
+  brut: Record<string, unknown>,
+  contexte: string,
+): { modele_path: string | null; modele_licence: string } {
+  if (!("modele_path" in brut)) {
+    throw new ValidationError(
+      `${contexte} : champ "modele_path" manquant (null si le dessin est fait en SVG).`,
+    );
+  }
+  const chemin = brut["modele_path"];
+  const licence = brut["modele_licence"];
+  if (typeof licence !== "string" || licence.trim() === "") {
+    throw new ValidationError(`${contexte} : champ "modele_licence" manquant ou vide.`);
+  }
+  if (chemin === null) {
+    if (licence !== LICENCE_DESSIN_SVG) {
+      throw new ValidationError(
+        `${contexte} : sans modele_path, modele_licence doit être « ${LICENCE_DESSIN_SVG} ».`,
+      );
+    }
+    return { modele_path: null, modele_licence: licence };
+  }
+  if (typeof chemin !== "string" || !chemin.startsWith("/models/")) {
+    throw new ValidationError(
+      `${contexte} : modele_path doit commencer par /models/ ou valoir null.`,
+    );
+  }
+  if (!/\bCC0\b/.test(licence)) {
+    throw new ValidationError(
+      `${contexte} : un modèle externe doit être sous licence CC0 (reçu « ${licence} »).`,
+    );
+  }
+  return { modele_path: chemin, modele_licence: licence };
+}
+
+// ---------------------------------------------------------------------------
+// Grille et effet des bâtiments (3D-1, AE-9)
+// ---------------------------------------------------------------------------
+
+function validerGrille(brut: unknown, contexte: string): GrilleBatiment {
+  if (!estObjet(brut)) {
+    throw new ValidationError(`${contexte} : "grille" manquante (largeur, hauteur, entree_x, entree_y).`);
+  }
+  const entier = (champ: string, min: number): number => {
+    const v = brut[champ];
+    if (typeof v !== "number" || !Number.isInteger(v) || v < min) {
+      throw new ValidationError(`${contexte} : grille.${champ} doit être un entier ≥ ${min}.`);
+    }
+    return v;
+  };
+  const largeur = entier("largeur", 1);
+  const hauteur = entier("hauteur", 1);
+  const entree_x = entier("entree_x", 0);
+  const entree_y = entier("entree_y", 0);
+  if (entree_x >= largeur || entree_y >= hauteur) {
+    throw new ValidationError(`${contexte} : l'entree (${entree_x}, ${entree_y}) est hors de la grille.`);
+  }
+  const auBord = entree_x === 0 || entree_y === 0 || entree_x === largeur - 1 || entree_y === hauteur - 1;
+  if (!auBord) {
+    throw new ValidationError(`${contexte} : l'entree doit être sur le bord de la grille.`);
+  }
+  return { largeur, hauteur, entree_x, entree_y };
+}
+
+function validerEffetBatiment(brut: unknown, contexte: string): EffetBatiment {
+  if (!estObjet(brut)) {
+    throw new ValidationError(`${contexte} : "effet" (effet économique) doit être un objet.`);
+  }
+  const type = brut["type"];
+  if (type === "production") return { type: "production" };
+  if (type === "point_de_vente") {
+    const passants = brut["passants_par_jour"];
+    if (typeof passants !== "number" || !Number.isInteger(passants) || passants <= 0) {
+      throw new ValidationError(`${contexte} : passants_par_jour doit être un entier > 0.`);
+    }
+    const bonus = brut["bonus_desirabilite_points_par_mois"];
+    if (typeof bonus !== "number" || !Number.isFinite(bonus) || bonus < 0 || bonus > 100) {
+      throw new ValidationError(
+        `${contexte} : bonus_desirabilite_points_par_mois doit être entre 0 et 100 (jauge de désirabilité).`,
+      );
+    }
+    return { type: "point_de_vente", passants_par_jour: passants, bonus_desirabilite_points_par_mois: bonus };
+  }
+  throw new ValidationError(
+    `${contexte} : effet.type "${String(type)}" inconnu. Valeurs : production, point_de_vente.`,
+  );
+}
+
+/** Effet attendu selon la catégorie (les autres catégories n'ont pas encore d'entrée au catalogue). */
+const EFFET_PAR_CATEGORIE: Partial<Record<CategorieBatiment, EffetBatiment["type"]>> = {
+  atelier: "production",
+  boutique: "point_de_vente",
+};
+
+// ---------------------------------------------------------------------------
 // validerBatiments
 // ---------------------------------------------------------------------------
 
@@ -168,6 +280,7 @@ const CATEGORIES_VALIDES: CategorieBatiment[] = [
   "entrepot",
   "bureau",
   "prestige",
+  "boutique",
 ];
 
 export function validerBatiments(data: unknown): TypeBatiment[] {
@@ -219,8 +332,16 @@ export function validerBatiments(data: unknown): TypeBatiment[] {
     }
 
     const source_prix = exigerChaineNonVide(brut, "source_prix", ctx);
-    const modele_path = exigerChaineNonVide(brut, "modele_path", ctx);
-    const modele_licence = exigerChaineNonVide(brut, "modele_licence", ctx);
+    const grille = validerGrille(brut["grille"], ctx);
+    const effet = validerEffetBatiment(brut["effet"], ctx);
+    const attendu = EFFET_PAR_CATEGORIE[categorie as CategorieBatiment];
+    if (attendu !== undefined && effet.type !== attendu) {
+      throw new ValidationError(
+        `${ctx} : un bâtiment de catégorie "${categorie}" doit avoir l'effet "${attendu}" (reçu "${effet.type}").`,
+      );
+    }
+    const source_effet = exigerChaineNonVide(brut, "source_effet", ctx);
+    const { modele_path, modele_licence } = validerRendu(brut, ctx);
 
     return {
       id,
@@ -234,6 +355,9 @@ export function validerBatiments(data: unknown): TypeBatiment[] {
       charges_mensuelles_centimes: charges,
       etape_debloquee: etape,
       source_prix,
+      grille,
+      effet,
+      source_effet,
       modele_path,
       modele_licence,
     } satisfies TypeBatiment;
@@ -289,26 +413,7 @@ export function validerModules(data: unknown): TypeModule[] {
 
     const source_prix = exigerChaineNonVide(brut, "source_prix", ctx);
 
-    // modele_path et modele_licence : tous les deux null, ou tous les deux renseignés
-    const rawPath = brut["modele_path"];
-    const rawLicence = brut["modele_licence"];
-
-    if (rawPath !== null && rawLicence === null) {
-      throw new ValidationError(
-        `${ctx} : modele_licence est requis quand modele_path est renseigné.`,
-      );
-    }
-    if (rawPath === null && rawLicence !== null) {
-      throw new ValidationError(
-        `${ctx} : modele_path est requis quand modele_licence est renseigné.`,
-      );
-    }
-    if (rawPath !== null && (typeof rawPath !== "string" || rawPath.trim() === "")) {
-      throw new ValidationError(`${ctx} : modele_path doit être une chaîne non vide ou null.`);
-    }
-    if (rawLicence !== null && (typeof rawLicence !== "string" || rawLicence.trim() === "")) {
-      throw new ValidationError(`${ctx} : modele_licence doit être une chaîne non vide ou null.`);
-    }
+    const { modele_path, modele_licence } = validerRendu(brut, ctx);
 
     return {
       id,
@@ -320,8 +425,8 @@ export function validerModules(data: unknown): TypeModule[] {
       amortissement_mois: amort,
       effet,
       source_prix,
-      modele_path: rawPath as string | null,
-      modele_licence: rawLicence as string | null,
+      modele_path,
+      modele_licence,
     } satisfies TypeModule;
   });
 }

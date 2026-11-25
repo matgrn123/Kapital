@@ -132,4 +132,50 @@ describe("parametres-v1.json (le vrai fichier)", () => {
       expect(params[cle], `paramètre manquant : ${cle}`).toBeDefined();
     }
   });
+  it("contient les paramètres de la tranche boutique (AE-9)", () => {
+    const params = validateParametres(JSON.parse(readFileSync(cheminParametres, "utf-8")));
+    const cles = [
+      "boutique_travaux_amenagement_centimes_par_m2",
+      "boutique_travaux_duree_mois",
+      "boutique_amortissement_agencement_mois",
+      "boutique_depot_garantie_mois_de_loyer",
+      "vendeur_salaire_brut_mensuel_centimes",
+      "vendeur_ventes_max_pieces_par_mois",
+      "seuil_etape_3_chiffre_affaires_ht_cumule_centimes",
+      "seuil_etape_3_tresorerie_minimale_centimes",
+      "seuil_etape_3_notoriete_minimale",
+    ];
+    for (const cle of cles) {
+      expect(params[cle], `paramètre manquant : ${cle}`).toBeDefined();
+    }
+  });
+
+  it("boutique : travaux d'un mois de jeu, dépôt dans le plafond légal de 3 mois", () => {
+    const params = validateParametres(JSON.parse(readFileSync(cheminParametres, "utf-8")));
+    expect(params["boutique_travaux_duree_mois"]!.valeur).toBe(1);
+    const depot = params["boutique_depot_garantie_mois_de_loyer"]!.valeur;
+    expect(depot).toBeGreaterThan(0);
+    expect(depot).toBeLessThanOrEqual(3);
+  });
+
+  it("étape 3 : plus exigeante que l'étape 2, notoriété sur l'échelle 0 à 100", () => {
+    const params = validateParametres(JSON.parse(readFileSync(cheminParametres, "utf-8")));
+    expect(params["seuil_etape_3_chiffre_affaires_ht_cumule_centimes"]!.valeur).toBeGreaterThan(
+      params["seuil_etape_2_chiffre_affaires_ht_cumule_centimes"]!.valeur,
+    );
+    expect(params["seuil_etape_3_tresorerie_minimale_centimes"]!.valeur).toBeGreaterThan(0);
+    const noto = params["seuil_etape_3_notoriete_minimale"]!.valeur;
+    expect(noto).toBeGreaterThan(0);
+    expect(noto).toBeLessThanOrEqual(100);
+  });
+
+  it("vendeur : salaire au moins égal au SMIC, ventes plafonnées par un entier positif", () => {
+    const params = validateParametres(JSON.parse(readFileSync(cheminParametres, "utf-8")));
+    expect(params["vendeur_salaire_brut_mensuel_centimes"]!.valeur).toBeGreaterThanOrEqual(
+      params["smic_mensuel_brut"]!.valeur,
+    );
+    const max = params["vendeur_ventes_max_pieces_par_mois"]!.valeur;
+    expect(Number.isInteger(max)).toBe(true);
+    expect(max).toBeGreaterThan(0);
+  });
 });

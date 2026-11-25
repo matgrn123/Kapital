@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "./validate.js";
 import {
+  LICENCE_DESSIN_SVG,
   validerBatiments,
   validerModules,
 } from "./valider-catalogues.js";
@@ -26,8 +27,23 @@ function batimentValide(): TypeBatiment {
     charges_mensuelles_centimes: 105_000,
     etape_debloquee: 0,
     source_prix: "docs/referentiel-couts.md section 7",
-    modele_path: "/models/Building_Small_1.gltf",
-    modele_licence: "CC0 - Quaternius Downtown City MegaKit",
+    grille: { largeur: 10, hauteur: 5, entree_x: 0, entree_y: 3 },
+    effet: { type: "production" },
+    source_effet: "docs/plan-architecture-entreprise.md section 3",
+    modele_path: null,
+    modele_licence: LICENCE_DESSIN_SVG,
+  };
+}
+
+function boutiqueValide(): TypeBatiment {
+  return {
+    ...batimentValide(),
+    id: "test_boutique",
+    nom: "Boutique test",
+    categorie: "boutique",
+    zones_amenageables: ["vente", "reserve"],
+    etape_debloquee: 3,
+    effet: { type: "point_de_vente", passants_par_jour: 2_500, bonus_desirabilite_points_par_mois: 0.5 },
   };
 }
 
@@ -43,7 +59,7 @@ function moduleValide(): TypeModule {
     effet: { type: "poste_artisan" },
     source_prix: "docs/referentiel-couts.md section 7",
     modele_path: null,
-    modele_licence: null,
+    modele_licence: LICENCE_DESSIN_SVG,
   };
 }
 
@@ -71,11 +87,82 @@ describe("validerBatiments", () => {
     expect(() => validerBatiments([b])).toThrow(/modele_licence/);
   });
 
-  it("refuse un bâtiment sans modele_path", () => {
+  it("refuse un bâtiment sans champ modele_path (null est permis, l'absence non)", () => {
     const b = batimentValide();
     delete (b as Partial<TypeBatiment>).modele_path;
     expect(() => validerBatiments([b])).toThrow(ValidationError);
     expect(() => validerBatiments([b])).toThrow(/modele_path/);
+  });
+
+  it("dessiné en SVG (modele_path null) : la licence doit être celle du dessin original", () => {
+    const b = { ...batimentValide(), modele_licence: "CC0 - Quaternius" };
+    expect(() => validerBatiments([b])).toThrow(/modele_licence/);
+  });
+
+  it("modèle externe : chemin sous /models/ et licence CC0 obligatoires", () => {
+    const ok = { ...batimentValide(), modele_path: "/models/X.gltf", modele_licence: "CC0 - Quaternius" };
+    expect(() => validerBatiments([ok])).not.toThrow();
+    const pasCc0 = { ...ok, modele_licence: "CC-BY 4.0 - Auteur" };
+    expect(() => validerBatiments([pasCc0])).toThrow(/CC0/);
+    const mauvaisChemin = { ...ok, modele_path: "models/X.gltf" };
+    expect(() => validerBatiments([mauvaisChemin])).toThrow(/modele_path/);
+  });
+
+  it("refuse un bâtiment sans grille d'aménagement (dimensions 3D-1)", () => {
+    const b = batimentValide();
+    delete (b as Partial<TypeBatiment>).grille;
+    expect(() => validerBatiments([b])).toThrow(/grille/);
+  });
+
+  it("refuse une grille de largeur nulle ou non entière", () => {
+    const g = batimentValide().grille;
+    expect(() => validerBatiments([{ ...batimentValide(), grille: { ...g, largeur: 0 } }])).toThrow(/grille/);
+    expect(() => validerBatiments([{ ...batimentValide(), grille: { ...g, hauteur: 4.5 } }])).toThrow(/grille/);
+  });
+
+  it("refuse une entrée hors de la grille ou au milieu de la pièce", () => {
+    const g = batimentValide().grille;
+    expect(() => validerBatiments([{ ...batimentValide(), grille: { ...g, entree_y: 5 } }])).toThrow(/entree/);
+    expect(() =>
+      validerBatiments([{ ...batimentValide(), grille: { ...g, entree_x: 4, entree_y: 2 } }]),
+    ).toThrow(/entree/);
+  });
+
+  it("refuse un bâtiment sans effet économique", () => {
+    const b = batimentValide();
+    delete (b as Partial<TypeBatiment>).effet;
+    expect(() => validerBatiments([b])).toThrow(/effet/);
+  });
+
+  it("refuse un effet de bâtiment sans source", () => {
+    expect(() => validerBatiments([{ ...batimentValide(), source_effet: " " }])).toThrow(/source_effet/);
+  });
+
+  it("accepte une boutique (catégorie AE-9) avec un effet point de vente", () => {
+    expect(() => validerBatiments([boutiqueValide()])).not.toThrow();
+  });
+
+  it("refuse une boutique dont l'effet n'est pas un point de vente", () => {
+    const b = { ...boutiqueValide(), effet: { type: "production" as const } };
+    expect(() => validerBatiments([b])).toThrow(/point_de_vente/);
+  });
+
+  it("refuse un atelier dont l'effet n'est pas la production", () => {
+    const b = { ...batimentValide(), effet: boutiqueValide().effet };
+    expect(() => validerBatiments([b])).toThrow(/production/);
+  });
+
+  it("refuse un point de vente sans passants ou avec un bonus de désirabilité négatif", () => {
+    const sansPassants = {
+      ...boutiqueValide(),
+      effet: { type: "point_de_vente" as const, passants_par_jour: 0, bonus_desirabilite_points_par_mois: 0.5 },
+    };
+    expect(() => validerBatiments([sansPassants])).toThrow(/passants_par_jour/);
+    const bonusNegatif = {
+      ...boutiqueValide(),
+      effet: { type: "point_de_vente" as const, passants_par_jour: 100, bonus_desirabilite_points_par_mois: -1 },
+    };
+    expect(() => validerBatiments([bonusNegatif])).toThrow(/bonus_desirabilite/);
   });
 
   it("refuse un prix_achat non entier (critère d'acceptation 3D-1)", () => {
@@ -132,12 +219,36 @@ describe("batiments-v1.json (le vrai fichier)", () => {
     expect(liste.some((b) => b.etape_debloquee === 0)).toBe(true);
   });
 
-  it("chaque bâtiment a un modele_path commençant par /models/", () => {
+  it("chaque bâtiment est dessiné en SVG (aucun modèle glTF chargé par le jeu)", () => {
     const brut = JSON.parse(
       readFileSync(resolve(ici, "..", "batiments-v1.json"), "utf-8"),
     );
     for (const b of validerBatiments(brut)) {
-      expect(b.modele_path).toMatch(/^\/models\//);
+      expect(b.modele_path).toBeNull();
+      expect(b.modele_licence).toBe(LICENCE_DESSIN_SVG);
+    }
+  });
+
+  it("contient 2 ou 3 emplacements de boutique, débloqués à l'étape 3", () => {
+    const brut = JSON.parse(
+      readFileSync(resolve(ici, "..", "batiments-v1.json"), "utf-8"),
+    );
+    const boutiques = validerBatiments(brut).filter((b) => b.categorie === "boutique");
+    expect(boutiques.length).toBeGreaterThanOrEqual(2);
+    expect(boutiques.length).toBeLessThanOrEqual(3);
+    for (const b of boutiques) {
+      expect(b.etape_debloquee).toBe(3);
+      expect(b.loyer_mensuel_centimes).toBeGreaterThan(0);
+      expect(b.effet.type).toBe("point_de_vente");
+    }
+  });
+
+  it("garde les ateliers sur la grille déjà utilisée en base (10 × 5, entrée en 0,3 : migration 0019)", () => {
+    const brut = JSON.parse(
+      readFileSync(resolve(ici, "..", "batiments-v1.json"), "utf-8"),
+    );
+    for (const b of validerBatiments(brut).filter((x) => x.categorie === "atelier")) {
+      expect(b.grille).toEqual({ largeur: 10, hauteur: 5, entree_x: 0, entree_y: 3 });
     }
   });
 });
@@ -150,26 +261,35 @@ describe("validerModules", () => {
   });
 
   it("refuse un module avec modele_path mais sans modele_licence", () => {
-    const m: TypeModule = {
+    const m = {
       ...moduleValide(),
       modele_path: "/models/Machine_Couture.gltf",
       modele_licence: null,
     };
-    expect(() => validerModules([m])).toThrow(/modele_licence/);
+    expect(() => validerModules([m as unknown as TypeModule])).toThrow(/modele_licence/);
   });
 
-  it("refuse un module avec modele_licence mais sans modele_path", () => {
+  it("refuse un module dessiné en SVG dont la licence n'est pas celle du dessin original", () => {
     const m: TypeModule = {
       ...moduleValide(),
       modele_path: null,
       modele_licence: "CC0 - Quaternius",
     };
-    expect(() => validerModules([m])).toThrow(/modele_path/);
+    expect(() => validerModules([m])).toThrow(/modele_licence/);
   });
 
-  it("accepte un module sans modèle 3D (null / null)", () => {
-    const m = { ...moduleValide(), modele_path: null, modele_licence: null };
-    expect(() => validerModules([m])).not.toThrow();
+  it("refuse un module sans licence (null n'est plus permis)", () => {
+    const m = { ...moduleValide(), modele_licence: null };
+    expect(() => validerModules([m as unknown as TypeModule])).toThrow(/modele_licence/);
+  });
+
+  it("refuse un modèle externe qui n'est pas CC0", () => {
+    const m = { ...moduleValide(), modele_path: "/models/m.glb", modele_licence: "CC-BY 3.0 - Kenney" };
+    expect(() => validerModules([m])).toThrow(/CC0/);
+  });
+
+  it("accepte un module dessiné en SVG (chemin null, licence du dessin original)", () => {
+    expect(() => validerModules([moduleValide()])).not.toThrow();
   });
 
   it("refuse un bonus_motivation_max_pct > 5 (critère d'acceptation 3D-1)", () => {
@@ -245,14 +365,24 @@ describe("modules-v1.json (le vrai fichier)", () => {
     ).toBe(true);
   });
 
-  it("chaque module avec modele_path a aussi modele_licence", () => {
+  it("chaque module a une licence : celle du dessin SVG original (3D-1)", () => {
     const brut = JSON.parse(
       readFileSync(resolve(ici, "..", "modules-v1.json"), "utf-8"),
     );
     for (const m of validerModules(brut)) {
-      if (m.modele_path !== null) {
-        expect(m.modele_licence).not.toBeNull();
-      }
+      expect(m.modele_path).toBeNull();
+      expect(m.modele_licence).toBe(LICENCE_DESSIN_SVG);
+    }
+  });
+
+  it("chaque module a un effet économique, un prix et une source", () => {
+    const brut = JSON.parse(
+      readFileSync(resolve(ici, "..", "modules-v1.json"), "utf-8"),
+    );
+    for (const m of validerModules(brut)) {
+      expect(m.effet.type).not.toBe("aucun");
+      expect(m.prix_centimes).toBeGreaterThan(0);
+      expect(m.source_prix.trim()).not.toBe("");
     }
   });
 });
