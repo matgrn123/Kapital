@@ -28,7 +28,7 @@ export default async function PageMissions() {
   const reussies = progressions.filter((p) => p.etat === "validee").length;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+    <div className="flex flex-col gap-5">
       <EnTete surTitre="Progression" titre="Missions">
         Trois missions pour apprendre les notions clés du jeu : le coût de revient, la trésorerie, le besoin en fonds de
         roulement. Elles avancent toutes seules pendant que tu joues.

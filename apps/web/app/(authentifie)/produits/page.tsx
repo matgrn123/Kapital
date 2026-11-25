@@ -92,7 +92,7 @@ export default async function PageProduits() {
   const catalogueVide = auCatalogue.length === 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+    <div className="flex flex-col gap-5">
       <EnTete surTitre="Canaux de vente" titre="Vente et prix">
         Fixe tes prix. Chaque produit a deux prix : le prix public TTC, en ligne, et le prix hors taxes pour les
         revendeurs. Plus cher, tu vends moins, sauf si ta marque fait envie.

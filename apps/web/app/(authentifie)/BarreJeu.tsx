@@ -168,7 +168,7 @@ export function BarreJeu({
   const reste = horloge && maintenant !== null ? horloge.finDuMoisMs - (maintenant + decalageMs) : null;
 
   return (
-    <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-3 border-b border-line bg-bg px-6 py-3">
+    <header className="sticky top-0 z-10 flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-line bg-bg py-3 max-[900px]:static">
       <Link href="/jeu" className="mr-auto flex items-center gap-2.5">
         <svg viewBox="0 0 32 32" className="h-8 w-8" aria-hidden="true">
           <path d="M16 3 28 9.5v13L16 29 4 22.5v-13z" fill="var(--accent)" />

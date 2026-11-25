@@ -176,3 +176,17 @@ export function alertes(e: {
   if (r.length === 0) r.push({ ton: "bon", texte: "Rien à signaler : trésorerie positive, stock et ventes en cours." });
   return r;
 }
+
+/** Solde du compte 512 (banque) à la fin de chacun des `nombre` derniers mois. */
+export function tresorerieFinDeMois(lignes: readonly LigneGrandLivre[], moisCourant: number, nombre: number): number[] {
+  const debut = Math.max(0, moisCourant - nombre + 1);
+  const r: number[] = [];
+  for (let m = debut; m <= moisCourant; m++) {
+    r.push(
+      lignes
+        .filter((l) => l.compte === "512" && l.mois_jeu <= m)
+        .reduce((s, l) => s + (l.sens === "debit" ? l.montant_centimes : -l.montant_centimes), 0),
+    );
+  }
+  return r;
+}

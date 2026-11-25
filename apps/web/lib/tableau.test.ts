@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { alertes, bilanSimplifie, caParMois, dernieresEcritures, type LigneGrandLivre } from "./tableau";
+import { alertes, bilanSimplifie, caParMois, dernieresEcritures, tresorerieFinDeMois, type LigneGrandLivre } from "./tableau";
 
 let n = 0;
 function l(
@@ -124,5 +124,11 @@ describe("alertes", () => {
 
   it("dit que tout va bien quand rien n'est à signaler", () => {
     expect(alertes(base)).toEqual([{ ton: "bon", texte: "Rien à signaler : trésorerie positive, stock et ventes en cours." }]);
+  });
+});
+
+describe("tresorerieFinDeMois", () => {
+  it("donne le solde du compte 512 à la fin de chaque mois, mois sans mouvement compris", () => {
+    expect(tresorerieFinDeMois(GL, 3, 4)).toEqual([20_000_00, 30_000_00, 26_200_00, 26_200_00]);
   });
 });

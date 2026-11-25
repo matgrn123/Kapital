@@ -29,7 +29,7 @@ export default async function PageIndicateurs() {
     );
   } catch {
     return (
-      <div className="mx-auto max-w-5xl px-8 py-10">
+      <div className="flex flex-col gap-5">
         <h1 className="text-3xl font-semibold tracking-tight">Indicateurs</h1>
         <p role="alert" className="mt-4 text-sm text-[color:var(--color-erreur)]">
           Les indicateurs n'ont pas pu être calculés pour le moment. Rechargez la page dans un instant.
@@ -46,7 +46,7 @@ export default async function PageIndicateurs() {
   ] as const;
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-10">
+    <div className="flex flex-col gap-5">
       <header className="border-b border-[color:var(--color-g-200)] pb-6">
         <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">Pilotage</p>
         <h1 className="text-3xl font-semibold tracking-tight">Indicateurs</h1>

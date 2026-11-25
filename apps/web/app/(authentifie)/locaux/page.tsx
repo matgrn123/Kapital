@@ -137,7 +137,7 @@ export default async function PageLocaux() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+    <div className="flex flex-col gap-5">
       <EnTeteEcran surTitre="Immobilier d'entreprise" titre="Locaux">
         Louer garde ta trésorerie libre. Acheter te rend propriétaire, mais immobilise de l&apos;argent et
         alourdit ta dette.

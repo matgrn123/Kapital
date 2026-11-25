@@ -10,6 +10,17 @@ import {
   Kpi,
   Puce,
   SurTitre,
+  Alerte,
+  Bandeau,
+  Courbe,
+  EnTete,
+  Etapes,
+  Faits,
+  Ligne,
+  Note,
+  Resultat,
+  TableauRang,
+  Verrou,
 } from "../../../components/ui";
 
 // Vitrine des composants du design V2, hors menu (adresse /design).
@@ -17,7 +28,7 @@ import {
 
 export default function PageDesign() {
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-8 py-10">
+    <div className="flex flex-col gap-5">
       <header>
         <SurTitre>Design V2</SurTitre>
         <h1 className="text-[1.75rem] font-extrabold">Composants de l&apos;interface</h1>
@@ -115,6 +126,47 @@ export default function PageDesign() {
           </EncadreFilRouge>
         </div>
       </div>
+      <EnTete surTitre="Composants d'écran" titre="En-tête avec action" action={<BoutonLien href="/jeu">← Village</BoutonLien>}>
+        L&apos;en-tête peut porter une action à droite, comme dans la maquette.
+      </EnTete>
+      <Bandeau droite="mois 10, jour 19 · 1 jour réel = 1 mois de jeu">Bandeau d&apos;information pleine largeur.</Bandeau>
+      <div className="grid gap-4 md:grid-cols-3">
+        <Carte titre="Faits et lignes">
+          <Faits lignes={[["Capacité", "440 pièces/mois"], ["Stock", "205 pièces"], ["Équipe", "1 salarié"]]} />
+          <div className="mt-3">
+            <Ligne libelle="Coût total">1 200 €</Ligne>
+            <Ligne libelle="Marge" ton="bon">+ 340 €</Ligne>
+          </div>
+        </Carte>
+        <Carte titre="Étapes et alertes">
+          <Etapes etapes={["Choisir la forme", "Déposer le capital", "Immatriculer"]} />
+          <div className="mt-3 flex flex-col gap-2">
+            <Alerte ton="critique">Compte à découvert.</Alerte>
+            <Alerte ton="alerte">Stock bas.</Alerte>
+            <Alerte ton="bon">Tout va bien.</Alerte>
+          </div>
+        </Carte>
+        <Carte titre="Résultat, courbe, verrou">
+          <Resultat libelle="Mensualité" valeur="860 €" detail="pendant 12 mois" />
+          <div className="my-3">
+            <Courbe titre="Exemple de trésorerie" valeurs={[100, 140, 120, 180, 160, 210]} />
+          </div>
+          <Verrou>Se débloque à l&apos;étape 2.</Verrou>
+          <div className="mt-2">
+            <Note>Le serveur revérifie au moment de valider.</Note>
+          </div>
+        </Carte>
+      </div>
+      <Carte titre="Classement">
+        <TableauRang
+          entetes={[{ texte: "Rang" }, { texte: "Entreprise" }, { texte: "Valeur", droite: true }]}
+          lignes={[
+            { cle: "a", cellules: ["1", "Exemple A", "52 000 €"] },
+            { cle: "b", moi: true, cellules: ["2", "Ta société", "41 000 €"] },
+            { cle: "c", cellules: ["3", "Exemple C", "38 000 €"] },
+          ]}
+        />
+      </Carte>
     </div>
   );
 }

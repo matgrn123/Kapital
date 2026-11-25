@@ -130,7 +130,7 @@ export default async function PageAtelier() {
     : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+    <div className="flex flex-col gap-5">
       <EnTete surTitre="Fabrication" titre="Production">
         Fabrique dans ton atelier ou confie la production à un façonnier. Les deux choix n&apos;ont ni le même coût, ni le
         même effet sur ta trésorerie.

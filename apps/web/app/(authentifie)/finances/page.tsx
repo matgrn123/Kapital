@@ -63,7 +63,7 @@ export default async function PageFinances() {
   const tresorerie = solde(soldes, "512");
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-10">
+    <div className="flex flex-col gap-5">
       <header className="border-b border-[color:var(--color-g-200)] pb-6">
         <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
           Comptabilité

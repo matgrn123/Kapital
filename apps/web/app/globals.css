@@ -149,7 +149,6 @@ h4 {
 /* Les cartes se détachent du fond : blanches, avec une ombre très légère. */
 main .rounded-md.border:not([class*="bg-"]):not(.border-dashed) {
   background: var(--surface);
-  box-shadow: var(--shadow);
 }
 
 input,

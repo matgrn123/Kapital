@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { echelleGraphique, equilibreEcriture, pourcentageJauge } from "./calculs";
+import { echelleGraphique, equilibreEcriture, pointsCourbe, pourcentageJauge } from "./calculs";
 
 describe("pourcentageJauge", () => {
   it("donne la part remplie en pourcentage", () => {
@@ -59,5 +59,25 @@ describe("equilibreEcriture", () => {
         { compte: "512", credit: 900_00 },
       ]).equilibree,
     ).toBe(false);
+  });
+});
+
+describe("pointsCourbe", () => {
+  it("place les points de gauche à droite, le plus haut en haut", () => {
+    const p = pointsCourbe([0, 10, 5], 100, 50);
+    expect(p).toHaveLength(3);
+    expect(p[0]![0]).toBe(4);
+    expect(p[2]![0]).toBe(96);
+    expect(p[1]![1]).toBeLessThan(p[2]![1]);
+    expect(p[0]![1]).toBeGreaterThan(p[2]![1]);
+  });
+
+  it("ne donne rien avec moins de deux valeurs", () => {
+    expect(pointsCourbe([5], 100, 50)).toEqual([]);
+  });
+
+  it("reste à plat quand toutes les valeurs sont égales", () => {
+    const p = pointsCourbe([3, 3, 3], 100, 50);
+    expect(new Set(p.map((x) => x[1])).size).toBe(1);
   });
 });

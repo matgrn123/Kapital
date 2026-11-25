@@ -39,7 +39,7 @@ export default async function PageMarketing() {
   const libelle = (t: string) => ACTIONS.find((a) => a.type === t)?.libelle ?? "Action";
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+    <div className="flex flex-col gap-5">
       <EnTete surTitre="Marque" titre="Publicité">
         Ta marque a deux jauges. La notoriété fait venir des clients, la désirabilité leur fait accepter un prix plus
         élevé.

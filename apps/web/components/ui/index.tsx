@@ -3,6 +3,7 @@
 // Montants en centimes, formatés ici.
 
 import Link from "next/link";
+import { chargerFilRougeLV, type EcranFilRouge } from "@kapital/content";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { compteParNumero } from "../../lib/comptes";
 import { formaterEuros } from "../../lib/formatage";
@@ -49,7 +50,7 @@ export function Carte({
   return (
     <section
       className={classes(
-        "min-w-0 rounded-[14px] border border-line bg-surface p-[18px] shadow-carte",
+        "min-w-0 rounded-[14px] border border-line bg-surface p-[18px]",
         className,
       )}
     >
@@ -241,6 +242,34 @@ export function EncadreNotion({ titre, children }: { titre: ReactNode; children:
   );
 }
 
+/**
+ * Fil rouge Louis Vuitton d'un écran : textes sourcés de
+ * packages/content/fil-rouge-lv.json. N'affiche rien s'il n'y en a pas.
+ */
+export function FilRouge({ ecran }: { ecran: EcranFilRouge }) {
+  const textes = chargerFilRougeLV().filter((t) => t.ecran === ecran);
+  if (textes.length === 0) return null;
+  return (
+    <>
+      {textes.map((t) => (
+        <EncadreFilRouge key={t.texte}>
+          <p>{t.texte}</p>
+          <p className="mt-1 text-[0.72rem] text-muted">
+            Source :{" "}
+            {t.url ? (
+              <a href={t.url} target="_blank" rel="noopener noreferrer" className="underline">
+                {t.source}
+              </a>
+            ) : (
+              t.source
+            )}
+          </p>
+        </EncadreFilRouge>
+      ))}
+    </>
+  );
+}
+
 export function EncadreFilRouge({ children }: { children: ReactNode }) {
   return (
     <aside className="flex flex-col gap-1 rounded-xl border border-dashed border-thread bg-thread-soft px-3.5 py-3">
@@ -370,3 +399,29 @@ export function Graphique({
     </div>
   );
 }
+
+export {
+  Alerte,
+  Bandeau,
+  BandeauEtape,
+  CLASSE_SAISIE,
+  Catalogue,
+  Champ,
+  Choix,
+  Courbe,
+  EnTete,
+  Etapes,
+  Faits,
+  Ligne,
+  Message,
+  Note,
+  Options,
+  Refus,
+  Resultat,
+  Succes,
+  Tableau,
+  TableauRang,
+  Verrou,
+  Vide,
+  Curseur,
+} from "./formulaire";

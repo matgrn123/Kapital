@@ -75,7 +75,7 @@ export default async function PageBanque() {
   const { verrou } = await lireVerrou(supabase, entreprise.id, "demande_pret");
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+    <div className="flex flex-col gap-5">
       <EnTeteEcran surTitre="Financement" titre="Banque et prêt">
         Emprunter permet d&apos;investir sans attendre. La banque regarde l&apos;objet du prêt et ta
         trésorerie : ta dette totale ne peut pas dépasser un multiple de ce que tu as en caisse.

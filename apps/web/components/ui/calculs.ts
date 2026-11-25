@@ -41,3 +41,22 @@ export function equilibreEcriture(lignes: readonly LigneEcriture[]): {
   const credit = lignes.reduce((s, l) => s + (l.credit ?? 0), 0);
   return { debit, credit, equilibree: debit === credit };
 }
+
+/**
+ * Points d'une petite courbe (sparkline) dans une boîte largeur × hauteur,
+ * avec 4 px de marge horizontale et 6 px en bas, comme la maquette.
+ */
+export function pointsCourbe(
+  valeurs: readonly number[],
+  largeur: number,
+  hauteur: number,
+): Array<[number, number]> {
+  if (valeurs.length < 2) return [];
+  const min = Math.min(...valeurs);
+  const max = Math.max(...valeurs);
+  const ecart = max - min || 1;
+  return valeurs.map((v, i) => [
+    (i / (valeurs.length - 1)) * (largeur - 8) + 4,
+    hauteur - 6 - ((v - min) / ecart) * (hauteur - 14),
+  ]);
+}

@@ -41,7 +41,7 @@ export default async function PageClassement() {
     .at(-1);
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-10">
+    <div className="flex flex-col gap-5">
       <header className="flex items-end justify-between border-b border-[color:var(--color-g-200)] pb-6">
         <div>
           <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">

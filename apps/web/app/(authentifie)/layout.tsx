@@ -57,18 +57,20 @@ export default async function LayoutAuthentifie({
   }
   const entreprise = entreprises[0]!;
 
+  // Ossature de la maquette (.shell) : barre collée en haut, rail de 200 px
+  // collé sous la barre, contenu en pleine largeur ; c'est la page qui défile.
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-bg">
+    <div className="min-h-screen bg-bg px-4 pb-8">
       <BarreJeu
         companyId={entreprise.id}
         nomEntreprise={entreprise.nom}
         tresorerieInitiale={entreprise.tresorerie_centimes}
         etapeInitiale={entreprise.etape}
       />
-      <div className="flex min-h-0 flex-1">
-        <aside className="flex w-[216px] shrink-0 flex-col overflow-y-auto px-3 pt-5">
+      <div className="grid grid-cols-[200px_minmax(0,1fr)] gap-6 pt-5 max-[900px]:grid-cols-1 max-[900px]:gap-3.5">
+        <aside className="sticky top-[84px] flex flex-col gap-4 self-start max-[900px]:static">
           <NavLaterale />
-          <div className="mt-auto border-t border-line px-2.5 py-3 text-xs text-muted">
+          <div className="border-t border-line px-2.5 pt-3 text-xs text-muted max-[900px]:hidden">
             <p className="truncate">{profil?.pseudo ?? user.email}</p>
             {profil?.role === "admin" && (
               <Link href="/admin" className="mt-2 block underline hover:text-ink">
@@ -87,7 +89,7 @@ export default async function LayoutAuthentifie({
             )}
           </div>
         </aside>
-        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">{children}</main>
+        <main className="flex min-w-0 flex-col gap-5">{children}</main>
       </div>
     </div>
   );

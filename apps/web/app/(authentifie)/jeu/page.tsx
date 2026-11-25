@@ -4,6 +4,7 @@ import { chargerParametresV1 } from "@kapital/content";
 import {
   BoutonLien,
   Carte,
+  Courbe,
   EcritureComptable,
   EncadreNotion,
   Graphique,
@@ -21,6 +22,7 @@ import {
   bilanSimplifie,
   caParMois,
   dernieresEcritures,
+  tresorerieFinDeMois,
   type LigneGrandLivre,
 } from "../../../lib/tableau";
 import { CarteEtape } from "./CarteEtape";
@@ -102,7 +104,7 @@ export default async function PageJeu() {
     caMoisPrecedent > 0 ? Math.round(((caMois - caMoisPrecedent) / caMoisPrecedent) * 1000) / 10 : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+    <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <SurTitre>
@@ -144,12 +146,20 @@ export default async function PageJeu() {
       )}
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <Kpi
-          libelle="Trésorerie"
-          valeur={euros(Number(entreprise.tresorerie_centimes))}
-          detail="Compte 512 Banque"
-          ton={Number(entreprise.tresorerie_centimes) < 0 ? "critique" : "neutre"}
-        />
+        <Carte>
+          <div className="flex flex-col gap-1">
+            <SurTitre>Trésorerie</SurTitre>
+            <span
+              className={`font-display text-[1.7rem] font-extrabold leading-[1.1] tabular-nums ${
+                Number(entreprise.tresorerie_centimes) < 0 ? "text-bad" : ""
+              }`}
+            >
+              {euros(Number(entreprise.tresorerie_centimes))}
+            </span>
+            <Courbe titre="Trésorerie en fin de mois, six derniers mois" valeurs={tresorerieFinDeMois(lignes, moisCourant, 6)} />
+            <span className="text-[0.8rem] text-muted">Compte 512 Banque, fin de chaque mois</span>
+          </div>
+        </Carte>
         <Kpi
           libelle="Ventes du mois"
           valeur={euros(caMois)}

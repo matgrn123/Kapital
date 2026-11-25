@@ -57,7 +57,7 @@ export default async function PageAchats() {
   const stocksTab = ((stocks ?? []) as Array<{ material_id: string; quantite: number }>).filter((s) => Number(s.quantite) > 0);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+    <div className="flex flex-col gap-5">
       <EnTete surTitre="Fournisseurs" titre="Achats de matière">
         Commande le tissu dont ton atelier a besoin. Le prix est figé le jour de la commande ; la matière arrive après le
         délai du fournisseur.

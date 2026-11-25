@@ -78,7 +78,7 @@ export default async function PageSalaries() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+    <div className="flex flex-col gap-5">
       <EnTeteEcran surTitre="Bureau de l'emploi" titre="Embauche et salariés">
         Chaque salarié augmente ta capacité, mais ajoute un coût fixe chaque mois, que tu vendes ou non.
       </EnTeteEcran>
