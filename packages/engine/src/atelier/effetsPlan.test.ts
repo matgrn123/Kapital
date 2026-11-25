@@ -50,7 +50,7 @@ describe("3D-3 : effets du plan d'aménagement", () => {
   });
 });
 
-describe("3D-3 : postes posés à la signature (migration 0033)", () => {
+describe("3D-3 : postes posés à la signature (migration 0036)", () => {
   it("le paramètre pose bien des postes de couture de base", () => {
     expect(POSTES_SIGNATURE).toBe(2);
     expect(positionsPostesALaSignature(2)).toEqual([

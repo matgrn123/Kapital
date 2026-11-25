@@ -191,3 +191,21 @@ describe("scénario complet : vente puis retour 19 %", () => {
     expect(resultat(gl)).toBeGreaterThan(0);
   });
 });
+
+describe("coût de sortie du stock à la vente", () => {
+  it("la vente crédite le 35 du coût total sorti du stock quand il est fourni (pas unitaire arrondi × quantité)", () => {
+    // Coût moyen 3,335 € : 3 pièces sortent pour 10,01 €, alors que 3,34 × 3 = 10,02 €.
+    const gl = enregistrerVenteDirecte(planComptableV1(), {
+      idEcriture: "v1",
+      mois: moisJeu(0),
+      produit: idProduit("prod_tshirt"),
+      quantite: 3,
+      prixTtcUnitaire: centimes(2_400),
+      coutRevientUnitaire: centimes(334),
+      coutRevientTotal: centimes(1_001),
+      tauxTva: 0.2,
+    });
+    expect(soldeCompte(gl, "35")).toBe(-1_001);
+    expect(Math.abs(soldeCompte(gl, "7135"))).toBe(1_001); // 7135 est un compte de produits : débité de 10,01 €
+  });
+});

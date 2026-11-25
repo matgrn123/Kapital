@@ -49,6 +49,9 @@ export function simulerMoisEntreprise(
     {
       tvaAPayerCeMois: donnees.tvaAPayerCeMois,
       moisDecouvertConsecutifs: donnees.moisDecouvertConsecutifs,
+      ...(donnees.resultatExerciceAvantMois !== undefined
+        ? { resultatExerciceAvantMois: donnees.resultatExerciceAvantMois }
+        : {}),
     },
     params,
     mois,

@@ -18,12 +18,10 @@ const scenario = jouerScenarioSolo({ mois: 24, graine: 7 });
 const { etat, journal } = scenario;
 
 /**
- * Anomalies du garde-fou dues à des bugs du moteur déjà signalés (PR AE-8) : le banc les
- * tolère pour rester vert, mais en échoue sur toute autre. À retirer quand le bug est corrigé
- * (le test « aucune anomalie » marqué `fails` se mettra alors à échouer pour le rappeler).
- *  - stock_fini_sans_ecriture : arrondi du coût moyen à la vente (flux.ts › diminuerStockFini).
+ * Anomalies du garde-fou tolérées le temps qu'un bug signalé soit corrigé (vide : les trois
+ * bugs trouvés par le banc — arrondi du stock, IS sur 12 mois, TVA du serveur — sont corrigés).
  */
-const ANOMALIES_CONNUES = new Set(["stock_fini_sans_ecriture"]);
+const ANOMALIES_CONNUES = new Set<string>();
 
 describe("AE-8 · scénario solo de 24 mois", () => {
   it("joue 24 clôtures, de la création aux embauches", () => {
@@ -77,18 +75,15 @@ describe("3D-9 · garde-fou monétaire sur les 24 clôtures", () => {
     }
   });
 
-  // Bug moteur signalé : à la vente, le stock 35 est crédité de « coût moyen arrondi × quantité »
-  // alors que le stock du moteur baisse de « arrondi(coût moyen × quantité) ». L'écart reste
-  // dans le stock du moteur, sans écriture. `fails` : ce test doit passer quand ce sera corrigé.
-  it.fails("aucune anomalie du tout (bug d'arrondi du coût moyen, signalé)", () => {
+  // Corrigé : la vente crédite le 35 du coût total réellement sorti du stock du moteur.
+  it("aucune anomalie du tout (le stock du moteur suit le compte 35 au centime)", () => {
     for (const b of etat.historique) expect(b.anomalies, `mois ${b.mois}`).toEqual([]);
   });
 });
 
-describe("constats du banc (bugs signalés, non corrigés ici)", () => {
-  // L'impôt de fin d'exercice est calculé sur le résultat du seul 12e mois (cloture.ts ›
-  // agrégats du mois), pas sur celui des 12 mois de l'exercice.
-  it.fails("l'impôt sur les sociétés porte sur le résultat de l'exercice entier", () => {
+describe("corrections vérifiées par le banc", () => {
+  // Corrigé : l'IS du 12e mois porte sur le résultat des 12 mois de l'exercice.
+  it("l'impôt sur les sociétés porte sur le résultat de l'exercice entier", () => {
     const params = chargerParametresV1();
     const exercice = grandLivreDepuis(etat.ecritures.filter((e) => e.mois <= 11 && !e.id.startsWith("is_")));
     const attendu = calculImpotSocietes(centimes(Math.max(0, resultat(exercice))), parametresIsDepuis(params));
@@ -96,9 +91,8 @@ describe("constats du banc (bugs signalés, non corrigés ici)", () => {
     expect(passe).toBe(attendu);
   });
 
-  // Le serveur (StockageSupabase.chargerFinDeMois) paie le solde net du 44551 du mois
-  // précédent, paiement de ce mois-là déduit : une TVA sur deux n'est jamais payée.
-  it("la formule de TVA du serveur laisse de la TVA impayée qui s'accumule", () => {
+  // Corrigé : le serveur paie ce qui reste dû au 44551 ; plus de TVA impayée qui s'accumule.
+  it("la formule de TVA du serveur paie toute la TVA déclarée", () => {
     const serveur = jouerScenarioSolo({ mois: 24, graine: 7, tva: "serveur" }).etat;
     const declare = (e: typeof etat, m: number) =>
       e.ecritures
@@ -108,7 +102,7 @@ describe("constats du banc (bugs signalés, non corrigés ici)", () => {
         .reduce((s, l) => s + l.montant, 0);
     // Règle juste : seule la TVA déclarée au dernier mois reste à payer.
     expect(soldeCompte(grandLivreDepuis(etat.ecritures), "44551")).toBe(declare(etat, 23));
-    // Formule du serveur : bien plus, et cela grossit avec le temps.
-    expect(soldeCompte(grandLivreDepuis(serveur.ecritures), "44551")).toBeGreaterThan(5 * declare(serveur, 23));
+    // Formule du serveur : même chose, seule la dernière déclaration reste due.
+    expect(soldeCompte(grandLivreDepuis(serveur.ecritures), "44551")).toBe(declare(serveur, 23));
   });
 });
