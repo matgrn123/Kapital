@@ -13,6 +13,7 @@ import { BandeauEtape, Carte, EncadreNotion, EnTete, Etapes, Faits, FilRouge, Pu
 import { apercuBail } from "../../../lib/apercu-lot4";
 import { formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
+import { COLONNES_MODULES_POSES, postesPoses, type AvecModulesPoses } from "../../../lib/api-helpers";
 import { lireEstrAnnuel } from "../_partage/estr";
 import { lireVerrou } from "../_partage/verrou";
 import { BoutonConge, CarteOffre, type OffreLocal } from "./ActionsLocaux";
@@ -23,13 +24,12 @@ import { BoutonConge, CarteOffre, type OffreLocal } from "./ActionsLocaux";
 // Durée sur laquelle on compare louer et acheter : un choix d'affichage, pas une règle du moteur.
 const HORIZON_COMPARATIF_MOIS = 24;
 
-type Local = {
+type Local = AvecModulesPoses & {
   batiment_id: string | null;
   surface_m2: number;
   loyer_mensuel_centimes: number;
   charges_mensuelles_centimes: number;
   depot_garantie_centimes: number;
-  nombre_machines: number;
   mode_detention: "bail" | "achat" | "credit";
   mois_conge: number | null;
   mois_fin: number | null;
@@ -66,7 +66,7 @@ export default async function PageLocaux() {
     supabase
       .from("workshops")
       .select(
-        "batiment_id, surface_m2, loyer_mensuel_centimes, charges_mensuelles_centimes, depot_garantie_centimes, nombre_machines, mode_detention, mois_conge, mois_fin, prix_achat_centimes, apport_centimes, duree_amortissement_mois",
+        `batiment_id, surface_m2, loyer_mensuel_centimes, charges_mensuelles_centimes, depot_garantie_centimes, mode_detention, mois_conge, mois_fin, prix_achat_centimes, apport_centimes, duree_amortissement_mois, ${COLONNES_MODULES_POSES}`,
       )
       .eq("company_id", entreprise.id)
       .maybeSingle(),
@@ -147,7 +147,8 @@ export default async function PageLocaux() {
           <div className="grid gap-4 md:grid-cols-2">
             <p className="text-[0.9rem]">
               Tu fais fabriquer chez des façonniers : pas de loyer, mais chaque pièce coûte plus cher. Avec ton
-              propre atelier, tu installes des machines et tu embauches des artisans.
+              propre atelier, livré avec {bail.machinesALaSignature} postes de couture déjà posés, tu embauches des
+              artisans (un par poste) et tu ajoutes des machines dans l&apos;écran Atelier.
             </p>
             <Etapes
               etapes={[
@@ -168,7 +169,7 @@ export default async function PageLocaux() {
                 ["Loyer (613)", `${formaterEuros(local.loyer_mensuel_centimes)} € / mois`],
                 ["Charges (614)", `${formaterEuros(local.charges_mensuelles_centimes)} € / mois`],
                 ["Dépôt de garantie (275)", `${formaterEuros(local.depot_garantie_centimes)} €`],
-                ["Postes de travail", local.nombre_machines],
+                ["Postes de travail (posés)", postesPoses(local)],
               ]}
             />
             <div>
@@ -195,6 +196,7 @@ export default async function PageLocaux() {
                 ["Dette immobilière (164)", `${formaterEuros(detteCredit)} €`],
                 ["Mensualité du crédit", mensualiteCredit === null ? "aucune" : `${formaterEuros(mensualiteCredit)} € / mois`],
                 ["Charges d'entretien (614)", `${formaterEuros(local.charges_mensuelles_centimes)} € / mois`],
+                ["Postes de travail (posés)", postesPoses(local)],
                 [
                   "Amortissement",
                   local.duree_amortissement_mois

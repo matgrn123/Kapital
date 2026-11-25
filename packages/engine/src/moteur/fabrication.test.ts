@@ -20,6 +20,10 @@ import {
   piecesPermisesParLaMatiere,
 } from "./fabrication.js";
 import { avancerFlux, planProductionDuMois } from "./flux.js";
+import { postesALaSignature } from "../atelier/effetsPlan.js";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 const PARAMS = chargerParametresV1();
 const CHUTE = PARAMS["taux_chute_matiere_defaut"]!.valeur;
@@ -57,7 +61,7 @@ function entreprise(surcharge: Partial<Entreprise> = {}): Entreprise {
       ancienneteMois: 12,
       experienceMois: 12,
     })),
-    atelier: { surfaceM2: 80, loyerMensuel: centimes(150_000), nombreMachines: 2 },
+    atelier: { surfaceM2: 80, loyerMensuel: centimes(150_000), modules: postesALaSignature(2, MODULES_CATALOGUE) },
     marque: { notoriete: 50, desirabilite: 50 },
     prets: [],
     catalogue: [

@@ -21,12 +21,15 @@ export function FormulaireEmbauche({
   moisCourant,
   tresorerie,
   postesLibres,
+  aUnAtelier,
   verrouille,
 }: {
   coefficients: CoefficientsSalaires;
   moisCourant: number;
   tresorerie: number;
   postesLibres: number;
+  /** Sans local, il n'y a aucun poste où poser une machine. */
+  aUnAtelier: boolean;
   /** Embauche pas encore débloquée par l'étape : le bandeau de la page l'explique. */
   verrouille: boolean;
 }) {
@@ -35,7 +38,6 @@ export function FormulaireEmbauche({
   const [brut, setBrut] = useState(bornes.min);
   const [enCours, setEnCours] = useState<Poste | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [avertissement, setAvertissement] = useState<string | null>(null);
   const [succes, setSucces] = useState<string | null>(null);
 
   const apercu = useMemo(() => apercuEmbauche({ salaireBrut: brut, coefficients, mois: moisCourant }), [brut, coefficients, moisCourant]);
@@ -43,16 +45,12 @@ export function FormulaireEmbauche({
 
   async function embaucher(poste: Poste) {
     setErreur(null);
-    setAvertissement(null);
     setSucces(null);
     setEnCours(poste);
     const r = await appelerAction("/api/actions/embaucher", { poste, salaireBrutMensuelCentimes: brut });
     setEnCours(null);
     if (!r.ok) return setErreur(r.message);
     setSucces("Salarié embauché. Son premier salaire tombera à la fin du mois de jeu.");
-    if (r.data["sansPosteLibre"] === true) {
-      setAvertissement("Ce salarié n'a pas de poste : il ne produira pas tant qu'un poste n'est pas libre. Son salaire est dû quand même.");
-    }
     router.refresh();
   }
 
@@ -89,7 +87,11 @@ export function FormulaireEmbauche({
               <p className="text-[0.86rem]">{p.effet}</p>
               {p.id === "artisan" && (
                 <p className="text-[0.8rem] text-muted">
-                  {postesLibres > 0 ? `${postesLibres} poste(s) libre(s) dans ton atelier.` : "Aucun poste libre : il serait payé sans produire."}
+                  {postesLibres > 0
+                    ? `${postesLibres} poste${postesLibres > 1 ? "s" : ""} libre${postesLibres > 1 ? "s" : ""} dans ton atelier.`
+                    : aUnAtelier
+                      ? "Aucun poste libre : pose d'abord un poste de travail dans ton atelier (écran Atelier)."
+                      : "Aucun poste : loue d'abord un local (écran Locaux), il arrive avec ses postes de couture."}
                 </p>
               )}
               <div>
@@ -102,7 +104,8 @@ export function FormulaireEmbauche({
               <Bouton
                 variante={sansPoste ? "secondaire" : "principal"}
                 onClick={() => embaucher(p.id)}
-                disabled={enCours !== null || verrouille}
+                disabled={enCours !== null || verrouille || sansPoste}
+                title={sansPoste ? "Aucun poste de travail libre dans ton atelier" : undefined}
               >
                 {enCours === p.id ? "Embauche…" : `Embaucher (${p.nom.toLowerCase()})`}
               </Bouton>
@@ -123,7 +126,6 @@ export function FormulaireEmbauche({
 
       {erreur && <Message ton="erreur">{erreur}</Message>}
       {succes && <Message ton="succes">{succes}</Message>}
-      {avertissement && <Message ton="info">{avertissement}</Message>}
       <Note>
         L&apos;embauche ne passe aucune écriture le jour où tu signes. Le serveur refuse l&apos;embauche si ta trésorerie
         ne garde pas une réserve de paie suffisante.

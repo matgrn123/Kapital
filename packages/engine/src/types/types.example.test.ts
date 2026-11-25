@@ -18,6 +18,10 @@ import {
   minutes,
   moisJeu,
 } from "./index.js";
+import { postesALaSignature } from "../atelier/effetsPlan.js";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 describe("types du moteur", () => {
   it("construit un produit de référence (t-shirt)", () => {
@@ -57,7 +61,7 @@ describe("types du moteur", () => {
       atelier: {
         surfaceM2: 50,
         loyerMensuel: centimes(100_000),
-        nombreMachines: 2,
+        modules: postesALaSignature(2, MODULES_CATALOGUE),
       },
       marque: { notoriete: 0, desirabilite: 0 },
       prets: [],

@@ -1,15 +1,18 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { chargerParametresV1 } from "@kapital/content";
+import { chargerModulesV1, chargerParametresV1 } from "@kapital/content";
 import { verifierDeblocageEtape } from "@kapital/server";
 import {
   centimes,
+  effetsPlan,
   etapeEffective,
+  resoudreModules,
   idEntreprise,
   idSalarie,
   type ActionVerrouillable,
   type Entreprise,
   type EtapeEntreprise,
+  type ModulePose,
   type Poste,
   type Salarie,
 } from "@kapital/engine";
@@ -172,6 +175,30 @@ type LigneSalarie = {
  * (trésorerie, salariés actifs avec ancienneté et expérience, nombre de machines). Les stocks,
  * prêts et catalogue ne servent pas à ces deux validations.
  */
+// ---------------------------------------------------------------------------
+// 3D-3 : postes posés dans l'atelier (table placed_modules), un seul calcul pour tous les écrans
+// ---------------------------------------------------------------------------
+
+/** Jointure PostgREST à ajouter au select de workshops pour lire les modules posés. */
+export const COLONNES_MODULES_POSES = "placed_modules(module_type_id, x, y, pivote)";
+
+export type AvecModulesPoses = {
+  placed_modules?: { module_type_id: string; x: number; y: number; pivote: boolean | null }[] | null;
+};
+
+/** Modules posés d'un atelier lu avec COLONNES_MODULES_POSES, complétés par le catalogue. */
+export function modulesPoses(atelier: AvecModulesPoses | null | undefined): ModulePose[] {
+  return resoudreModules(
+    (atelier?.placed_modules ?? []).map((m) => ({ id_type: m.module_type_id, x: m.x, y: m.y, pivote: m.pivote ?? false })),
+    chargerModulesV1(),
+  );
+}
+
+/** Postes de travail équipés (moteur : atelier/effetsPlan) ; 0 sans atelier. */
+export function postesPoses(atelier: AvecModulesPoses | null | undefined): number {
+  return effetsPlan(modulesPoses(atelier)).postesEquipes;
+}
+
 export async function chargerEntreprisePersonnel(ctx: ContexteAction): Promise<Entreprise> {
   const [{ data: lignes }, { data: atelier }] = await Promise.all([
     ctx.supabaseAdmin
@@ -181,7 +208,7 @@ export async function chargerEntreprisePersonnel(ctx: ContexteAction): Promise<E
       .eq("statut", "actif"),
     ctx.supabaseAdmin
       .from("workshops")
-      .select("surface_m2, loyer_mensuel_centimes, nombre_machines")
+      .select(`surface_m2, loyer_mensuel_centimes, ${COLONNES_MODULES_POSES}`)
       .eq("company_id", ctx.companyId)
       .maybeSingle(),
   ]);
@@ -195,7 +222,7 @@ export async function chargerEntreprisePersonnel(ctx: ContexteAction): Promise<E
       experienceMois: e.experience_mois_debut + dureeService,
     };
   });
-  const a = atelier as { surface_m2: number; loyer_mensuel_centimes: number; nombre_machines: number } | null;
+  const a = atelier as ({ surface_m2: number; loyer_mensuel_centimes: number } & AvecModulesPoses) | null;
   return {
     id: idEntreprise(ctx.companyId),
     nom: "",
@@ -215,7 +242,7 @@ export async function chargerEntreprisePersonnel(ctx: ContexteAction): Promise<E
       ? {
           surfaceM2: a.surface_m2,
           loyerMensuel: centimes(Number(a.loyer_mensuel_centimes)),
-          nombreMachines: a.nombre_machines,
+          modules: modulesPoses(a),
         }
       : null,
     marque: { notoriete: 0, desirabilite: 0 },

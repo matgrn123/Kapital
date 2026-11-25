@@ -26,6 +26,10 @@ import {
 import { simulerPas } from "./pas.js";
 import { simulerMoisEntreprise } from "./simulerMois.js";
 import { configTempsDepuis } from "./temps.js";
+import { postesALaSignature } from "../atelier/effetsPlan.js";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 // ---------------------------------------------------------------------------
 // Scénario
@@ -91,7 +95,7 @@ function entrepriseDeTest(surcharge: Partial<Entreprise> = {}): Entreprise {
       ancienneteMois: 6,
       experienceMois: 6,
     })),
-    atelier: { surfaceM2: 150, loyerMensuel: centimes(250_000), nombreMachines: 3 },
+    atelier: { surfaceM2: 150, loyerMensuel: centimes(250_000), modules: postesALaSignature(3, MODULES_CATALOGUE) },
     marque: { notoriete: 50, desirabilite: 50 },
     prets: [
       {

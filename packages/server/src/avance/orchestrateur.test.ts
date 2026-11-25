@@ -13,6 +13,10 @@ import {
 import { describe, expect, it } from "vitest";
 import { avancerMondeJusquA } from "./orchestrateur.js";
 import { StockageMemoire } from "./stockageMemoire.js";
+import { postesALaSignature } from "@kapital/engine";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 // ---------------------------------------------------------------------------
 // Scénario
@@ -50,7 +54,7 @@ function entreprise(id: string): Entreprise {
       ancienneteMois: 6,
       experienceMois: 6,
     })),
-    atelier: { surfaceM2: 150, loyerMensuel: centimes(250_000), nombreMachines: 2 },
+    atelier: { surfaceM2: 150, loyerMensuel: centimes(250_000), modules: postesALaSignature(2, MODULES_CATALOGUE) },
     marque: { notoriete: 50, desirabilite: 50 },
     prets: [
       {
