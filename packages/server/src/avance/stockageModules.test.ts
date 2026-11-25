@@ -20,6 +20,19 @@ describe("3D-3 : chargerEtat lit les modules posés et le matériel au bilan", (
     expect(effetsPlan(modules)).toMatchObject({ postesEquipes: 2, tableCoupe: true });
   });
 
+  it("3D-5 : seul le plan actif est chargé, le plan prévu attend la clôture", () => {
+    const modules = modulesDepuisLignes(
+      [
+        { module_type_id: "poste_couture_base", x: 2, y: 1, pivote: false, statut: "actif" },
+        { module_type_id: "poste_couture_base", x: 2, y: 1, pivote: false, statut: "prevu" },
+        { module_type_id: "poste_couture_base", x: 5, y: 1, pivote: false, statut: "prevu" },
+        { module_type_id: "poste_couture_base", x: 8, y: 1, pivote: false },
+      ],
+      CATALOGUE,
+    );
+    expect(modules.map((m) => m.x)).toEqual([2, 8]);
+  });
+
   it("sans atelier ni module : aucun poste", () => {
     expect(modulesDepuisLignes(null, CATALOGUE)).toEqual([]);
   });

@@ -47,5 +47,5 @@ export * from "./geometrie";
 export { Defs, urlTexture, type Texture } from "./defs";
 export * from "./primitives";
 export { Batiment, Facade, sommetBatiment, type BatimentProps, type StyleBatiment } from "./batiment";
-export { Meuble, Piece, TAILLE_MEUBLE, type TypeMeuble } from "./interieur";
+export { Meuble, Piece, TAILLE_MEUBLE, tailleMeuble, type TypeMeuble } from "./interieur";
 export { SceneIso, cadreScene, encombrement, type ObjetIso, type GrilleIso, type SceneIsoProps } from "./scene";

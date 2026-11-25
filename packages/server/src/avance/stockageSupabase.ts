@@ -58,15 +58,20 @@ export type LigneModulePose = {
   x: number;
   y: number;
   pivote: boolean | null;
+  /** 3D-5 (migration 0037) : 'actif' (plan en service) ou 'prevu' (appliqué à la clôture). */
+  statut?: string | null;
 };
 
-/** Modules posés lus en base, complétés par le catalogue modules-v1 (effet, prix, durée). */
+/**
+ * Modules posés lus en base, complétés par le catalogue modules-v1 (effet, prix, durée).
+ * 3D-5 : seul le plan en service (statut 'actif') compte ; le plan prévu attend la clôture.
+ */
 export function modulesDepuisLignes(
   lignes: readonly LigneModulePose[] | null | undefined,
   catalogue: readonly TypeModule[],
 ): ModulePose[] {
   return resoudreModules(
-    (lignes ?? []).map((m) => ({ id_type: m.module_type_id, x: m.x, y: m.y, pivote: m.pivote ?? false })),
+    (lignes ?? []).filter((m) => (m.statut ?? "actif") === "actif").map((m) => ({ id_type: m.module_type_id, x: m.x, y: m.y, pivote: m.pivote ?? false })),
     catalogue,
   );
 }
@@ -312,7 +317,7 @@ export class StockageSupabase implements StockageMonde {
           .eq("statut", "actif"),
         this.supabase
           .from("workshops")
-          .select("surface_m2, loyer_mensuel_centimes, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin, mode_detention, prix_achat_centimes, apport_centimes, mois_achat, duree_amortissement_mois, placed_modules(module_type_id, x, y, pivote)")
+          .select("surface_m2, loyer_mensuel_centimes, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin, mode_detention, prix_achat_centimes, apport_centimes, mois_achat, duree_amortissement_mois, placed_modules(module_type_id, x, y, pivote, statut)")
           .eq("company_id", companyId)
           .maybeSingle(),
         this.supabase
