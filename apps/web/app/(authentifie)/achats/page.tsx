@@ -1,3 +1,6 @@
+import { chargerParametresV1 } from "@kapital/content";
+import { Carte, EncadreNotion, Puce } from "../../../components/ui";
+import { EnTete, Tableau, Vide } from "../../../components/apercu/elements";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
 import { FormulaireCommande } from "./FormulaireCommande";
@@ -22,7 +25,6 @@ type Commande = {
   material_id: string;
   quantite: number;
   prix_unitaire_centimes: number;
-  instant_commande: string;
   instant_livraison_prevue: string;
   statut: string;
 };
@@ -34,98 +36,102 @@ export default async function PageAchats() {
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
-  const [{ data: fournisseurs }, { data: catalogue }, { data: commandes }, { data: materials }] =
+  const [{ data: fournisseurs }, { data: catalogue }, { data: commandes }, { data: materials }, { data: stocks }] =
     await Promise.all([
-      supabase
-        .from("suppliers")
-        .select("id, nom, pays, delai_mois, minimum_commande")
-        .order("nom"),
+      supabase.from("suppliers").select("id, nom, pays, delai_mois, minimum_commande").order("nom"),
       supabase.from("supplier_catalogue").select("supplier_id, material_id, prix_centimes"),
       supabase
         .from("purchase_orders")
-        .select("id, supplier_id, material_id, quantite, prix_unitaire_centimes, instant_commande, instant_livraison_prevue, statut")
+        .select("id, supplier_id, material_id, quantite, prix_unitaire_centimes, instant_livraison_prevue, statut")
         .eq("company_id", entreprise.id)
+        .eq("statut", "en_cours")
         .order("instant_livraison_prevue", { ascending: true }),
       supabase.from("materials").select("id, nom"),
+      supabase.from("material_stock").select("material_id, quantite").eq("company_id", entreprise.id),
     ]);
 
+  const params = chargerParametresV1();
   const fournisseursTab = (fournisseurs ?? []) as Fournisseur[];
-  const catalogueTab = (catalogue ?? []) as LigneCatalogue[];
-  const commandesTab = (commandes ?? []) as Commande[];
-  const materialsMap = new Map<string, string>(
-    (materials ?? []).map((m) => [m.id as string, m.nom as string]),
-  );
-
-  const enCours = commandesTab.filter((c) => c.statut === "en_cours");
+  const enCours = (commandes ?? []) as Commande[];
+  const materialsMap = new Map<string, string>((materials ?? []).map((m) => [m.id as string, m.nom as string]));
+  const stocksTab = ((stocks ?? []) as Array<{ material_id: string; quantite: number }>).filter((s) => Number(s.quantite) > 0);
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-10">
-      <header className="border-b border-[color:var(--color-g-200)] pb-6">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Achats
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Matières et fournisseurs</h1>
-        <p className="mt-1 text-sm text-[color:var(--color-g-500)]">
-          Le prix est figé à la commande, pas à la livraison. Le délai se compte
-          en jours réels (1 jour = 1 mois de jeu).
-        </p>
-      </header>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+      <EnTete surTitre="Fournisseurs" titre="Achats de matière">
+        Commande le tissu dont ton atelier a besoin. Le prix est figé le jour de la commande ; la matière arrive après le
+        délai du fournisseur.
+      </EnTete>
 
-      <section className="mt-10 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider">
-          Commandes en cours ({enCours.length})
-        </h2>
-        {enCours.length === 0 ? (
-          <p className="rounded-md border border-dashed border-[color:var(--color-g-300)] px-5 py-6 text-center text-sm text-[color:var(--color-g-500)]">
-            Pas de commande en cours.
-          </p>
-        ) : (
-          <div className="overflow-hidden rounded-md border border-[color:var(--color-g-200)]">
-            <table className="w-full text-sm">
-              <thead className="bg-[color:var(--color-g-100)] text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">Fournisseur</th>
-                  <th className="px-4 py-2 text-left font-medium">Matière</th>
-                  <th className="px-4 py-2 text-right font-medium">Quantité</th>
-                  <th className="px-4 py-2 text-right font-medium">Prix unit.</th>
-                  <th className="px-4 py-2 text-right font-medium">Total</th>
-                  <th className="px-4 py-2 text-left font-medium">Livraison prévue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {enCours.map((c) => {
-                  const f = fournisseursTab.find((x) => x.id === c.supplier_id);
-                  return (
-                    <tr key={c.id} className="border-t border-[color:var(--color-g-200)]">
-                      <td className="px-4 py-2">{f?.nom ?? c.supplier_id}</td>
-                      <td className="px-4 py-2">{materialsMap.get(c.material_id) ?? c.material_id}</td>
-                      <td className="chiffre px-4 py-2 text-right">{c.quantite}</td>
-                      <td className="chiffre px-4 py-2 text-right">{formaterEuros(c.prix_unitaire_centimes)} €</td>
-                      <td className="chiffre px-4 py-2 text-right">
-                        {formaterEuros(c.prix_unitaire_centimes * c.quantite)} €
-                      </td>
-                      <td className="chiffre px-4 py-2 text-xs text-[color:var(--color-g-700)]">
-                        {formaterDateHeure(c.instant_livraison_prevue)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-4">
+          <Carte titre="Passer une commande">
+            <FormulaireCommande
+              fournisseurs={fournisseursTab}
+              catalogue={(catalogue ?? []) as LigneCatalogue[]}
+              materials={Array.from(materialsMap.entries()).map(([id, nom]) => ({ id, nom }))}
+              params={params}
+            />
+          </Carte>
 
-      <section className="mt-10 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider">
-          Passer une commande
-        </h2>
-        <FormulaireCommande
-          fournisseurs={fournisseursTab}
-          catalogue={catalogueTab}
-          materials={Array.from(materialsMap.entries()).map(([id, nom]) => ({ id, nom }))}
-        />
-      </section>
+          <Carte titre="Commandes en route" action={<Puce>{enCours.length}</Puce>}>
+            {enCours.length === 0 ? (
+              <Vide>Aucune commande en route. Choisis un fournisseur ci-dessus pour remplir ton stock de matière.</Vide>
+            ) : (
+              <Tableau
+                entetes={[
+                  { texte: "Fournisseur" },
+                  { texte: "Matière" },
+                  { texte: "Quantité", droite: true },
+                  { texte: "Total", droite: true },
+                  { texte: "Arrivée prévue" },
+                ]}
+              >
+                {enCours.map((c) => (
+                  <tr key={c.id}>
+                    <td>{fournisseursTab.find((x) => x.id === c.supplier_id)?.nom ?? "Fournisseur"}</td>
+                    <td>{materialsMap.get(c.material_id) ?? "Matière"}</td>
+                    <td className="text-right tabular-nums">{Number(c.quantite).toLocaleString("fr-FR")}</td>
+                    <td className="text-right tabular-nums">
+                      {formaterEuros(Math.round(c.prix_unitaire_centimes * Number(c.quantite)))} €
+                    </td>
+                    <td className="text-muted">{formaterDateHeure(c.instant_livraison_prevue)}</td>
+                  </tr>
+                ))}
+              </Tableau>
+            )}
+          </Carte>
+
+          <Carte titre="Ton stock de matière">
+            {stocksTab.length === 0 ? (
+              <Vide>Ton stock de matière est vide.</Vide>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {stocksTab.map((s) => (
+                  <Puce key={s.material_id}>
+                    {materialsMap.get(s.material_id) ?? "Matière"} : {Number(s.quantite).toLocaleString("fr-FR")}
+                  </Puce>
+                ))}
+              </div>
+            )}
+          </Carte>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <EncadreNotion titre="Le stock, c'est de l'argent qui dort">
+            La matière livrée entre à l&apos;actif de ton bilan (compte 31, stock de matières). Ce n&apos;est pas encore une
+            charge : elle le deviendra quand tu la transformeras en produits et que tu les vendras.
+          </EncadreNotion>
+          <EncadreNotion titre="Acheter à crédit">
+            Le fournisseur te livre avant d&apos;être payé : tu lui dois l&apos;argent (compte 401, dettes fournisseurs). Ce
+            crédit réduit ton besoin en fonds de roulement, mais c&apos;est une dette.
+          </EncadreNotion>
+          <EncadreNotion titre="Minimum de commande et délai">
+            Chaque fournisseur impose une quantité minimale et un délai. Commander tard, c&apos;est risquer la rupture ;
+            commander trop, c&apos;est immobiliser de la trésorerie.
+          </EncadreNotion>
+        </div>
+      </div>
     </div>
   );
 }

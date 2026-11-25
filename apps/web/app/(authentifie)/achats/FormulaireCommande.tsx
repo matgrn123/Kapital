@@ -1,7 +1,11 @@
 "use client";
 
+import type { Parametres } from "@kapital/content";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { Bouton, EcritureComptable } from "../../../components/ui";
+import { CLASSE_SAISIE, Champ, Choix, Ligne, NoteEcriture, Refus, Succes } from "../../../components/apercu/elements";
+import { apercuCommandeMatiere, texteDelai } from "../../../lib/apercus";
 import { formaterEuros } from "../../../lib/formatage";
 
 type Fournisseur = {
@@ -18,50 +22,69 @@ type LigneCatalogue = {
   prix_centimes: number;
 };
 
-const HEURES_PAR_MOIS_JEU = 24;
-
 export function FormulaireCommande({
   fournisseurs,
   catalogue,
   materials,
+  params,
 }: {
   fournisseurs: readonly Fournisseur[];
   catalogue: readonly LigneCatalogue[];
   materials: readonly { id: string; nom: string }[];
+  params: Parametres;
 }) {
   const router = useRouter();
   const [fournisseurId, setFournisseurId] = useState<string>(fournisseurs[0]?.id ?? "");
   const fournisseur = fournisseurs.find((f) => f.id === fournisseurId);
-
   const matieresPourFourn = useMemo(
     () => catalogue.filter((l) => l.supplier_id === fournisseurId),
     [fournisseurId, catalogue],
   );
-
   const [materialId, setMaterialId] = useState<string>(matieresPourFourn[0]?.material_id ?? "");
-  const [quantite, setQuantite] = useState("100");
+  const [quantite, setQuantite] = useState(String(fournisseurs[0]?.minimum_commande ?? 100));
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
 
-  const ligne = catalogue.find(
-    (l) => l.supplier_id === fournisseurId && l.material_id === materialId,
-  );
-  const quantiteN = parseFloat(quantite);
-  const totalCentimes = ligne ? Math.round(ligne.prix_centimes * quantiteN) : 0;
+  const ligne = catalogue.find((l) => l.supplier_id === fournisseurId && l.material_id === materialId);
+  const nomMat = materials.find((m) => m.id === materialId)?.nom ?? "matière";
+  const quantiteN = Number(quantite.replace(",", "."));
+
+  const apercu = useMemo(() => {
+    if (!fournisseur || !ligne) return null;
+    return apercuCommandeMatiere({
+      fournisseur: {
+        id: fournisseur.id,
+        nom: fournisseur.nom,
+        delaiMois: fournisseur.delai_mois,
+        minimumCommande: fournisseur.minimum_commande,
+      },
+      matiere: ligne.material_id,
+      prixUnitaire: ligne.prix_centimes,
+      quantite: quantiteN,
+      moisCourant: 0,
+      params,
+    });
+  }, [fournisseur, ligne, quantiteN, params]);
+
+  function choisirFournisseur(id: string) {
+    setFournisseurId(id);
+    const prem = catalogue.find((l) => l.supplier_id === id);
+    if (prem) setMaterialId(prem.material_id);
+    const f = fournisseurs.find((x) => x.id === id);
+    if (f && quantiteN < f.minimum_commande) setQuantite(String(f.minimum_commande));
+  }
 
   async function commander(e: React.FormEvent) {
     e.preventDefault();
     setErreur(null);
-    if (!fournisseur || !ligne) {
-      setErreur("Fournisseur ou matière non valide.");
+    setOk(null);
+    if (!fournisseur || !ligne || !apercu) {
+      setErreur("Choisis un fournisseur et une matière.");
       return;
     }
-    if (!Number.isFinite(quantiteN) || quantiteN <= 0) {
-      setErreur("Quantité invalide.");
-      return;
-    }
-    if (quantiteN < fournisseur.minimum_commande) {
-      setErreur(`Minimum du fournisseur : ${fournisseur.minimum_commande}.`);
+    if (!apercu.ok) {
+      setErreur(apercu.message);
       return;
     }
     setEnCours(true);
@@ -69,104 +92,81 @@ export function FormulaireCommande({
       const reponse = await fetch("/api/actions/commander-matiere", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          supplierId: fournisseur.id,
-          materialId,
-          quantite: quantiteN,
-        }),
+        body: JSON.stringify({ supplierId: fournisseur.id, materialId, quantite: quantiteN }),
       });
-      const data = (await reponse.json()) as { error?: string };
-      if (data.error) {
-        setErreur(data.error);
+      const data = (await reponse.json().catch(() => ({}))) as { error?: string };
+      if (!reponse.ok || data.error) {
+        setErreur(data.error ?? `Commande impossible (erreur ${reponse.status}).`);
         return;
       }
-      setQuantite("100");
+      setOk(`Commande passée : ${quantiteN} de ${nomMat.toLowerCase()} chez ${fournisseur.nom}.`);
       router.refresh();
+    } catch {
+      setErreur("Impossible de joindre le serveur. Vérifie ta connexion et réessaie.");
     } finally {
       setEnCours(false);
     }
   }
 
+  if (fournisseurs.length === 0) {
+    return <Refus>Aucun fournisseur n&apos;est disponible pour l&apos;instant.</Refus>;
+  }
+
   return (
-    <form onSubmit={commander} className="grid grid-cols-5 gap-4 rounded-md border border-[color:var(--color-g-200)] p-5">
-      <div className="col-span-2 space-y-1.5">
-        <span className="block text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Fournisseur
-        </span>
-        <select
-          value={fournisseurId}
-          onChange={(e) => {
-            setFournisseurId(e.target.value);
-            const prem = catalogue.find((l) => l.supplier_id === e.target.value);
-            if (prem) setMaterialId(prem.material_id);
-          }}
-          className="w-full rounded-md border border-[color:var(--color-g-300)] px-3 py-2 text-sm"
-        >
+    <form onSubmit={commander} className="flex flex-col gap-4">
+      <div>
+        <h4 className="mb-2 text-[0.9rem] font-bold">Chez qui ?</h4>
+        <div className="grid gap-2 sm:grid-cols-2">
           {fournisseurs.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.nom} ({f.pays}, délai {f.delai_mois} mois, min {f.minimum_commande})
-            </option>
+            <Choix key={f.id} actif={f.id === fournisseurId} onClick={() => choisirFournisseur(f.id)} titre={f.nom}>
+              {f.pays} · livraison en {texteDelai(f.delai_mois, params)} · minimum {f.minimum_commande}
+            </Choix>
           ))}
-        </select>
+        </div>
       </div>
 
-      <div className="col-span-2 space-y-1.5">
-        <span className="block text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Matière
-        </span>
-        <select
-          value={materialId}
-          onChange={(e) => setMaterialId(e.target.value)}
-          className="w-full rounded-md border border-[color:var(--color-g-300)] px-3 py-2 text-sm"
-        >
-          {matieresPourFourn.map((l) => (
-            <option key={l.material_id} value={l.material_id}>
-              {materials.find((m) => m.id === l.material_id)?.nom ?? l.material_id}
-              {" — "}
-              {formaterEuros(l.prix_centimes)} €
-            </option>
-          ))}
-        </select>
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <Champ libelle="Matière">
+          <select value={materialId} onChange={(e) => setMaterialId(e.target.value)} className={CLASSE_SAISIE}>
+            {matieresPourFourn.map((l) => (
+              <option key={l.material_id} value={l.material_id}>
+                {materials.find((m) => m.id === l.material_id)?.nom ?? "Matière"} · {formaterEuros(l.prix_centimes)} € l&apos;unité
+              </option>
+            ))}
+          </select>
+        </Champ>
+        <Champ libelle="Quantité" aide={fournisseur ? `Minimum ${fournisseur.minimum_commande}` : undefined}>
+          <input inputMode="decimal" value={quantite} onChange={(e) => setQuantite(e.target.value)} className={CLASSE_SAISIE} />
+        </Champ>
       </div>
 
-      <div className="space-y-1.5">
-        <span className="block text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Quantité
-        </span>
-        <input
-          type="text"
-          value={quantite}
-          onChange={(e) => setQuantite(e.target.value)}
-          className="chiffre w-full rounded-md border border-[color:var(--color-g-300)] px-3 py-2 text-sm outline-none focus:border-[color:var(--color-noir)]"
-        />
-      </div>
-
-      {ligne && Number.isFinite(quantiteN) && quantiteN > 0 && (
-        <p className="col-span-5 chiffre text-xs text-[color:var(--color-g-500)]">
-          Total figé à la commande : {formaterEuros(totalCentimes)} €
-          {fournisseur && (
-            <span>
-              {" "}
-              — livraison dans {fournisseur.delai_mois * HEURES_PAR_MOIS_JEU}h
-            </span>
-          )}
-        </p>
+      {apercu && apercu.ok && ligne && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <Ligne libelle="Prix à l'unité (figé à la commande)">{formaterEuros(ligne.prix_centimes)} €</Ligne>
+            <Ligne libelle="Coût total">{formaterEuros(apercu.total)} €</Ligne>
+            <Ligne libelle="Livraison">dans {texteDelai(apercu.delaiMois, params)}</Ligne>
+            <Ligne libelle="Sortie de trésorerie aujourd'hui">0,00 €</Ligne>
+          </div>
+          <NoteEcriture>
+            Rien n&apos;est écrit maintenant. À la livraison, le moteur entrera la matière en stock et notera ce que tu dois
+            au fournisseur :
+          </NoteEcriture>
+          <EcritureComptable
+            libelle={`Livraison : ${nomMat.toLowerCase()}`}
+            etiquette="à la livraison"
+            lignes={apercu.ecritureLivraison}
+          />
+        </div>
       )}
+      {apercu && !apercu.ok && <Refus>{apercu.message}</Refus>}
+      {erreur && <Refus>{erreur}</Refus>}
+      {ok && <Succes>{ok}</Succes>}
 
-      {erreur && (
-        <p role="alert" className="col-span-5 text-sm text-[color:var(--color-erreur)]">
-          {erreur}
-        </p>
-      )}
-
-      <div className="col-span-5 flex justify-end">
-        <button
-          type="submit"
-          disabled={enCours}
-          className="rounded-md bg-[color:var(--color-noir)] px-4 py-2 text-sm font-medium text-[color:var(--color-blanc)] transition hover:bg-[color:var(--color-g-900)] disabled:opacity-50"
-        >
-          {enCours ? "Envoi..." : "Passer commande"}
-        </button>
+      <div className="flex justify-end">
+        <Bouton type="submit" variante="principal" disabled={enCours || !apercu?.ok}>
+          {enCours ? "Envoi…" : "Passer la commande"}
+        </Bouton>
       </div>
     </form>
   );

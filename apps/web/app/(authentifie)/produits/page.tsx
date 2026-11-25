@@ -1,3 +1,7 @@
+import { chargerParametresV1 } from "@kapital/content";
+import { ID_GROSSISTE_LOCAL } from "@kapital/server";
+import { Carte, EncadreNotion, Puce } from "../../../components/ui";
+import { EnTete } from "../../../components/apercu/elements";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros } from "../../../lib/formatage";
 import { nomMatiere } from "../../../lib/lisible";
@@ -6,7 +10,6 @@ import { AjouterProduitBouton, FormulairePrix } from "./FormulairePrix";
 type Produit = {
   id: string;
   nom: string;
-  type: string;
   matiere_id: string;
   consommation_par_piece: number;
   fournitures_par_piece_centimes: number;
@@ -22,103 +25,157 @@ type CompanyProduit = {
   production_mensuelle_cible: number;
 };
 
+type Stock = { product_id: string; quantite_pieces: number; valeur_totale_centimes: number };
+
 export default async function PageProduits() {
   const supabase = await creerClientServeur();
 
-  const { data: entreprises } = await supabase
-    .from("companies")
-    .select("id, gamme")
-    .limit(1);
+  const { data: entreprises } = await supabase.from("companies").select("id").limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
-  const { data: produitsRef } = await supabase
-    .from("products")
-    .select("id, nom, type, matiere_id, consommation_par_piece, fournitures_par_piece_centimes, temps_standard_minutes")
-    .order("nom");
+  const [{ data: produitsRef }, { data: catalogue }, { data: stocks }, { data: matieres }, { data: prixFacon }, { data: atelier }] =
+    await Promise.all([
+      supabase
+        .from("products")
+        .select("id, nom, matiere_id, consommation_par_piece, fournitures_par_piece_centimes, temps_standard_minutes")
+        .order("nom"),
+      supabase
+        .from("company_products")
+        .select("id, product_id, qualite_visee, prix_vente_directe_centimes, prix_revendeur_centimes, production_mensuelle_cible")
+        .eq("company_id", entreprise.id),
+      supabase
+        .from("product_stock")
+        .select("product_id, quantite_pieces, valeur_totale_centimes")
+        .eq("company_id", entreprise.id),
+      supabase.from("materials").select("id, nom"),
+      supabase.from("faconnier_catalogue").select("faconnier_id, product_id, prix_par_piece_centimes"),
+      supabase.from("workshops").select("id").eq("company_id", entreprise.id).maybeSingle(),
+    ]);
 
-  const { data: catalogue } = await supabase
-    .from("company_products")
-    .select("id, product_id, qualite_visee, prix_vente_directe_centimes, prix_revendeur_centimes, production_mensuelle_cible")
-    .eq("company_id", entreprise.id);
-
-  const { data: stocks } = await supabase
-    .from("product_stock")
-    .select("product_id, quantite_pieces")
-    .eq("company_id", entreprise.id);
-
-  const { data: matieres } = await supabase.from("materials").select("id, nom");
+  const params = chargerParametresV1();
   const nomsMatieres: Record<string, string> = {};
-  for (const m of (matieres ?? []) as Array<{ id: string; nom: string }>) {
-    nomsMatieres[m.id] = m.nom;
+  for (const m of (matieres ?? []) as Array<{ id: string; nom: string }>) nomsMatieres[m.id] = m.nom;
+  const produitsRefTab = (produitsRef ?? []) as Produit[];
+  const cataMap = new Map(((catalogue ?? []) as CompanyProduit[]).map((c) => [c.product_id, c]));
+  const stockMap = new Map(((stocks ?? []) as Stock[]).map((s) => [s.product_id, s]));
+
+  // Prix de façon le plus bas par produit (hors grossiste express).
+  const faconMin = new Map<string, number>();
+  for (const l of (prixFacon ?? []) as Array<{ faconnier_id: string; product_id: string; prix_par_piece_centimes: number }>) {
+    if (l.faconnier_id === ID_GROSSISTE_LOCAL) continue;
+    const v = faconMin.get(l.product_id);
+    if (v === undefined || l.prix_par_piece_centimes < v) faconMin.set(l.product_id, l.prix_par_piece_centimes);
   }
 
-  const produitsRefTab = (produitsRef ?? []) as Produit[];
-  const cataMap = new Map<string, CompanyProduit>(
-    ((catalogue ?? []) as CompanyProduit[]).map((c) => [c.product_id, c]),
-  );
-  const stockMap = new Map<string, number>(
-    ((stocks ?? []) as Array<{ product_id: string; quantite_pieces: number }>).map(
-      (s) => [s.product_id, s.quantite_pieces],
-    ),
-  );
+  /** Coût de revient utilisé pour la marge : celui du stock (coût moyen), sinon le façonnier le moins cher. */
+  function coutDe(productId: string): { cout: number | null; origine: string } {
+    const s = stockMap.get(productId);
+    if (s && s.quantite_pieces > 0 && s.valeur_totale_centimes > 0) {
+      return {
+        cout: Math.round(s.valeur_totale_centimes / s.quantite_pieces),
+        origine: `Coût moyen de tes ${s.quantite_pieces} pièces en stock : c'est celui que le moteur sort du stock à chaque vente.`,
+      };
+    }
+    const f = faconMin.get(productId);
+    if (f !== undefined) {
+      return {
+        cout: f,
+        origine: "Pas encore de stock : estimation au prix du façonnier le moins cher. Le vrai coût sera celui de ta production.",
+      };
+    }
+    return { cout: null, origine: "" };
+  }
+
+  const auCatalogue = produitsRefTab.filter((p) => cataMap.has(p.id));
+  const aAjouter = produitsRefTab.filter((p) => !cataMap.has(p.id));
+  const catalogueVide = auCatalogue.length === 0;
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-10">
-      <header className="border-b border-[color:var(--color-g-200)] pb-6">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Catalogue
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Produits et prix</h1>
-        <p className="mt-1 text-sm text-[color:var(--color-g-500)]">
-          Chaque produit a deux prix : vente directe TTC (prix public) et prix
-          de gros HT (pour les revendeurs).
-        </p>
-      </header>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+      <EnTete surTitre="Canaux de vente" titre="Vente et prix">
+        Fixe tes prix. Chaque produit a deux prix : le prix public TTC, en ligne, et le prix hors taxes pour les
+        revendeurs. Plus cher, tu vends moins, sauf si ta marque fait envie.
+      </EnTete>
 
-      <div className="mt-10 space-y-4">
-        {produitsRefTab.map((p) => {
-          const ligne = cataMap.get(p.id);
-          return (
-            <article
-              key={p.id}
-              className="rounded-md border border-[color:var(--color-g-200)]"
-            >
-              <header className="flex items-start justify-between border-b border-[color:var(--color-g-200)] px-5 py-3">
-                <div>
-                  <h2 className="text-sm font-semibold">{p.nom}</h2>
-                  <p className="text-xs text-[color:var(--color-g-500)]">
-                    <span className="chiffre">{p.consommation_par_piece.toLocaleString("fr-FR")}</span>{" "}
-                    m de {nomMatiere(p.matiere_id, nomsMatieres)} ·{" "}
-                    <span className="chiffre">{p.temps_standard_minutes}</span>{" "}
-                    min atelier · fournitures{" "}
-                    <span className="chiffre">{formaterEuros(p.fournitures_par_piece_centimes)}</span>{" "}
-                    €
-                  </p>
-                </div>
-                {!ligne && (
-                  <AjouterProduitBouton productId={p.id} />
-                )}
-              </header>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-4">
+          {catalogueVide && (
+            <Carte titre="Commence par choisir un produit">
+              <p className="text-[0.88rem] text-muted">
+                Ton catalogue est vide. Ajoute ton premier produit ci-dessous : ta société reçoit alors une première série
+                prête à vendre, et les ventes commencent au prix que tu fixes.
+              </p>
+            </Carte>
+          )}
 
-              {ligne ? (
-                <div className="px-5 py-4 space-y-4">
-                  <div className="flex items-center justify-between rounded-md bg-[color:var(--color-g-100)] px-4 py-2 text-xs">
-                    <span className="text-[color:var(--color-g-500)]">Stock disponible</span>
-                    <span className="chiffre font-medium">
-                      {stockMap.get(p.id) ?? 0} pièces
-                    </span>
-                  </div>
-                  <FormulairePrix lignePrix={ligne} />
-                </div>
-              ) : (
-                <p className="px-5 py-6 text-center text-sm text-[color:var(--color-g-500)]">
-                  Pas encore à votre catalogue.
+          {auCatalogue.map((p) => {
+            const ligne = cataMap.get(p.id)!;
+            const stock = stockMap.get(p.id)?.quantite_pieces ?? 0;
+            const { cout, origine } = coutDe(p.id);
+            return (
+              <Carte
+                key={p.id}
+                surTitre="Au catalogue"
+                titre={p.nom}
+                action={
+                  <Puce ton={stock > 0 ? "bon" : "alerte"}>
+                    {stock > 0 ? `${stock} en stock` : "Stock vide"}
+                  </Puce>
+                }
+              >
+                <p className="mb-3 text-[0.8rem] text-muted">
+                  {p.consommation_par_piece.toLocaleString("fr-FR")} m de {nomMatiere(p.matiere_id, nomsMatieres)} ·{" "}
+                  {p.temps_standard_minutes} min de couture · fournitures {formaterEuros(p.fournitures_par_piece_centimes)} €
                 </p>
-              )}
-            </article>
-          );
-        })}
+                <FormulairePrix
+                  lignePrix={ligne}
+                  nomProduit={p.nom}
+                  coutRevient={cout}
+                  origineCout={origine}
+                  params={params}
+                  aUnAtelier={!!atelier}
+                />
+              </Carte>
+            );
+          })}
+
+          {aAjouter.length > 0 && (
+            <Carte titre={catalogueVide ? "Produits disponibles" : "Ajouter un produit"}>
+              <div className="flex flex-col divide-y divide-line">
+                {aAjouter.map((p) => (
+                  <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                    <div className="min-w-0">
+                      <b>{p.nom}</b>
+                      <p className="text-[0.8rem] text-muted">
+                        {p.consommation_par_piece.toLocaleString("fr-FR")} m de {nomMatiere(p.matiere_id, nomsMatieres)} ·{" "}
+                        {p.temps_standard_minutes} min de couture
+                        {faconMin.has(p.id) && ` · façon dès ${formaterEuros(faconMin.get(p.id)!)} € la pièce`}
+                      </p>
+                    </div>
+                    <AjouterProduitBouton productId={p.id} premier={catalogueVide} />
+                  </div>
+                ))}
+              </div>
+            </Carte>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <EncadreNotion titre="La marge">
+            Marge = prix de vente hors taxes − coût de revient. Le taux de marge, c&apos;est cette marge divisée par le prix
+            hors taxes. Baisser le prix fait vendre plus, mais chaque pièce rapporte moins. En ligne, une partie des pièces
+            revient : leur traitement coûte, c&apos;est compté dans la marge affichée.
+          </EncadreNotion>
+          <EncadreNotion titre="La TVA ne t'appartient pas">
+            Sur un prix TTC, la TVA est collectée pour l&apos;État : elle va au compte 44571 et sera reversée. Ton chiffre
+            d&apos;affaires, c&apos;est le prix hors taxes (compte 707).
+          </EncadreNotion>
+          <EncadreNotion titre="Vendre n'est pas encaisser">
+            Un revendeur paie plus tard : tant qu&apos;il ne l&apos;a pas fait, il te doit de l&apos;argent (une créance, compte
+            411). Ton chiffre d&apos;affaires monte, ta trésorerie attend : c&apos;est ton besoin en fonds de roulement.
+          </EncadreNotion>
+        </div>
       </div>
     </div>
   );

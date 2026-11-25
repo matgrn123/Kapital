@@ -2,41 +2,43 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { capaciteEmprunt, centimes, tauxPret, type ObjetPret, type ReglesPret } from "@kapital/engine";
+import { Bouton, Carte, EcritureComptable, Jauge } from "../../../components/ui";
 import {
-  capaciteEmprunt,
-  centimes,
-  genererEcheancier,
-  mensualite,
-  tauxPret,
-  type ObjetPret,
-  type ReglesPret,
-} from "@kapital/engine";
+  BandeauEtape,
+  classeChamp,
+  classeEtiquette,
+  Message,
+  NoteMoteur,
+  Options,
+  Resultat,
+} from "../../../components/ui/lot4";
+import { apercuPret, extraitEcheancier, lireEuros } from "../../../lib/apercu-lot4";
 import { formaterEuros } from "../../../lib/formatage";
 import { appelerAction } from "../_partage/reponses";
 import type { VerrouAffiche } from "../_partage/verrou";
-import { BandeauVerrou } from "../_partage/BandeauVerrou";
 
 const OBJETS: ReadonlyArray<{ id: ObjetPret; libelle: string; aide: string }> = [
-  { id: "tresorerie", libelle: "Trésorerie", aide: "Pour passer un cap de caisse : court, plafond bas." },
-  { id: "equipement", libelle: "Équipement", aide: "Pour acheter des machines : durée moyenne." },
-  { id: "immobilier", libelle: "Immobilier", aide: "Pour un local : longue durée, taux le plus bas." },
+  { id: "tresorerie", libelle: "Trésorerie", aide: "Passer un cap de caisse : court, plafond bas." },
+  { id: "equipement", libelle: "Équipement", aide: "Acheter des machines : durée moyenne." },
+  { id: "immobilier", libelle: "Immobilier", aide: "Un local : longue durée, taux le plus bas." },
 ];
 
-function pourcent(x: number): string {
-  return `${(x * 100).toFixed(2).replace(".", ",")} %`;
-}
+const pourcent = (x: number) => `${(x * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %`;
 
 export function FormulairePret({
   tresorerieActuelle,
   detteActuelle,
   regles,
   estrAnnuel,
+  moisCourant,
   verrou,
 }: {
   tresorerieActuelle: number;
   detteActuelle: number;
   regles: ReglesPret;
   estrAnnuel: number;
+  moisCourant: number;
   verrou: VerrouAffiche | null;
 }) {
   const router = useRouter();
@@ -48,172 +50,165 @@ export function FormulairePret({
   const [succes, setSucces] = useState<string | null>(null);
 
   const regle = regles.parObjet[objet];
-  const taux = tauxPret(objet, estrAnnuel, regles);
+  const capitalCentimes = lireEuros(capital);
+  const dureeN = Number.parseInt(duree, 10);
   const capacite = useMemo(
     () => capaciteEmprunt({ tresorerie: centimes(tresorerieActuelle), detteEnCours: centimes(detteActuelle) }, objet, regles),
     [tresorerieActuelle, detteActuelle, objet, regles],
   );
-
-  const capitalCentimes = Math.round(parseFloat(capital.replace(",", ".")) * 100);
-  const dureeN = parseInt(duree, 10);
-  const capitalValide = Number.isFinite(capitalCentimes) && capitalCentimes > 0;
-  const dureeValide = Number.isFinite(dureeN) && dureeN >= regle.dureeMinMois && dureeN <= regle.dureeMaxMois;
-
-  const simulation = useMemo(() => {
-    if (!capitalValide || !dureeValide) return null;
-    const mens = mensualite(centimes(capitalCentimes), taux, dureeN);
-    const echeancier = genererEcheancier(centimes(capitalCentimes), taux, dureeN);
-    const total = echeancier.reduce((s, e) => s + e.montant, 0);
-    return { mens, coutTotal: total - capitalCentimes };
-  }, [capitalValide, dureeValide, capitalCentimes, dureeN, taux]);
+  const apercu = useMemo(
+    () =>
+      apercuPret({
+        situation: { tresorerie: tresorerieActuelle, detteEnCours: detteActuelle },
+        objet,
+        capital: capitalCentimes ?? 0,
+        dureeMois: Number.isFinite(dureeN) ? dureeN : 0,
+        estrAnnuel,
+        mois: moisCourant,
+        regles,
+      }),
+    [tresorerieActuelle, detteActuelle, objet, capitalCentimes, dureeN, estrAnnuel, moisCourant, regles],
+  );
+  const sim = apercu.simulation;
+  const refus = capitalCentimes === null ? "Indique un montant en euros, supérieur à zéro." : apercu.evaluation.ok ? null : apercu.evaluation.message;
 
   function choisirObjet(o: ObjetPret) {
     setObjet(o);
     const r = regles.parObjet[o];
-    const courante = parseInt(duree, 10);
-    if (!Number.isFinite(courante) || courante < r.dureeMinMois || courante > r.dureeMaxMois) {
-      setDuree(String(r.dureeMinMois));
-    }
+    if (!(dureeN >= r.dureeMinMois && dureeN <= r.dureeMaxMois)) setDuree(String(r.dureeMinMois));
   }
 
   async function demander(e: React.FormEvent) {
     e.preventDefault();
     setErreur(null);
     setSucces(null);
-    if (!capitalValide) {
-      setErreur("Indiquez un montant en euros, supérieur à zéro.");
-      return;
-    }
-    if (!dureeValide) {
-      setErreur(`La durée d'un prêt ${OBJETS.find((o) => o.id === objet)?.libelle.toLowerCase()} est de ${regle.dureeMinMois} à ${regle.dureeMaxMois} mois.`);
+    if (refus || capitalCentimes === null) {
+      setErreur(refus ?? "Montant invalide.");
       return;
     }
     setEnCours(true);
-    const r = await appelerAction("/api/actions/demander-pret", {
-      capitalCentimes,
-      dureeMois: dureeN,
-      objet,
-    });
+    const r = await appelerAction("/api/actions/demander-pret", { capitalCentimes, dureeMois: dureeN, objet });
     setEnCours(false);
     if (!r.ok) {
       setErreur(r.message);
       return;
     }
-    const tauxObtenu = typeof r.data["tauxAnnuel"] === "number" ? r.data["tauxAnnuel"] : taux;
-    setSucces(`Prêt accordé de ${formaterEuros(capitalCentimes)} € à ${pourcent(tauxObtenu)}.`);
+    const tauxObtenu = typeof r.data["tauxAnnuel"] === "number" ? r.data["tauxAnnuel"] : sim?.taux ?? 0;
+    setSucces(`Prêt accordé : ${formaterEuros(capitalCentimes)} € à ${pourcent(tauxObtenu)}. L'argent est sur ton compte.`);
     router.refresh();
   }
 
-  const champ =
-    "chiffre w-full rounded-md border border-[color:var(--color-g-300)] px-3 py-2 text-sm outline-none focus:border-[color:var(--color-noir)]";
-  const etiquette = "block text-xs uppercase tracking-wider text-[color:var(--color-g-500)]";
+  const lignesEcheancier = sim ? extraitEcheancier(sim.echeancier) : [];
+  const detteApres = sim ? sim.detteApres : detteActuelle;
 
   return (
-    <div className="space-y-4">
-      {verrou && <BandeauVerrou verrou={verrou} action="L'emprunt" />}
+    <Carte titre="Simuler un prêt professionnel">
+      <form onSubmit={demander} className="flex flex-col gap-4">
+        {verrou && <BandeauEtape verrou={verrou} action="L'emprunt" />}
 
-      <div className="rounded-md border border-[color:var(--color-g-200)] p-5">
-        <h3 className="text-sm font-semibold uppercase tracking-wider">Votre capacité d'emprunt</h3>
-        <p className="mt-1 text-xs text-[color:var(--color-g-500)]">
-          La banque limite votre dette totale à {regle.plafondEndettementMultipleTresorerie} fois votre
-          trésorerie, pour un prêt {OBJETS.find((o) => o.id === objet)?.libelle.toLowerCase()}.
-        </p>
-        <dl className="mt-3 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-          <div>
-            <dt className={etiquette}>Dette actuelle</dt>
-            <dd className="chiffre mt-1">{formaterEuros(capacite.detteEnCours)} €</dd>
-          </div>
-          <div>
-            <dt className={etiquette}>Dette maximale</dt>
-            <dd className="chiffre mt-1">{formaterEuros(capacite.plafondEndettement)} €</dd>
-          </div>
-          <div>
-            <dt className={etiquette}>Marge restante</dt>
-            <dd className="chiffre mt-1">{formaterEuros(capacite.margeEndettement)} €</dd>
-          </div>
-          <div>
-            <dt className={etiquette}>Plus gros prêt possible</dt>
-            <dd className="chiffre mt-1">{formaterEuros(capacite.montantMaximal)} €</dd>
-          </div>
-        </dl>
-        <p className="mt-2 text-xs text-[color:var(--color-g-500)]">
-          Un seul prêt de ce type est limité à {formaterEuros(capacite.plafondMontantParPret)} €.
-        </p>
-      </div>
-
-      <form onSubmit={demander} className="grid grid-cols-1 gap-4 rounded-md border border-[color:var(--color-g-200)] p-5 sm:grid-cols-6">
-        <div className="space-y-1.5 sm:col-span-6">
-          <span className={etiquette}>Objet du prêt</span>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {OBJETS.map((o) => {
-              const actif = objet === o.id;
-              return (
-                <button
-                  key={o.id}
-                  type="button"
-                  aria-pressed={actif}
-                  onClick={() => choisirObjet(o.id)}
-                  className={`rounded-md border px-3 py-2 text-left text-sm ${
-                    actif
-                      ? "border-[color:var(--color-noir)] bg-[color:var(--color-noir)] text-[color:var(--color-blanc)]"
-                      : "border-[color:var(--color-g-300)]"
-                  }`}
-                >
-                  <span className="block font-medium">{o.libelle}</span>
-                  <span className={`block text-xs ${actif ? "opacity-80" : "text-[color:var(--color-g-500)]"}`}>
-                    {o.aide} Taux {pourcent(tauxPret(o.id, estrAnnuel, regles))}.
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+        <div className="flex flex-col gap-1.5">
+          <span className={classeEtiquette}>Objet du prêt</span>
+          <Options
+            libelle="Objet du prêt"
+            valeur={objet}
+            onChange={choisirObjet}
+            options={OBJETS.map((o) => ({
+              id: o.id,
+              titre: `${o.libelle} · ${pourcent(tauxPret(o.id, estrAnnuel, regles))}`,
+              detail: o.aide,
+            }))}
+          />
         </div>
 
-        <div className="space-y-1.5 sm:col-span-2">
-          <label htmlFor="pret-capital" className={etiquette}>Capital demandé (€)</label>
-          <input id="pret-capital" type="text" inputMode="decimal" value={capital} onChange={(e) => setCapital(e.target.value)} className={champ} />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <label htmlFor="pret-duree" className={etiquette}>
-            Durée (mois, de {regle.dureeMinMois} à {regle.dureeMaxMois})
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5" htmlFor="pret-capital">
+            <span className={classeEtiquette}>Montant (€)</span>
+            <input id="pret-capital" type="text" inputMode="decimal" value={capital} onChange={(e) => setCapital(e.target.value)} className={classeChamp} />
+            <span className="text-[0.78rem] text-muted">Au plus {formaterEuros(capacite.montantMaximal)} € aujourd&apos;hui.</span>
           </label>
-          <input id="pret-duree" type="text" inputMode="numeric" value={duree} onChange={(e) => setDuree(e.target.value)} className={champ} />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <span className={etiquette}>Taux annuel</span>
-          <p className="chiffre pt-2 text-sm">{pourcent(taux)}</p>
-          <p className="text-xs text-[color:var(--color-g-500)]">
-            Taux du marché ({pourcent(Math.max(estrAnnuel, 0))}) + marge de la banque ({pourcent(regle.margeSurEstr)}).
-          </p>
+          <label className="flex flex-col gap-1.5" htmlFor="pret-duree">
+            <span className={classeEtiquette}>Durée (mois)</span>
+            <input id="pret-duree" type="number" min={regle.dureeMinMois} max={regle.dureeMaxMois} value={duree} onChange={(e) => setDuree(e.target.value)} className={classeChamp} />
+            <span className="text-[0.78rem] text-muted">De {regle.dureeMinMois} à {regle.dureeMaxMois} mois pour cet objet.</span>
+          </label>
         </div>
 
-        {simulation && (
-          <p className="chiffre text-xs text-[color:var(--color-g-500)] sm:col-span-6">
-            Mensualité : {formaterEuros(simulation.mens)} € · Coût total du crédit : {formaterEuros(simulation.coutTotal)} €
-          </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Resultat
+            libelle="Taux"
+            valeur={pourcent(tauxPret(objet, estrAnnuel, regles))}
+            detail={`€STR ${pourcent(Math.max(estrAnnuel, 0))} + marge ${pourcent(regle.margeSurEstr)}`}
+          />
+          <Resultat libelle="Mensualité" valeur={sim ? `${formaterEuros(sim.mensualite)} €` : "—"} />
+          <Resultat libelle="Coût total du crédit" valeur={sim ? `${formaterEuros(sim.coutTotal)} €` : "—"} detail="La somme des intérêts" />
+        </div>
+
+        {sim && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[0.86rem]">
+              <thead className="text-[0.7rem] uppercase tracking-[0.06em] text-muted">
+                <tr>
+                  <th className="py-1 text-left font-semibold">Échéance</th>
+                  <th className="py-1 text-right font-semibold">Mensualité</th>
+                  <th className="py-1 text-right font-semibold">Intérêts</th>
+                  <th className="py-1 text-right font-semibold">Capital</th>
+                  <th className="py-1 text-right font-semibold">Restant dû</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lignesEcheancier.map((e, i) =>
+                  e === null ? (
+                    <tr key={`trou-${i}`} className="border-t border-line text-muted">
+                      <td colSpan={5} className="py-1">…</td>
+                    </tr>
+                  ) : (
+                    <tr key={e.numero} className="border-t border-line tabular-nums">
+                      <td className="py-1.5">{e.numero}</td>
+                      <td className="py-1.5 text-right">{formaterEuros(e.montant)} €</td>
+                      <td className="py-1.5 text-right">{formaterEuros(e.interets)} €</td>
+                      <td className="py-1.5 text-right">{formaterEuros(e.amortissement)} €</td>
+                      <td className="py-1.5 text-right">{formaterEuros(e.capitalRestantApres)} €</td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
 
-        {erreur && (
-          <p role="alert" className="text-sm text-[color:var(--color-erreur)] sm:col-span-6">
-            {erreur}
-          </p>
-        )}
-        {succes && (
-          <p role="status" className="text-sm text-[color:var(--color-succes)] sm:col-span-6">
-            {succes}
-          </p>
+        <Jauge
+          libelle={`Endettement après ce prêt (plafond : ${regle.plafondEndettementMultipleTresorerie} fois ta trésorerie)`}
+          valeur={detteApres}
+          max={Math.max(1, capacite.plafondEndettement)}
+          texte={`${formaterEuros(detteApres)} € / ${formaterEuros(capacite.plafondEndettement)} €`}
+          ton={refus ? "critique" : "accent"}
+        />
+
+        {refus ? (
+          <Message ton="erreur">La banque refuserait : {refus}</Message>
+        ) : sim ? (
+          <Message ton="succes">
+            Demande recevable. Ta trésorerie passerait de {formaterEuros(tresorerieActuelle)} € à{" "}
+            {formaterEuros(sim.tresorerieApres)} €, et tu rembourseras {formaterEuros(sim.mensualite)} € chaque mois de jeu.
+          </Message>
+        ) : null}
+
+        {sim && (
+          <EcritureComptable libelle={sim.ecriture.libelle} etiquette="aperçu" lignes={sim.ecriture.lignes} />
         )}
 
-        <div className="flex justify-end sm:col-span-6">
-          <button
-            type="submit"
-            disabled={enCours}
-            className="rounded-md bg-[color:var(--color-noir)] px-4 py-2 text-sm font-medium text-[color:var(--color-blanc)] transition hover:bg-[color:var(--color-g-900)] disabled:opacity-50"
-          >
-            {enCours ? "Demande..." : "Demander le prêt"}
-          </button>
+        {erreur && <Message ton="erreur">{erreur}</Message>}
+        {succes && <Message ton="succes">{succes}</Message>}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Bouton type="submit" variante="principal" disabled={enCours || verrou !== null || refus !== null}>
+            {enCours ? "Signature…" : "Signer l'offre de prêt"}
+          </Bouton>
+          <NoteMoteur>
+            Le serveur revérifie ta capacité au moment de signer et prend l&apos;€STR du jour.
+          </NoteMoteur>
         </div>
       </form>
-    </div>
+    </Carte>
   );
 }

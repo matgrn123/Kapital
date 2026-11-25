@@ -1,106 +1,85 @@
 import { DEFINITIONS_MISSIONS, type EtatMission } from "@kapital/engine";
+import { BoutonLien, Carte, EncadreNotion, Jauge, Puce } from "../../../components/ui";
+import { EnTete } from "../../../components/apercu/elements";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { chargerProgressionMissions } from "../../../lib/missions";
 import { formaterEuros } from "../../../lib/formatage";
 
-const LIBELLES_ETAT: Record<EtatMission, string> = {
-  a_faire: "À faire",
-  en_cours: "En cours",
-  validee: "Validée",
+const ETATS: Record<EtatMission, { texte: string; ton: "neutre" | "alerte" | "bon" }> = {
+  a_faire: { texte: "À faire", ton: "neutre" },
+  en_cours: { texte: "En cours", ton: "alerte" },
+  validee: { texte: "Réussie", ton: "bon" },
+};
+
+/** Où aller pour faire avancer chaque mission. */
+const OU_AGIR: Record<string, { href: string; texte: string }> = {
+  mission1: { href: "/produits", texte: "Fixer mes prix" },
+  mission2: { href: "/banque", texte: "Voir ma trésorerie" },
+  mission3: { href: "/atelier", texte: "Produire plus" },
 };
 
 export default async function PageMissions() {
   const supabase = await creerClientServeur();
-  const { data: entreprises } = await supabase
-    .from("companies")
-    .select("id, nom")
-    .limit(1);
+  const { data: entreprises } = await supabase.from("companies").select("id").limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
   const progressions = (await chargerProgressionMissions(supabase, entreprise.id)) ?? [];
+  const reussies = progressions.filter((p) => p.etat === "validee").length;
 
   return (
-    <div className="mx-auto max-w-4xl px-8 py-10">
-      <header className="border-b border-[color:var(--color-g-200)] pb-6">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Tutoriel
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Missions</h1>
-        <p className="mt-2 text-sm text-[color:var(--color-g-500)]">
-          Trois étapes pour apprendre les notions clés du jeu : coût de revient,
-          trésorerie, besoin en fonds de roulement.
-        </p>
-      </header>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+      <EnTete surTitre="Progression" titre="Missions">
+        Trois missions pour apprendre les notions clés du jeu : le coût de revient, la trésorerie, le besoin en fonds de
+        roulement. Elles avancent toutes seules pendant que tu joues.
+      </EnTete>
 
-      <section className="mt-8 space-y-5">
+      <Carte>
+        <Jauge
+          libelle="Missions réussies"
+          valeur={reussies}
+          max={DEFINITIONS_MISSIONS.length}
+          ton={reussies === DEFINITIONS_MISSIONS.length ? "bon" : "accent"}
+        />
+      </Carte>
+
+      <div className="grid items-start gap-4 lg:grid-cols-3">
         {DEFINITIONS_MISSIONS.map((d) => {
           const p = progressions.find((x) => x.id === d.id);
           const etat: EtatMission = p?.etat ?? "a_faire";
           const actuel = p?.actuel ?? 0;
           const cible = p?.cible ?? 0;
-          const pourcentage =
-            cible > 0 ? Math.min(100, Math.round((actuel / cible) * 100)) : 0;
-          const formatValeur = d.id === "mission3"
-            ? (v: number) => `${formaterEuros(v)} €`
-            : (v: number) => String(v);
-
+          const format = d.id === "mission3" ? (v: number) => `${formaterEuros(v)} €` : (v: number) => String(v);
+          const agir = OU_AGIR[d.id];
           return (
-            <article
+            <Carte
               key={d.id}
-              className="rounded-md border border-[color:var(--color-g-200)] p-6"
+              surTitre={`Mission ${d.numero}`}
+              titre={d.titre}
+              action={<Puce ton={ETATS[etat].ton}>{ETATS[etat].texte}</Puce>}
             >
-              <header className="flex items-start justify-between gap-6">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-                    Mission {d.numero}
-                  </p>
-                  <h2 className="mt-1 text-lg font-semibold">{d.titre}</h2>
-                  <p className="mt-2 text-sm text-[color:var(--color-g-700)]">
-                    {d.objectif}
-                  </p>
-                </div>
-                <span
-                  className={`whitespace-nowrap rounded-md border px-3 py-1 text-xs font-medium ${
-                    etat === "validee"
-                      ? "border-[color:var(--color-g-900)] bg-[color:var(--color-noir)] text-[color:var(--color-blanc)]"
-                      : etat === "en_cours"
-                        ? "border-[color:var(--color-g-500)] text-[color:var(--color-g-700)]"
-                        : "border-[color:var(--color-g-300)] text-[color:var(--color-g-500)]"
-                  }`}
-                >
-                  {LIBELLES_ETAT[etat]}
-                </span>
-              </header>
-
-              <div className="mt-5">
-                <div className="flex items-baseline justify-between text-xs text-[color:var(--color-g-500)]">
-                  <span>Avancement</span>
-                  <span className="chiffre">
-                    {formatValeur(actuel)}
-                    {cible > 0 && ` / ${formatValeur(cible)}`}
-                  </span>
-                </div>
-                <div className="mt-2 h-1.5 rounded-full bg-[color:var(--color-g-200)]">
-                  <div
-                    className="h-full rounded-full bg-[color:var(--color-noir)] transition-all"
-                    style={{ width: `${pourcentage}%` }}
-                  />
-                </div>
+              <div className="flex flex-col gap-3">
+                <p className="text-[0.86rem] text-muted">{d.objectif}</p>
+                <Jauge
+                  libelle="Avancement"
+                  valeur={etat === "validee" ? Math.max(actuel, cible) : actuel}
+                  max={cible > 0 ? cible : 1}
+                  ton={etat === "validee" ? "bon" : "accent"}
+                  texte={cible > 0 ? `${format(actuel)} / ${format(cible)}` : etat === "validee" ? "Fait" : "Pas encore"}
+                />
+                <EncadreNotion titre={d.notion}>{d.explication}</EncadreNotion>
+                {etat !== "validee" && agir && (
+                  <div>
+                    <BoutonLien href={agir.href} petit>
+                      {agir.texte}
+                    </BoutonLien>
+                  </div>
+                )}
               </div>
-
-              <div className="mt-5 border-t border-[color:var(--color-g-200)] pt-4">
-                <p className="text-xs font-medium uppercase tracking-wider text-[color:var(--color-g-500)]">
-                  {d.notion}
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-[color:var(--color-g-700)]">
-                  {d.explication}
-                </p>
-              </div>
-            </article>
+            </Carte>
           );
         })}
-      </section>
+      </div>
     </div>
   );
 }

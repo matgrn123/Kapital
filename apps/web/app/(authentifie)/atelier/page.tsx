@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { Carte, EncadreNotion, Kpi, Puce } from "../../../components/ui";
+import { EnTete, Tableau, Vide } from "../../../components/apercu/elements";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
 import { chargerParametresV1 } from "@kapital/content";
@@ -6,6 +9,7 @@ import { coutUsineParPiece, ID_GROSSISTE_LOCAL } from "@kapital/server";
 import {
   LouerAtelierBouton,
   FormulaireProduction,
+  type ProduitCatalogue,
   type ProduitGrossiste,
 } from "./FormulaireProduction";
 
@@ -76,10 +80,10 @@ export default async function PageAtelier() {
   const params = chargerParametresV1();
   const { data: lignesCatalogue } = await supabase
     .from("company_products")
-    .select("product_id")
+    .select("product_id, prix_vente_directe_centimes")
     .eq("company_id", entreprise.id);
   const produitsGrossiste: ProduitGrossiste[] = await Promise.all(
-    ((lignesCatalogue ?? []) as { product_id: string }[])
+    ((lignesCatalogue ?? []) as { product_id: string; prix_vente_directe_centimes: number }[])
       .filter((l) => prodMap.has(l.product_id))
       .map(async (l) => {
         let prixEstimeCentimes: number | null = null;
@@ -94,125 +98,131 @@ export default async function PageAtelier() {
   );
   const delaiMinutes = Math.round(delaiGrossisteMinutes(params));
 
+  const [{ data: stocksFinis }, { data: stocksMat }, { data: matieres }] = await Promise.all([
+    supabase.from("product_stock").select("product_id, quantite_pieces").eq("company_id", entreprise.id),
+    supabase.from("material_stock").select("material_id, quantite, valeur_totale_centimes").eq("company_id", entreprise.id),
+    supabase.from("materials").select("id, nom"),
+  ]);
+  const stockFini = new Map(
+    ((stocksFinis ?? []) as Array<{ product_id: string; quantite_pieces: number }>).map((s) => [s.product_id, s.quantite_pieces]),
+  );
+  const produitsCatalogue: ProduitCatalogue[] = (
+    (lignesCatalogue ?? []) as { product_id: string; prix_vente_directe_centimes: number }[]
+  )
+    .filter((l) => prodMap.has(l.product_id))
+    .map((l) => ({
+      id: l.product_id,
+      nom: prodMap.get(l.product_id)!,
+      prixVenteTtc: l.prix_vente_directe_centimes,
+      stock: stockFini.get(l.product_id) ?? 0,
+    }));
+  // Le moteur consomme en atelier la première matière en stock (moteur/flux.ts).
+  const premiereMatiere = ((stocksMat ?? []) as Array<{ material_id: string; quantite: number; valeur_totale_centimes: number }>).find(
+    (s) => Number(s.quantite) > 0,
+  );
+  const nomsMat = new Map((matieres ?? []).map((m) => [m.id as string, m.nom as string]));
+  const stockMatiere = premiereMatiere
+    ? {
+        quantite: Number(premiereMatiere.quantite),
+        valeurTotale: Number(premiereMatiere.valeur_totale_centimes),
+        nom: nomsMat.get(premiereMatiere.material_id) ?? "Matière",
+      }
+    : null;
+
   return (
-    <div className="mx-auto max-w-5xl px-8 py-10">
-      <header className="border-b border-[color:var(--color-g-200)] pb-6">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Production
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Atelier et façonniers</h1>
-      </header>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+      <EnTete surTitre="Fabrication" titre="Production">
+        Fabrique dans ton atelier ou confie la production à un façonnier. Les deux choix n&apos;ont ni le même coût, ni le
+        même effet sur ta trésorerie.
+      </EnTete>
 
-      <section className="mt-10 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider">Votre atelier</h2>
-        {atelier ? (
-          <div className="grid grid-cols-3 gap-4">
-            <Carte libelle="Surface">
-              <span className="chiffre">{atelier.surface_m2}</span> m²
-            </Carte>
-            <Carte libelle="Loyer mensuel">
-              <span className="chiffre">{formaterEuros(atelier.loyer_mensuel_centimes)}</span> €
-            </Carte>
-            <Carte libelle="Machines">
-              <span className="chiffre">{atelier.nombre_machines}</span>
-            </Carte>
-          </div>
-        ) : (
-          <div className="rounded-md border border-dashed border-[color:var(--color-g-300)] p-6">
-            <p className="text-sm text-[color:var(--color-g-700)]">
-              Pas d'atelier propre pour l'instant. Vous pouvez produire via les
-              façonniers ou louer un petit atelier (50 m², 2 machines,
-              1 000 €/mois).
-            </p>
-            <div className="mt-3">
-              <LouerAtelierBouton />
-            </div>
-          </div>
-        )}
-      </section>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-4">
+          <Carte titre="Lancer une production">
+            <FormulaireProduction
+              aUnAtelier={!!atelier}
+              faconniers={faconniersTab}
+              catalogueFaconnier={catalogueFacTab}
+              produits={produitsCatalogue}
+              produitsGrossiste={produitsGrossiste}
+              delaiGrossisteMinutes={delaiMinutes}
+              stockMatiere={stockMatiere}
+              params={params}
+            />
+          </Carte>
 
-      <section className="mt-10 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider">
-          Productions en cours ({ordresTab.length})
-        </h2>
-        {ordresTab.length === 0 ? (
-          <p className="rounded-md border border-dashed border-[color:var(--color-g-300)] px-5 py-6 text-center text-sm text-[color:var(--color-g-500)]">
-            Pas de production en cours.
-          </p>
-        ) : (
-          <div className="overflow-hidden rounded-md border border-[color:var(--color-g-200)]">
-            <table className="w-full text-sm">
-              <thead className="bg-[color:var(--color-g-100)] text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">Produit</th>
-                  <th className="px-4 py-2 text-right font-medium">Quantité</th>
-                  <th className="px-4 py-2 text-left font-medium">Lieu</th>
-                  <th className="px-4 py-2 text-right font-medium">Prix unitaire</th>
-                  <th className="px-4 py-2 text-left font-medium">Livraison prévue</th>
-                </tr>
-              </thead>
-              <tbody>
+          <Carte titre="Productions en cours" action={<Puce>{ordresTab.length}</Puce>}>
+            {ordresTab.length === 0 ? (
+              <Vide>Aucune production en cours. Sans nouvelle production, ton stock finira par s&apos;épuiser.</Vide>
+            ) : (
+              <Tableau
+                entetes={[
+                  { texte: "Produit" },
+                  { texte: "Quantité", droite: true },
+                  { texte: "Lieu" },
+                  { texte: "Prix par pièce", droite: true },
+                  { texte: "Arrivée prévue" },
+                ]}
+              >
                 {ordresTab.map((o) => {
                   const fac = faconniersTab.find((f) => f.id === o.faconnier_id);
                   const grossiste = o.faconnier_id === ID_GROSSISTE_LOCAL;
                   return (
-                    <tr key={o.id} className="border-t border-[color:var(--color-g-200)]">
-                      <td className="px-4 py-2">{prodMap.get(o.product_id) ?? o.product_id}</td>
-                      <td className="chiffre px-4 py-2 text-right">{o.quantite}</td>
-                      <td className="px-4 py-2">
-                        {o.lieu_type === "atelier"
-                          ? "Atelier propre"
-                          : grossiste
-                            ? "Grossiste local (commande express)"
-                            : (fac?.nom ?? "Façonnier")}
+                    <tr key={o.id}>
+                      <td>{prodMap.get(o.product_id) ?? "Produit"}</td>
+                      <td className="text-right tabular-nums">{o.quantite}</td>
+                      <td>
+                        {o.lieu_type === "atelier" ? "Ton atelier" : grossiste ? "Grossiste (express)" : (fac?.nom ?? "Façonnier")}
                       </td>
-                      <td className="chiffre px-4 py-2 text-right">
-                        {o.prix_facon_par_piece_centimes != null
-                          ? `${formaterEuros(o.prix_facon_par_piece_centimes)} €${grossiste ? " (grossiste)" : ""}`
-                          : "—"}
+                      <td className="text-right tabular-nums">
+                        {o.prix_facon_par_piece_centimes != null ? `${formaterEuros(o.prix_facon_par_piece_centimes)} €` : "—"}
                       </td>
-                      <td className="chiffre px-4 py-2 text-xs text-[color:var(--color-g-700)]">
-                        {formaterDateHeure(o.instant_livraison_prevue)}
-                      </td>
+                      <td className="text-muted">{formaterDateHeure(o.instant_livraison_prevue)}</td>
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+              </Tableau>
+            )}
+          </Carte>
 
-      <section className="mt-10 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider">
-          Lancer une production
-        </h2>
-        <FormulaireProduction
-          aUnAtelier={!!atelier}
-          faconniers={faconniersTab}
-          catalogueFaconnier={catalogueFacTab}
-          produits={Array.from(prodMap.entries()).map(([id, nom]) => ({ id, nom }))}
-          produitsGrossiste={produitsGrossiste}
-          delaiGrossisteMinutes={delaiMinutes}
-        />
-      </section>
-    </div>
-  );
-}
+          <Carte titre="Ton atelier">
+            {atelier ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Kpi libelle="Surface" valeur={`${atelier.surface_m2} m²`} />
+                <Kpi libelle="Loyer mensuel" valeur={`${formaterEuros(atelier.loyer_mensuel_centimes)} €`} />
+                <Kpi libelle="Machines" valeur={atelier.nombre_machines} />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <p className="text-[0.88rem] text-muted">
+                  Pas encore d&apos;atelier : tu produis chez les façonniers. Un atelier coûte un loyer chaque mois, mais
+                  chaque pièce y revient moins cher quand il tourne bien. Les conditions sont dans{" "}
+                  <Link href="/locaux" className="text-accent underline">
+                    Locaux
+                  </Link>
+                  .
+                </p>
+                <LouerAtelierBouton />
+              </div>
+            )}
+          </Carte>
+        </div>
 
-function Carte({
-  libelle,
-  children,
-}: {
-  libelle: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-md border border-[color:var(--color-g-200)] p-4">
-      <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-        {libelle}
-      </p>
-      <p className="mt-2 text-xl font-medium">{children}</p>
+        <div className="flex flex-col gap-4">
+          <EncadreNotion titre="Coût variable, coût fixe">
+            Chez le façonnier, tout est variable : tu paies chaque pièce. En atelier, le salaire et le loyer tombent chaque
+            mois, que tu produises ou non. L&apos;atelier devient rentable quand il tourne à pleine capacité.
+          </EncadreNotion>
+          <EncadreNotion titre="Le coût de revient">
+            Coût d&apos;une pièce = matière (chutes comprises) + fournitures + façon. La façon, c&apos;est le prix du façonnier,
+            ou le temps de couture multiplié par le coût de la minute dans ton atelier.
+          </EncadreNotion>
+          <EncadreNotion titre="Le BFR (besoin en fonds de roulement)">
+            Tu paies la production avant de vendre. L&apos;argent immobilisé dans le stock, c&apos;est ton BFR. Le façonnier qui
+            te facture à la livraison finance ton stock un moment : c&apos;est une dette fournisseur.
+          </EncadreNotion>
+        </div>
+      </div>
     </div>
   );
 }

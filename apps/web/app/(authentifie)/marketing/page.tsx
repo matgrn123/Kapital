@@ -1,33 +1,24 @@
+import { chargerParametresV1 } from "@kapital/content";
+import { coefficientsMarketingDepuisParametres } from "@kapital/engine";
+import { Carte, EncadreNotion, Jauge } from "../../../components/ui";
+import { EnTete, Tableau, Vide } from "../../../components/apercu/elements";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
 import { ActionsMarketing } from "./ActionsMarketing";
+import { ACTIONS } from "./actions";
 
-type Marque = {
-  notoriete: number;
-  desirabilite: number;
-};
+type Marque = { notoriete: number; desirabilite: number };
 
-type Action = {
-  id: string;
-  type: string;
-  montant_centimes: number;
-  instant: string;
-};
+type Action = { id: string; type: string; montant_centimes: number; instant: string };
 
-const LIBELLE_ACTION: Record<string, string> = {
-  publicite: "Publicité",
-  image_marque: "Image de marque",
-  promotion: "Promotion",
-  relations_presse: "Relations presse",
-};
+function pourcent(x: number): string {
+  return `${(x * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
+}
 
 export default async function PageMarketing() {
   const supabase = await creerClientServeur();
 
-  const { data: entreprises } = await supabase
-    .from("companies")
-    .select("id, tresorerie_centimes")
-    .limit(1);
+  const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes").limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
@@ -41,83 +32,64 @@ export default async function PageMarketing() {
       .limit(10),
   ]);
 
+  const params = chargerParametresV1();
+  const coefficients = coefficientsMarketingDepuisParametres(params);
   const marque = (brand ?? { notoriete: 0, desirabilite: 0 }) as Marque;
   const actionsTab = (actions ?? []) as Action[];
+  const libelle = (t: string) => ACTIONS.find((a) => a.type === t)?.libelle ?? "Action";
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-10">
-      <header className="border-b border-[color:var(--color-g-200)] pb-6">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Marque
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Marketing</h1>
-      </header>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-6 py-6">
+      <EnTete surTitre="Marque" titre="Publicité">
+        Ta marque a deux jauges. La notoriété fait venir des clients, la désirabilité leur fait accepter un prix plus
+        élevé.
+      </EnTete>
 
-      <section className="mt-10 grid grid-cols-2 gap-4">
-        <Jauge libelle="Notoriété" valeur={marque.notoriete} />
-        <Jauge libelle="Désirabilité" valeur={marque.desirabilite} />
-      </section>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-4">
+          <Carte titre="Ta marque aujourd'hui">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Jauge libelle="Notoriété" valeur={marque.notoriete} max={100} texte={`${Math.round(marque.notoriete)} / 100`} />
+              <Jauge libelle="Désirabilité" valeur={marque.desirabilite} max={100} ton="or" texte={`${Math.round(marque.desirabilite)} / 100`} />
+            </div>
+          </Carte>
 
-      <section className="mt-10 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider">Lancer une action</h2>
-        <ActionsMarketing
-          tresorerie={entreprise.tresorerie_centimes}
-          marque={marque}
-        />
-      </section>
+          <Carte titre="Choisis une action">
+            <ActionsMarketing tresorerie={entreprise.tresorerie_centimes} marque={marque} coefficients={coefficients} />
+          </Carte>
 
-      <section className="mt-10 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider">
-          Dernières actions
-        </h2>
-        {actionsTab.length === 0 ? (
-          <p className="rounded-md border border-dashed border-[color:var(--color-g-300)] px-5 py-6 text-center text-sm text-[color:var(--color-g-500)]">
-            Pas d'action lancée pour l'instant.
-          </p>
-        ) : (
-          <div className="overflow-hidden rounded-md border border-[color:var(--color-g-200)]">
-            <table className="w-full text-sm">
-              <thead className="bg-[color:var(--color-g-100)] text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">Action</th>
-                  <th className="px-4 py-2 text-right font-medium">Montant</th>
-                  <th className="px-4 py-2 text-left font-medium">Date</th>
-                </tr>
-              </thead>
-              <tbody>
+          <Carte titre="Dernières actions">
+            {actionsTab.length === 0 ? (
+              <Vide>Aucune action pour l&apos;instant. Une première publicité fait connaître ta marque.</Vide>
+            ) : (
+              <Tableau entetes={[{ texte: "Action" }, { texte: "Montant", droite: true }, { texte: "Date" }]}>
                 {actionsTab.map((a) => (
-                  <tr key={a.id} className="border-t border-[color:var(--color-g-200)]">
-                    <td className="px-4 py-2">{LIBELLE_ACTION[a.type] ?? a.type}</td>
-                    <td className="chiffre px-4 py-2 text-right">{formaterEuros(a.montant_centimes)} €</td>
-                    <td className="chiffre px-4 py-2 text-xs text-[color:var(--color-g-700)]">
-                      {formaterDateHeure(a.instant)}
-                    </td>
+                  <tr key={a.id}>
+                    <td>{libelle(a.type)}</td>
+                    <td className="text-right tabular-nums">{formaterEuros(a.montant_centimes)} €</td>
+                    <td className="text-muted">{formaterDateHeure(a.instant)}</td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
+              </Tableau>
+            )}
+          </Carte>
+        </div>
 
-function Jauge({ libelle, valeur }: { libelle: string; valeur: number }) {
-  const pct = Math.max(0, Math.min(100, valeur));
-  return (
-    <div className="rounded-md border border-[color:var(--color-g-200)] p-5">
-      <div className="flex items-baseline justify-between">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          {libelle}
-        </p>
-        <p className="chiffre text-xl font-medium">{valeur.toFixed(1)} / 100</p>
-      </div>
-      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--color-g-200)]">
-        <div
-          className="h-full bg-[color:var(--color-noir)]"
-          style={{ width: `${pct}%` }}
-        />
+        <div className="flex flex-col gap-4">
+          <EncadreNotion titre="La publicité est une charge">
+            Elle réduit le résultat du mois où tu la paies, même si son effet dure plus longtemps. C&apos;est un pari : elle
+            doit rapporter plus de marge qu&apos;elle ne coûte.
+          </EncadreNotion>
+          <EncadreNotion titre="Les rendements décroissants">
+            Doubler le budget ne double pas l&apos;effet : chaque euro de plus rapporte un peu moins que le précédent.
+            Plusieurs petites actions valent souvent mieux qu&apos;une grosse.
+          </EncadreNotion>
+          <EncadreNotion titre="Une marque s'entretient">
+            Sans dépense, les jauges baissent chaque mois : la notoriété d&apos;environ {pourcent(coefficients.decroissanceNotoriete)},
+            la désirabilité d&apos;environ {pourcent(coefficients.decroissanceDesirabilite)}. Une promotion fait venir du monde
+            mais abîme l&apos;image.
+          </EncadreNotion>
+        </div>
       </div>
     </div>
   );
