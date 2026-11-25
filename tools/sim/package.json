@@ -1,0 +1,14 @@
+{
+  "name": "@kapital/tool-sim",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "banc-solo": "tsx src/lancer.ts"
+  },
+  "dependencies": {
+    "@kapital/content": "*",
+    "@kapital/engine": "*"
+  }
+}
