@@ -14,6 +14,7 @@ const GROUPES: ReadonlyArray<{ readonly titre: string; readonly liens: ReadonlyA
     liens: [
       { href: "/vue-3d", libelle: "Le village", icone: "M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6" },
       { href: "/atelier-3d", libelle: "L'atelier", icone: "M4 20V9l5 3V9l5 3V6l6 3v11zM8 16h2M14 16h2" },
+      { href: "/empire", libelle: "Mon empire", icone: "M3 21h18M4 21V11l4-3 4 3v10M12 21V7l4-3 4 3v14M7 14h2M15 11h2M15 15h2" },
     ],
   },
   {
@@ -52,7 +53,7 @@ export function NavLaterale() {
             {g.titre}
           </span>
           {g.liens.map((l) => {
-            const actif = chemin === l.href || (l.href === "/missions" && chemin === "/classement");
+            const actif = chemin === l.href || (l.href === "/missions" && (chemin === "/classement" || chemin.startsWith("/societes/")));
             return (
               <Link
                 key={l.href}
