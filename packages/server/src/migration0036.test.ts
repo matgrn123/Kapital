@@ -3,9 +3,9 @@ import { chargerModulesV1 } from "@kapital/content";
 import { MODULE_POSE_A_LA_SIGNATURE, positionsPostesALaSignature, validerPlanEtage } from "@kapital/engine";
 import { describe, expect, it } from "vitest";
 
-/** Contrôle statique (la base n'est pas exécutée en test) de la migration 0033. */
+/** Contrôle statique (la base n'est pas exécutée en test) de la migration 0036. */
 const sql = readFileSync(
-  new URL("../../../supabase/migrations/0033_postes_poses.sql", import.meta.url),
+  new URL("../../../supabase/migrations/0036_postes_poses.sql", import.meta.url),
   "utf8",
 );
 
@@ -16,7 +16,7 @@ function fonction(nom: string): string {
   return sql.slice(debut, fin);
 }
 
-describe("migration 0033 : postes posés à la signature", () => {
+describe("migration 0036 : postes posés à la signature", () => {
   it("signer_bail et acheter_local posent des postes de couture de base, sans écrire nombre_machines", () => {
     for (const nom of ["signer_bail", "acheter_local"]) {
       const f = fonction(nom);
