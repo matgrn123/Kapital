@@ -7,6 +7,7 @@ import {
   idProduit,
   moisJeu,
   preparerSerieLancement,
+  verifierQuantiteCommande,
 } from "@kapital/engine";
 
 // TP-3 : démarrage sans attente. Série de lancement à la création, grossiste local
@@ -95,9 +96,28 @@ export type ResultatCommandeGrossiste = {
   readonly livraisonPrevue: string;
 };
 
+/** Commande refusée par une règle du jeu (à renvoyer en 400, pas en 500). */
+export class CommandeRefusee extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "CommandeRefusee";
+  }
+}
+
 export async function passerCommandeGrossiste(
   supabase: SupabaseClient,
-  p: { companyId: string; productId: string; quantite: number; moisCourant: number; maintenant: Date },
+  p: {
+    companyId: string;
+    productId: string;
+    quantite: number;
+    moisCourant: number;
+    maintenant: Date;
+    /** Trésorerie du moment : la commande ne peut pas coûter plus (décision du 25/11/2026). */
+    tresorerieCentimes: number;
+  },
 ): Promise<ResultatCommandeGrossiste> {
   const params = chargerParametresV1();
   const cout = await coutUsineParPiece(supabase, p.productId);
@@ -108,6 +128,13 @@ export async function passerCommandeGrossiste(
     coutUsineParPiece: centimes(cout),
     instantCommandeMs: p.maintenant.getTime(),
   });
+  const verif = verifierQuantiteCommande({
+    quantite: c.quantite,
+    minimum: 1,
+    prixUnitaire: c.prixParPiece,
+    tresorerie: p.tresorerieCentimes,
+  });
+  if (!verif.ok) throw new CommandeRefusee(verif.code, verif.message);
   const livraison = new Date(c.instantLivraisonMs).toISOString();
   // Une commande au grossiste est un ordre « façonnier » sans matière : la livraison au pas
   // (TP-2) range les pièces au stock et inscrit la dette fournisseur (35 / 401).
