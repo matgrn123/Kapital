@@ -77,17 +77,25 @@ export default async function PageMarche() {
       product_id: string;
       prix_vente_directe_centimes: number;
       prix_revendeur_centimes: number;
-    }>;
-    brand_state: Array<{ notoriete: number; desirabilite: number }>;
-    product_stock: Array<{ product_id: string; quantite_pieces: number }>;
+    }> | null;
+    // Jointure un pour un : PostgREST renvoie un objet, ou null si la
+    // société n'a pas encore de ligne brand_state (avant la première clôture).
+    // Par prudence, on accepte aussi un tableau.
+    brand_state:
+      | { notoriete: number; desirabilite: number }
+      | Array<{ notoriete: number; desirabilite: number }>
+      | null;
+    product_stock: Array<{ product_id: string; quantite_pieces: number }> | null;
   };
   const lignes: LigneMarche[] = [];
   for (const o of (offres ?? []) as unknown as OffreDb[]) {
     const stockPar = new Map(
-      o.product_stock.map((s) => [s.product_id, s.quantite_pieces]),
+      (o.product_stock ?? []).map((s) => [s.product_id, s.quantite_pieces]),
     );
-    const marque = o.brand_state[0];
-    for (const cp of o.company_products) {
+    const marque = Array.isArray(o.brand_state)
+      ? o.brand_state[0]
+      : (o.brand_state ?? undefined);
+    for (const cp of o.company_products ?? []) {
       lignes.push({
         company_id: o.id,
         nom: o.nom,
@@ -116,10 +124,10 @@ export default async function PageMarche() {
   const companyIds = Array.from(
     new Set(((ecritures ?? []) as Array<{ company_id: string }>).map((e) => e.company_id)),
   );
-  const { data: noms } = await supabase
-    .from("companies")
-    .select("id, nom")
-    .in("id", companyIds);
+  const { data: noms } =
+    companyIds.length > 0
+      ? await supabase.from("companies").select("id, nom").in("id", companyIds)
+      : { data: [] as Array<{ id: string; nom: string }> };
   const nomPar = new Map(
     ((noms ?? []) as Array<{ id: string; nom: string }>).map((n) => [n.id, n.nom]),
   );

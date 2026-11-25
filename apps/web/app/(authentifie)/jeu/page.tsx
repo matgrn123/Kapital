@@ -2,7 +2,9 @@ import Link from "next/link";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
 import { chargerProgressionMissions } from "../../../lib/missions";
-import { DEFINITIONS_MISSIONS } from "@kapital/engine";
+import { DEFINITIONS_MISSIONS, type EtapeEntreprise } from "@kapital/engine";
+import { chargerParametresV1 } from "@kapital/content";
+import { CarteEtape } from "./CarteEtape";
 
 type Ecriture = {
   id: string;
@@ -19,7 +21,7 @@ export default async function PageJeu() {
 
   const { data: entreprises } = await supabase
     .from("companies")
-    .select("id, nom, gamme, etape, statut, tresorerie_centimes, cree_le")
+    .select("id, nom, gamme, etape, statut, tresorerie_centimes, pieces_vendues_total, chiffre_affaires_cumule_ht_centimes, cree_le")
     .limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
@@ -79,6 +81,8 @@ export default async function PageJeu() {
   const aUnProduitEnVente = ((catalogue ?? []) as Array<{
     prix_vente_directe_centimes: number;
   }>).some((p) => p.prix_vente_directe_centimes > 0);
+
+  const seriePieces = chargerParametresV1()["serie_lancement_pieces"]!.valeur;
 
   const progressions = (await chargerProgressionMissions(supabase, entreprise.id)) ?? [];
   const missionACourante =
@@ -169,6 +173,12 @@ export default async function PageJeu() {
         </div>
 
         <aside className="col-span-2 space-y-4">
+          <CarteEtape
+            etape={entreprise.etape as EtapeEntreprise}
+            piecesVendues={Number(entreprise.pieces_vendues_total)}
+            chiffreAffairesHt={Number(entreprise.chiffre_affaires_cumule_ht_centimes)}
+            tresorerie={Number(entreprise.tresorerie_centimes)}
+          />
           {caMois === 0 && (
             <div className="rounded-md border border-[color:var(--color-g-900)] bg-[color:var(--color-g-100)] p-5">
               <h3 className="text-sm font-semibold">Comment vendre ?</h3>
@@ -202,18 +212,18 @@ export default async function PageJeu() {
                     </span>
                   ) : (
                     <>
-                      Avoir du stock à vendre : clique{" "}
-                      <Link href="/produits" className="underline">
-                        "+100 (recette)"
-                      </Link>{" "}
-                      sur un produit
+                      Avoir du stock à vendre : dès qu'un produit est ajouté au
+                      catalogue, la société reçoit une série de lancement de{" "}
+                      {seriePieces} pièces prête à vendre. Ensuite, la commande au
+                      grossiste livre en environ 48 minutes.
                     </>
                   )}
                 </li>
                 <li>
                   <span className="chiffre mr-2 text-[color:var(--color-g-500)]">3.</span>
-                  Attendre qu'un mois s'écoule (ou bouton{" "}
-                  <Link href="/admin" className="underline">Avancer</Link> si admin)
+                  Laisser le monde avancer : il avance tout seul, d'un pas par minute
+                  réelle (un jour réel = un mois de jeu). Les ventes se font au fil du
+                  temps, sans rien à déclencher.
                 </li>
               </ol>
             </div>
