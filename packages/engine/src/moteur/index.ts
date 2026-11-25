@@ -6,3 +6,4 @@ export * from "./pas.js";
 export { cumulDemarrantAuPas, cumulVide } from "./donneesMois.js";
 export type { CumulMois, DonneesFinMois, DonneesFlux, DetteFournisseurEchue } from "./donneesMois.js";
 export * from "./fabrication.js";
+export * from "./finDeMois.js";

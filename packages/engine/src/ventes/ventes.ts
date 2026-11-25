@@ -39,7 +39,7 @@ export function enregistrerVenteDirecte(
   const prixHt = prixHtDepuisTtc(e.prixTtcUnitaire, e.tauxTva);
   const totalHt = centimes(prixHt * e.quantite);
   const totalTva = centimes(totalTtc - totalHt);
-  const totalCout = centimes(e.coutRevientUnitaire * e.quantite);
+  const totalCout = e.coutRevientTotal ?? centimes(e.coutRevientUnitaire * e.quantite);
   return enregistrer(gl, {
     id: e.idEcriture,
     mois: e.mois,
@@ -62,7 +62,7 @@ export function enregistrerVenteRevendeur(
     throw new Error("quantité doit être strictement positive");
   }
   const totalHt = centimes(e.prixGrosHtUnitaire * e.quantite);
-  const totalCout = centimes(e.coutRevientUnitaire * e.quantite);
+  const totalCout = e.coutRevientTotal ?? centimes(e.coutRevientUnitaire * e.quantite);
   return enregistrer(gl, {
     id: e.idEcriture,
     mois: e.mois,

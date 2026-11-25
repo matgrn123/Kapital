@@ -43,11 +43,15 @@ n'apparaît sans contrepartie. Il rend la liste des anomalies (vide si tout va b
 Le pilote l'appelle après chaque mois ; tout autre banc (36 mois, multijoueur) peut le
 réutiliser tel quel.
 
-## Bugs connus
+## Bugs trouvés par le banc (corrigés)
 
-Les tests marqués `it.fails` décrivent des bugs du moteur signalés et non corrigés ici :
-quand un bug est corrigé, son test se met à échouer, il suffit alors de retirer `.fails`
-(et l'entrée de `ANOMALIES_CONNUES` dans `scenarioSolo.test.ts`).
+- Arrondi du coût moyen à la vente : le compte 35 suit maintenant au centime la valeur du
+  stock du moteur (la vente reçoit le coût total sorti du stock).
+- Impôt sur les sociétés : calculé au 12e mois sur le résultat de l'exercice entier.
+- TVA du serveur : il paie ce qui reste dû au 44551, plus une TVA sur deux.
+
+Si un nouveau bug est trouvé, le documenter par un test `it.fails` (et, pour une anomalie
+du garde-fou, une entrée dans `ANOMALIES_CONNUES` de `scenarioSolo.test.ts`).
 
 ## Banc PNJ
 

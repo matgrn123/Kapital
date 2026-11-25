@@ -2,7 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { chargerModulesV1, type TypeModule } from "@kapital/content";
 import {
   centimes,
+  debutExercice,
+  planComptableV1,
   resoudreModules,
+  resultatDepuisLignes,
+  tvaRestantDue,
   idEntreprise,
   idMatiere,
   idPret,
@@ -591,32 +595,76 @@ export class StockageSupabase implements StockageMonde {
       .map(([ecritureId, solde]) => ({ ecritureId, montant: centimes(solde) }));
   }
 
+  /** Toutes les lignes d'une requête du grand livre, page par page (Supabase rend 1 000 lignes au plus). */
+  private async toutesLesLignes<T>(
+    nom: string,
+    requete: (de: number, a: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  ): Promise<T[]> {
+    const PAGE = 1000;
+    const lignes: T[] = [];
+    for (let de = 0; ; de += PAGE) {
+      const page = (verifier(nom, await requete(de, de + PAGE - 1)) ?? []) as T[];
+      lignes.push(...page);
+      if (page.length < PAGE) return lignes;
+    }
+  }
+
   async chargerFinDeMois(companyId: string, moisEnCours: number): Promise<DonneesFinMois> {
     const moisPrecedent = moisEnCours - 1;
-    const [tvaR, companyR] = await Promise.all([
+    // TVA : ce qui reste dû au 44551 à la fin du mois précédent (déclarations moins paiements).
+    const lignesTva =
       moisPrecedent >= 0
-        ? this.supabase
-            .from("ledger_entries")
-            .select("sens, montant_centimes")
-            .eq("company_id", companyId)
-            .eq("compte", "44551")
-            .eq("mois_jeu", moisPrecedent)
-        : Promise.resolve({ data: [], error: null }),
-      this.supabase
-        .from("companies")
-        .select("mois_decouvert_consecutifs")
-        .eq("id", companyId)
-        .maybeSingle(),
-    ]);
-    const tva = (verifier("ledger 44551", tvaR as { data: unknown; error: { message: string } | null }) ?? []) as Array<{
-      sens: string; montant_centimes: number;
-    }>;
-    let net = 0;
-    for (const l of tva) net += l.sens === "credit" ? l.montant_centimes : -l.montant_centimes;
+        ? await this.toutesLesLignes<{ sens: string; montant_centimes: number }>("ledger 44551", (de, a) =>
+            this.supabase
+              .from("ledger_entries")
+              .select("sens, montant_centimes")
+              .eq("company_id", companyId)
+              .eq("compte", "44551")
+              .lte("mois_jeu", moisPrecedent)
+              .order("id")
+              .range(de, a),
+          )
+        : [];
+    // IS : au dernier mois de l'exercice, résultat des mois déjà clos de cet exercice.
+    const dernierMoisExercice = (moisEnCours + 1) % 12 === 0;
+    const debut = debutExercice(moisEnCours);
+    const lignesResultat =
+      dernierMoisExercice && moisPrecedent >= debut
+        ? await this.toutesLesLignes<{ compte: string; sens: string; montant_centimes: number }>(
+            "ledger exercice",
+            (de, a) =>
+              this.supabase
+                .from("ledger_entries")
+                .select("compte, sens, montant_centimes")
+                .eq("company_id", companyId)
+                .gte("mois_jeu", debut)
+                .lte("mois_jeu", moisPrecedent)
+                .or("compte.like.6%,compte.like.7%")
+                .order("id")
+                .range(de, a),
+          )
+        : [];
+    const companyR = await this.supabase
+      .from("companies")
+      .select("mois_decouvert_consecutifs")
+      .eq("id", companyId)
+      .maybeSingle();
     const company = verifier("companies", companyR) as { mois_decouvert_consecutifs: number } | null;
     return {
-      tvaAPayerCeMois: centimes(Math.max(0, net)),
+      tvaAPayerCeMois: centimes(
+        tvaRestantDue(lignesTva.map((l) => ({ sens: l.sens, montant: Number(l.montant_centimes) }))),
+      ),
       moisDecouvertConsecutifs: company?.mois_decouvert_consecutifs ?? 0,
+      ...(dernierMoisExercice
+        ? {
+            resultatExerciceAvantMois: centimes(
+              resultatDepuisLignes(
+                lignesResultat.map((l) => ({ compte: l.compte, sens: l.sens, montant: Number(l.montant_centimes) })),
+                planComptableV1().comptes,
+              ),
+            ),
+          }
+        : {}),
     };
   }
 
