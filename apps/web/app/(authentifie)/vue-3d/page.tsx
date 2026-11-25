@@ -88,10 +88,9 @@ export default async function PageVue3D() {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "12px 24px",
-          borderBottom: "1px solid #f3f4f6",
-          background: "white",
           flexShrink: 0,
         }}
+        className="border-b border-line bg-surface"
       >
         <div>
           <p
@@ -99,9 +98,9 @@ export default async function PageVue3D() {
               fontSize: "11px",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
-              color: "#9ca3af",
               margin: 0,
             }}
+            className="text-muted"
           >
             Vue d'ensemble
           </p>
@@ -110,9 +109,9 @@ export default async function PageVue3D() {
               fontSize: "20px",
               fontWeight: 700,
               margin: "2px 0 0",
-              color: "#111827",
               letterSpacing: "-0.02em",
             }}
+            className="text-ink"
           >
             Votre entreprise
           </h1>
@@ -126,14 +125,12 @@ export default async function PageVue3D() {
             gap: "6px",
             padding: "7px 14px",
             borderRadius: "8px",
-            border: "1px solid #e5e7eb",
-            background: "white",
             fontSize: "12px",
             fontWeight: 500,
-            color: "#374151",
             textDecoration: "none",
             transition: "background 0.15s",
           }}
+          className="border border-line bg-surface text-ink hover:bg-surface-2"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="3" width="18" height="18" rx="2" />

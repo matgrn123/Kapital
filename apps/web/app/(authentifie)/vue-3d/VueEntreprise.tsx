@@ -21,9 +21,8 @@ function ChargementScene() {
         alignItems: "center",
         justifyContent: "center",
         gap: "12px",
-        background: "#f8fafc",
         fontFamily: "system-ui, sans-serif",
-        color: "#6b7280",
+        color: "var(--muted)",
       }}
     >
       <div
@@ -50,7 +49,17 @@ export function VueEntreprise({ zones }: { zones: ZoneVue3D[] }) {
     : null;
 
   return (
-    <div className="relative w-full h-full">
+    <div className="scene-ciel relative w-full h-full">
+      {/* Ciel de la maquette (--sky-top / --sky-bot), clair ou sombre selon le thème */}
+      <style>{`
+        .scene-ciel { --sky-top:#BCD8EA; --sky-bot:#E4EEF2; --scene-dim:1;
+          background: radial-gradient(120% 80% at 30% 0%, var(--sky-bot), var(--sky-top)); }
+        .scene-ciel canvas { filter: brightness(var(--scene-dim)); }
+        @media (prefers-color-scheme: dark) {
+          :root:not([data-theme="light"]) .scene-ciel { --sky-top:#22364C; --sky-bot:#3A4D60; --scene-dim:.86; }
+        }
+        :root[data-theme="dark"] .scene-ciel { --sky-top:#22364C; --sky-bot:#3A4D60; --scene-dim:.86; }
+      `}</style>
       <Scene3D
         zones={zones}
         zoneSelectionnee={zoneSelectionnee}

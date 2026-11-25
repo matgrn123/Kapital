@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber";
-import { OrbitControls, Html } from "@react-three/drei";
+import { OrbitControls, Html, useGLTF } from "@react-three/drei";
+import { echelleDansEmprise } from "./ajustement";
 import * as THREE from "three";
 
 export type ModulePose = {
@@ -108,7 +109,7 @@ function Murs({ largeur, hauteur, entree_x, entree_y }: { largeur: number; haute
   return (
     <>
       {segments.map((s, i) => (
-        <mesh key={i} position={s.pos}>
+        <mesh key={i} position={s.pos} castShadow receiveShadow>
           <boxGeometry args={s.taille} />
           <meshLambertMaterial color="#d8d0c4" />
         </mesh>
@@ -133,8 +134,22 @@ function MarqueurEntree({ x, y }: { x: number; y: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Module posé (boîte colorée animée au survol)
+// Module posé : meuble 3D (Kenney Furniture Pack, CC0) sur un tapis coloré
 // ---------------------------------------------------------------------------
+
+// Meuble affiché pour chaque type d'effet (fichiers dans public/models/atelier,
+// tous inscrits dans assets/LICENCES.md).
+const MEUBLE_EFFET: Record<string, string> = {
+  poste_artisan:            "/models/atelier/tableCross.glb",
+  poste_artisan_specialise: "/models/atelier/deskCorner.glb",
+  table_coupe:              "/models/atelier/tableCloth.glb",
+  stockage:                 "/models/atelier/bookcaseOpen.glb",
+  bureau:                   "/models/atelier/desk.glb",
+  salle_reunion:            "/models/atelier/tableRound.glb",
+  showroom:                 "/models/atelier/coatRackStanding.glb",
+  pause:                    "/models/atelier/loungeSofa.glb",
+};
+Object.values(MEUBLE_EFFET).forEach((u) => useGLTF.preload(u));
 
 type PropsBoite = {
   x: number;
@@ -143,20 +158,38 @@ type PropsBoite = {
   d: number;
   nom: string;
   couleur: string;
+  modele?: string;
+  pivote: boolean;
 };
 
-function BoiteModule({ x, y, w, d, nom, couleur }: PropsBoite) {
+/** Meuble recentré sur son emprise et mis à l'échelle (la géométrie est partagée entre copies). */
+function Meuble({ url, w, d, pivote }: { url: string; w: number; d: number; pivote: boolean }) {
+  const { scene } = useGLTF(url);
+  const objet = useMemo(() => {
+    const c = scene.clone(true);
+    c.traverse((o) => { if (o instanceof THREE.Mesh) { o.castShadow = true; o.receiveShadow = true; } });
+    if (pivote) c.rotation.y = Math.PI / 2;
+    const boite = new THREE.Box3().setFromObject(c);
+    const t = boite.getSize(new THREE.Vector3());
+    const e = echelleDansEmprise([t.x, t.y, t.z], w, d);
+    const centre = boite.getCenter(new THREE.Vector3());
+    const g = new THREE.Group();
+    c.position.set(-centre.x, -boite.min.y, -centre.z);
+    g.add(c);
+    g.scale.setScalar(e);
+    return g;
+  }, [scene, w, d, pivote]);
+  return <primitive object={objet} />;
+}
+
+function BoiteModule({ x, y, w, d, nom, couleur, modele, pivote }: PropsBoite) {
   const [survol, setSurvol] = useState(false);
-  const meshRef = useRef<THREE.Mesh>(null);
-  const hauteurCible = survol ? 2.4 : 1.8;
-  const hRef = useRef(1.8);
+  const groupe = useRef<THREE.Group>(null);
 
   useFrame((_, delta) => {
-    hRef.current += (hauteurCible - hRef.current) * Math.min(1, delta * 8);
-    if (meshRef.current) {
-      meshRef.current.scale.y = hRef.current / 1.8;
-      meshRef.current.position.y = hRef.current / 2;
-    }
+    if (!groupe.current) return;
+    const cible = survol ? 0.25 : 0;
+    groupe.current.position.y += (cible - groupe.current.position.y) * Math.min(1, delta * 8);
   });
 
   const cx = x + w / 2 - 0.5;
@@ -174,33 +207,32 @@ function BoiteModule({ x, y, w, d, nom, couleur }: PropsBoite) {
   }
 
   return (
-    <mesh
-      ref={meshRef}
-      position={[cx, 0.9, cz]}
-      onPointerEnter={onPointerEnter}
-      onPointerLeave={onPointerLeave}
-    >
-      <boxGeometry args={[w - 0.1, 1.8, d - 0.1]} />
-      <meshLambertMaterial color={couleur} />
+    <group position={[cx, 0, cz]} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
+      {/* tapis de la couleur du type de module : repère l'emprise au sol */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[w - 0.1, d - 0.1]} />
+        <meshStandardMaterial color={couleur} transparent opacity={survol ? 0.6 : 0.35} />
+      </mesh>
+      <group ref={groupe}>
+        {modele ? (
+          <Suspense fallback={null}>
+            <Meuble url={modele} w={w} d={d} pivote={pivote} />
+          </Suspense>
+        ) : (
+          <mesh position={[0, 0.6, 0]} castShadow>
+            <boxGeometry args={[w - 0.2, 1.2, d - 0.2]} />
+            <meshStandardMaterial color={couleur} />
+          </mesh>
+        )}
+      </group>
       {survol && (
-        <Html
-          center
-          distanceFactor={18}
-          style={{
-            pointerEvents: "none",
-            background: "rgba(0,0,0,0.75)",
-            color: "white",
-            borderRadius: "6px",
-            padding: "4px 10px",
-            fontSize: "13px",
-            fontFamily: "system-ui, sans-serif",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {nom}
+        <Html position={[0, 2.6, 0]} center style={{ pointerEvents: "none" }}>
+          <div className="whitespace-nowrap rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-semibold text-ink shadow-sm ring-1 ring-line">
+            {nom}
+          </div>
         </Html>
       )}
-    </mesh>
+    </group>
   );
 }
 
@@ -213,16 +245,20 @@ function ContenuScene({ largeur, hauteur, entree_x, entree_y, modules, catalogue
 
   return (
     <>
-      <ambientLight intensity={0.7} />
+      <hemisphereLight args={["#f2f4f8", "#b8ab98", 1.2]} />
       <directionalLight
         position={[largeur * 0.8, 12, hauteur * 0.8]}
-        intensity={0.9}
+        intensity={1.4}
         castShadow
+        shadow-mapSize={[1024, 1024]}
+        shadow-camera-left={-largeur} shadow-camera-right={largeur}
+        shadow-camera-top={hauteur} shadow-camera-bottom={-hauteur}
+        shadow-bias={-0.0005}
       />
       <directionalLight position={[-5, 8, -5]} intensity={0.3} />
 
       {/* Plancher */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[largeur / 2, -0.01, hauteur / 2]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[largeur / 2, -0.01, hauteur / 2]} receiveShadow>
         <planeGeometry args={[largeur, hauteur]} />
         <meshLambertMaterial color="#ede8e0" />
       </mesh>
@@ -246,6 +282,8 @@ function ContenuScene({ largeur, hauteur, entree_x, entree_y, modules, catalogue
             d={d}
             nom={dim.nom}
             couleur={couleur}
+            modele={MEUBLE_EFFET[dim.effet_type]}
+            pivote={m.pivote}
           />
         );
       })}
