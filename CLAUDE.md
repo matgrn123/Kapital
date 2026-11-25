@@ -15,11 +15,24 @@ En cas de contradiction, le cahier des charges l'emporte.
 ## Méthode de travail
 
 - Un ticket à la fois, dans l'ordre de la section 13 du cahier des charges. Les tickets 3D portent le préfixe 3D (3D-1 à 3D-9), ceux du temps le préfixe TP (TP-1 à TP-3), ceux de l'architecture de l'entreprise le préfixe AE (AE-1 à AE-11).
-- Avant de coder : résumer le ticket, proposer un plan court, attendre mon accord.
+- Avant de coder : résumer le ticket, proposer un plan court, attendre mon accord. Exception : l'interface, voir « Autonomie sur l'interface ».
 - Écrire les tests d'abord (Vitest), puis le code qui les fait passer.
 - Un ticket est terminé quand son critère d'acceptation passe et que `npm test` est vert.
 - Expliquer simplement ce qui a été fait : je ne suis pas développeur.
 - Ne jamais committer de secret (`.env`, clés Supabase). La clé de service Supabase ne va jamais côté client.
+
+## Autonomie sur l'interface (décision du 25 novembre 2026)
+
+Claude a la main sur l'interface et le design du site (`apps/web`, écrans et composants), sans attendre d'accord préalable. La boucle :
+
+1. Jouer : `/runcompany` (compte `robot-testeur`) pour relever ce qui casse, ce qui manque, ce qui est pénible.
+2. Corriger par petits lots, chacun sur sa branche, tests compris.
+3. Vérifier : le robot rejoue sur la prévisualisation Vercel de la branche.
+4. Rendre compte : lien de prévisualisation + avant / après / pourquoi, en trois lignes. Mathieu regarde l'écran et fusionne lui-même.
+
+Sans demander : bugs d'affichage, messages d'erreur, ergonomie et design des écrans, écrans manquants pour ce que le serveur sait déjà faire. Inspiration : les jeux de gestion (Les Sims, SimCity, Capitalism Lab) pour l'ergonomie et la lisibilité, sans copier leur apparence ni leurs éléments.
+
+Toujours avec accord : règles du jeu, chiffres et comptabilité (`packages/engine`, `packages/content`), schéma de la base (`supabase/migrations`), temps et administration, fusion dans `main`, toute fonctionnalité absente du cahier des charges (la proposer, ne pas la coder).
 
 ## Règles techniques
 

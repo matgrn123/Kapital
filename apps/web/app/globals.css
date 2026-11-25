@@ -1,16 +1,26 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-noir: #0a0a0a;
+  /* Encre bleu nuit plutôt que noir pur, fonds légèrement chauds : un
+     tableau de bord de jeu de gestion, pas un formulaire administratif. */
+  --color-noir: #14213d;
   --color-blanc: #ffffff;
-  --color-g-100: #f5f5f5;
-  --color-g-200: #e5e5e5;
-  --color-g-300: #d4d4d4;
-  --color-g-500: #737373;
-  --color-g-700: #404040;
-  --color-g-900: #171717;
-  --color-erreur: #b91c1c;
-  --color-succes: #15803d;
+  --color-g-100: #f3f1ec;
+  --color-g-200: #e4e0d8;
+  --color-g-300: #cfcabf;
+  --color-g-500: #6f6b63;
+  --color-g-700: #3f3c37;
+  --color-g-900: #1c1a17;
+  --color-erreur: #b42318;
+  --color-succes: #18794e;
+
+  --color-fond: #faf8f4;
+  --color-carte: #ffffff;
+  --color-accent: #1f7a5c;
+  --color-accent-clair: #7fd1b0;
+  --color-nav: #14213d;
+  --color-nav-texte: #c3cbdb;
+  --color-nav-discret: #7d89a3;
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -24,8 +34,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-* {
-  border-color: var(--color-g-200);
+/* Dans la couche de base, pour qu'une couleur de bordure demandée par un
+   écran (erreur, menu sombre) ne soit pas écrasée par cette valeur par défaut. */
+@layer base {
+  * {
+    border-color: var(--color-g-200);
+  }
+}
+
+/* Les cartes se détachent du fond : blanches, avec une ombre très légère. */
+main .rounded-md.border:not([class*="bg-"]):not(.border-dashed) {
+  background: var(--color-carte);
+  box-shadow: 0 1px 2px rgb(20 33 61 / 0.04);
 }
 
 input,

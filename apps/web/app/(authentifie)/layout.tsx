@@ -4,6 +4,7 @@ import { capitalDeDepart } from "@kapital/engine";
 import { creerClientServeur } from "../../lib/supabase/server";
 import { formaterEuros } from "../../lib/formatage";
 import { FormulaireSociete } from "./FormulaireSociete";
+import { BarreJeu } from "./BarreJeu";
 import { NavLaterale } from "./NavLaterale";
 
 export default async function LayoutAuthentifie({
@@ -37,7 +38,7 @@ export default async function LayoutAuthentifie({
 
   const { data: entreprises } = await supabase
     .from("companies")
-    .select("id, nom")
+    .select("id, nom, tresorerie_centimes, etape")
     .eq("owner_profile_id", user.id)
     .limit(1);
   if (!entreprises || entreprises.length === 0) {
@@ -58,23 +59,18 @@ export default async function LayoutAuthentifie({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-[color:var(--color-g-200)] bg-[color:var(--color-g-100)]">
-        <div className="border-b border-[color:var(--color-g-200)] px-5 py-4">
-          <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
+      <aside className="flex w-56 shrink-0 flex-col bg-[color:var(--color-nav)] text-[color:var(--color-nav-texte)]">
+        <div className="border-b border-white/10 px-5 py-4">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-[color:var(--color-accent-clair)]">
             Kapital
           </p>
-          <p className="truncate text-sm font-semibold">{entreprise.nom}</p>
+          <p className="truncate text-sm font-semibold text-white">{entreprise.nom}</p>
         </div>
         <NavLaterale />
-        <div className="border-t border-[color:var(--color-g-200)] px-5 py-3 text-xs">
-          <p className="truncate text-[color:var(--color-g-700)]">
-            {profil?.pseudo ?? user.email}
-          </p>
+        <div className="border-t border-white/10 px-5 py-3 text-xs">
+          <p className="truncate">{profil?.pseudo ?? user.email}</p>
           {profil?.role === "admin" && (
-            <Link
-              href="/admin"
-              className="mt-2 block text-[color:var(--color-g-500)] underline hover:text-[color:var(--color-noir)]"
-            >
+            <Link href="/admin" className="mt-2 block underline hover:text-white">
               Administration
             </Link>
           )}
@@ -83,14 +79,21 @@ export default async function LayoutAuthentifie({
               href={process.env.NEXT_PUBLIC_RETOUR_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 block text-[color:var(--color-g-500)] underline hover:text-[color:var(--color-noir)]"
+              className="mt-2 block underline hover:text-white"
             >
               Signaler un problème
             </a>
           )}
         </div>
       </aside>
-      <main className="flex flex-col flex-1 overflow-y-auto bg-[color:var(--color-blanc)]">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <BarreJeu
+          companyId={entreprise.id}
+          tresorerieInitiale={entreprise.tresorerie_centimes}
+          etapeInitiale={entreprise.etape}
+        />
+        <main className="flex flex-1 flex-col overflow-y-auto bg-[color:var(--color-fond)]">{children}</main>
+      </div>
     </div>
   );
 }
