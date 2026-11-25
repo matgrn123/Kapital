@@ -7,6 +7,8 @@ import {
 import type { Indicateurs } from "@kapital/engine";
 import { chargerContexte, estErreurAction } from "../../../lib/api-helpers";
 import { formaterEuros } from "../../../lib/formatage";
+import { Carte, Kpi } from "../../../components/ui";
+import { Alerte, EnTete, Message, Tableau, Vide } from "../../../components/ui/formulaire";
 
 export const dynamic = "force-dynamic";
 
@@ -30,10 +32,10 @@ export default async function PageIndicateurs() {
   } catch {
     return (
       <div className="flex flex-col gap-5">
-        <h1 className="text-3xl font-semibold tracking-tight">Indicateurs</h1>
-        <p role="alert" className="mt-4 text-sm text-[color:var(--color-erreur)]">
-          Les indicateurs n'ont pas pu être calculés pour le moment. Rechargez la page dans un instant.
-        </p>
+        <EnTete surTitre="Pilotage" titre="Indicateurs" />
+        <Message ton="erreur">
+          Les indicateurs n&apos;ont pas pu être calculés pour le moment. Recharge la page dans un instant.
+        </Message>
       </div>
     );
   }
@@ -47,20 +49,16 @@ export default async function PageIndicateurs() {
 
   return (
     <div className="flex flex-col gap-5">
-      <header className="border-b border-[color:var(--color-g-200)] pb-6">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">Pilotage</p>
-        <h1 className="text-3xl font-semibold tracking-tight">Indicateurs</h1>
-        <p className="mt-1 text-sm text-[color:var(--color-g-500)]">
-          Cinq repères pour savoir si votre entreprise est en bonne santé.
-        </p>
-      </header>
+      <EnTete surTitre="Pilotage" titre="Indicateurs">
+        Cinq repères pour savoir si ton entreprise est en bonne santé.
+      </EnTete>
 
       <Section titre="Marge par canal" explication="La marge brute, c'est ce qui reste d'une vente une fois payé le coût de fabrication de la pièce.">
         {!aDesVentes ? (
-          <Vide />
+          <Vide>{AUCUNE_DONNEE}</Vide>
         ) : (
           <>
-            <Tableau
+            <TableauTexte
               entetes={["Canal", "Pièces vendues", "Chiffre d'affaires HT", "Marge brute", "Marge (en % du CA)"]}
               lignes={[
                 ...canaux.map((c) => ligneMarge(c.libelle, marges.parCanal[c.cle])),
@@ -68,7 +66,7 @@ export default async function PageIndicateurs() {
               ]}
             />
             {marges.produitsIgnores.length > 0 && (
-              <p className="text-xs text-[color:var(--color-g-500)]">
+              <p className="text-[0.78rem] text-muted">
                 {marges.produitsIgnores.length} produit(s) vendu(s) sont exclus du calcul : leur coût de revient ou leur prix est inconnu.
               </p>
             )}
@@ -76,51 +74,48 @@ export default async function PageIndicateurs() {
         )}
       </Section>
 
-      <Section titre="Point mort" explication="Le point mort, c'est le niveau de ventes à partir duquel vous ne perdez plus d'argent chaque mois.">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Carte libelle="Salaires et cotisations">{eur(pointMort.chargesFixes.salaires)}</Carte>
-          <Carte libelle="Loyer">{eur(pointMort.chargesFixes.loyer)}</Carte>
-          <Carte libelle="Intérêts des prêts">{eur(pointMort.chargesFixes.interetsPrets)}</Carte>
-          <Carte libelle="Charges fixes par mois">{eur(pointMort.chargesFixes.total)}</Carte>
+      <Section titre="Point mort" explication="Le point mort, c'est le niveau de ventes à partir duquel tu ne perds plus d'argent chaque mois.">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Kpi libelle="Salaires et cotisations" valeur={eur(pointMort.chargesFixes.salaires)} />
+          <Kpi libelle="Loyer" valeur={eur(pointMort.chargesFixes.loyer)} />
+          <Kpi libelle="Intérêts des prêts" valeur={eur(pointMort.chargesFixes.interetsPrets)} />
+          <Kpi libelle="Charges fixes par mois" valeur={eur(pointMort.chargesFixes.total)} />
         </div>
         {pointMort.piecesPointMort === null || pointMort.chiffreAffairesPointMortHt === null ? (
-          <p className="text-sm text-[color:var(--color-g-500)]">
+          <p className="text-[0.88rem] text-muted">
             {aDesVentes
-              ? "Point mort non calculable : vos ventes ne dégagent pas encore de marge positive."
+              ? "Point mort non calculable : tes ventes ne dégagent pas encore de marge positive."
               : AUCUNE_DONNEE}
           </p>
         ) : (
-          <p className="text-sm">
-            Il vous faut vendre environ <span className="chiffre font-medium">{Math.ceil(pointMort.piecesPointMort)}</span> pièces
-            par mois, soit <span className="chiffre font-medium">{formaterEuros(pointMort.chiffreAffairesPointMortHt)}</span> € de
-            chiffre d'affaires hors taxes.
+          <p className="text-[0.88rem]">
+            Il te faut vendre environ <b className="tabular-nums">{Math.ceil(pointMort.piecesPointMort)}</b> pièces
+            par mois, soit <b className="tabular-nums">{eur(pointMort.chiffreAffairesPointMortHt)}</b> de
+            chiffre d&apos;affaires hors taxes.
           </p>
         )}
       </Section>
 
-      <Section titre="Besoin en fonds de roulement" explication="C'est l'argent immobilisé par votre activité : ce que vous avez en stock ou que l'on vous doit, moins ce que vous devez à vos fournisseurs.">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Carte libelle="Stocks">{eur(bfr.stocks)}</Carte>
-          <Carte libelle="Créances clients">{eur(bfr.creances)}</Carte>
-          <Carte libelle="Dettes fournisseurs">{eur(bfr.dettesFournisseurs)}</Carte>
-          <Carte libelle="Besoin">{eur(bfr.besoin)}</Carte>
+      <Section titre="Besoin en fonds de roulement" explication="C'est l'argent immobilisé par ton activité : ce que tu as en stock ou que l'on te doit, moins ce que tu dois à tes fournisseurs.">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Kpi libelle="Stocks" valeur={eur(bfr.stocks)} />
+          <Kpi libelle="Créances clients" valeur={eur(bfr.creances)} />
+          <Kpi libelle="Dettes fournisseurs" valeur={eur(bfr.dettesFournisseurs)} />
+          <Kpi libelle="Besoin" valeur={eur(bfr.besoin)} />
         </div>
       </Section>
 
-      <Section titre="Trésorerie des 3 prochains mois" explication="Une prévision de votre compte en banque si vos ventes gardent leur rythme actuel ; elle ne compte pas vos futurs achats de matière ni la TVA.">
+      <Section titre="Trésorerie des 3 prochains mois" explication="Une prévision de ton compte en banque si tes ventes gardent leur rythme actuel ; elle ne compte pas tes futurs achats de matière ni la TVA.">
         {previsionnel.premierMoisDecouvert !== null && (
-          <p
-            role="alert"
-            className="rounded-md border border-[color:var(--color-erreur)] px-4 py-3 text-sm text-[color:var(--color-erreur)]"
-          >
-            Attention : votre trésorerie prévue passe sous zéro au mois de jeu {previsionnel.premierMoisDecouvert}. Pensez à
-            réduire vos dépenses ou à emprunter.
-          </p>
+          <Alerte ton="critique">
+            Attention : ta trésorerie prévue passe sous zéro au mois de jeu {previsionnel.premierMoisDecouvert}. Pense à
+            réduire tes dépenses ou à emprunter.
+          </Alerte>
         )}
-        <p className="text-sm">
-          Trésorerie de départ : <span className="chiffre font-medium">{eur(previsionnel.tresorerieDepart)}</span>
+        <p className="text-[0.88rem]">
+          Trésorerie de départ : <b className="tabular-nums">{eur(previsionnel.tresorerieDepart)}</b>
         </p>
-        <Tableau
+        <TableauTexte
           entetes={["Mois de jeu", "Ventes directes", "Revendeurs", "Salaires", "Loyer", "Prêts", "Fournisseurs", "Flux net", "Trésorerie fin de mois"]}
           lignes={previsionnel.mois.map((m) => [
             String(m.mois),
@@ -136,20 +131,23 @@ export default async function PageIndicateurs() {
         />
       </Section>
 
-      <Section titre="Endettement" explication="Le ratio dettes sur capitaux propres compare ce que vous devez aux banques à ce que vos associés ont mis et gagné : plus il est haut, plus vous êtes fragile.">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Carte libelle="Dettes financières">{eur(endettement.dettesFinancieres)}</Carte>
-          <Carte libelle="Mensualités du mois">{eur(endettement.mensualitesDuMois)}</Carte>
-          <Carte libelle="Capitaux propres">{eur(endettement.capitauxPropres)}</Carte>
-          <Carte libelle="Dettes / capitaux propres">
-            {endettement.ratioDettesCapitauxPropres === null
-              ? "Non calculable"
-              : endettement.ratioDettesCapitauxPropres.toFixed(2).replace(".", ",")}
-          </Carte>
+      <Section titre="Endettement" explication="Le ratio dettes sur capitaux propres compare ce que tu dois aux banques à ce que les associés ont mis et gagné : plus il est haut, plus tu es fragile.">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Kpi libelle="Dettes financières" valeur={eur(endettement.dettesFinancieres)} />
+          <Kpi libelle="Mensualités du mois" valeur={eur(endettement.mensualitesDuMois)} />
+          <Kpi libelle="Capitaux propres" valeur={eur(endettement.capitauxPropres)} />
+          <Kpi
+            libelle="Dettes / capitaux propres"
+            valeur={
+              endettement.ratioDettesCapitauxPropres === null
+                ? "Non calculable"
+                : endettement.ratioDettesCapitauxPropres.toFixed(2).replace(".", ",")
+            }
+          />
         </div>
         {endettement.ratioDettesCapitauxPropres === null && (
-          <p className="text-xs text-[color:var(--color-g-500)]">
-            Le ratio n'a de sens que si vos capitaux propres sont positifs.
+          <p className="text-[0.78rem] text-muted">
+            Le ratio n&apos;a de sens que si tes capitaux propres sont positifs.
           </p>
         )}
       </Section>
@@ -182,56 +180,27 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-10 space-y-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wider">{titre}</h2>
-      <p className="text-sm text-[color:var(--color-g-500)]">{explication}</p>
-      {children}
-    </section>
+    <Carte titre={titre}>
+      <div className="flex flex-col gap-3">
+        <p className="text-[0.86rem] text-muted">{explication}</p>
+        {children}
+      </div>
+    </Carte>
   );
 }
 
-function Vide() {
+function TableauTexte({ entetes, lignes }: { entetes: string[]; lignes: string[][] }) {
   return (
-    <p className="rounded-md border border-dashed border-[color:var(--color-g-300)] px-5 py-6 text-center text-sm text-[color:var(--color-g-500)]">
-      {AUCUNE_DONNEE}
-    </p>
-  );
-}
-
-function Carte({ libelle, children }: { libelle: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-md border border-[color:var(--color-g-200)] p-4">
-      <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">{libelle}</p>
-      <p className="chiffre mt-2 text-lg font-medium">{children}</p>
-    </div>
-  );
-}
-
-function Tableau({ entetes, lignes }: { entetes: string[]; lignes: string[][] }) {
-  return (
-    <div className="overflow-x-auto rounded-md border border-[color:var(--color-g-200)]">
-      <table className="w-full text-sm">
-        <thead className="bg-[color:var(--color-g-100)] text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          <tr>
-            {entetes.map((e, i) => (
-              <th key={e} className={`px-4 py-2 font-medium ${i === 0 ? "text-left" : "text-right"}`}>
-                {e}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {lignes.map((l) => (
-            <tr key={l[0]} className="border-t border-[color:var(--color-g-200)]">
-              {l.map((c, i) => (
-                <td key={i} className={`px-4 py-2 ${i === 0 ? "text-left" : "chiffre text-right"}`}>
-                  {c}
-                </td>
-              ))}
-            </tr>
+    <Tableau entetes={entetes.map((texte, i) => ({ texte, droite: i > 0 }))}>
+      {lignes.map((l) => (
+        <tr key={l[0]}>
+          {l.map((c, i) => (
+            <td key={i} className={i === 0 ? "text-left" : "text-right"}>
+              {c}
+            </td>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </tr>
+      ))}
+    </Tableau>
   );
 }

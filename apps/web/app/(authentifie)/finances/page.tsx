@@ -1,12 +1,11 @@
+import { Carte, Courbe, Kpi } from "../../../components/ui";
+import { EnTete, Ligne, Message } from "../../../components/ui/formulaire";
 import { creerClientServeur } from "../../../lib/supabase/server";
+import { tresorerieFinDeMois, type LigneGrandLivre } from "../../../lib/tableau";
 import { formaterEuros } from "../../../lib/formatage";
 import { compteParNumero, PLAN_COMPTABLE, type TypeCompte } from "../../../lib/comptes";
 
-type Ecriture = {
-  compte: string;
-  sens: "debit" | "credit";
-  montant_centimes: number;
-};
+type Ecriture = Pick<LigneGrandLivre, "compte" | "sens" | "montant_centimes">;
 
 type SoldesParCompte = Map<string, number>;
 
@@ -35,17 +34,27 @@ function solde(soldes: SoldesParCompte, num: string): number {
 
 export default async function PageFinances() {
   const supabase = await creerClientServeur();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { data: entreprises } = await supabase.from("companies").select("id").limit(1);
+  const { data: entreprises } = await supabase
+    .from("companies")
+    .select("id")
+    .eq("owner_profile_id", user?.id ?? "")
+    .limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
-  const { data: ecritures } = await supabase
-    .from("ledger_entries")
-    .select("compte, sens, montant_centimes")
-    .eq("company_id", entreprise.id);
+  const [{ data: ecritures }, { data: monde }] = await Promise.all([
+    supabase
+      .from("ledger_entries")
+      .select("ecriture_id, mois_jeu, libelle, compte, sens, montant_centimes, cree_le")
+      .eq("company_id", entreprise.id),
+    supabase.from("worlds").select("mois_courant").limit(1).maybeSingle(),
+  ]);
 
-  const ec = (ecritures ?? []) as Ecriture[];
+  const ec = (ecritures ?? []) as LigneGrandLivre[];
   const soldes = calculerSoldes(ec);
 
   const comptesActifs = PLAN_COMPTABLE.filter((c) => c.type === "actif" && solde(soldes, c.numero) !== 0);
@@ -61,222 +70,89 @@ export default async function PageFinances() {
 
   const bilanOk = totalActif === totalPassif + resultat;
   const tresorerie = solde(soldes, "512");
+  const moisCourant = monde?.mois_courant ?? 0;
+  const courbe = tresorerieFinDeMois(ec, moisCourant, 12);
 
   return (
     <div className="flex flex-col gap-5">
-      <header className="border-b border-[color:var(--color-g-200)] pb-6">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Comptabilité
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Finances</h1>
-        <p className="mt-1 text-sm text-[color:var(--color-g-500)]">
-          Les trois documents comptables depuis votre création. Mode cumulatif,
-          pas encore de filtre mensuel.
-        </p>
-      </header>
+      <EnTete surTitre="Comptabilité" titre="Finances">
+        Les trois documents comptables depuis ta création, en cumulé (pas encore de filtre par mois).
+      </EnTete>
 
-      <section className="mt-10 grid grid-cols-3 gap-4">
-        <Carte
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Kpi
           libelle="Résultat net"
-          aide="Produits moins charges. Ce qui reste à l'entreprise après avoir payé tout le monde."
-        >
-          <span className={`chiffre ${resultat < 0 ? "text-[color:var(--color-erreur)]" : ""}`}>
-            {formaterEuros(resultat)} €
-          </span>
+          valeur={eur(resultat)}
+          detail="Produits moins charges : ce qui reste après avoir payé tout le monde."
+          ton={resultat < 0 ? "critique" : "neutre"}
+        />
+        <Kpi libelle="Trésorerie" valeur={eur(tresorerie)} detail="Argent en banque (compte 512). Différent du résultat." ton={tresorerie < 0 ? "critique" : "neutre"} />
+        <Kpi libelle="Total actif" valeur={eur(totalActif)} detail="Tout ce que l'entreprise possède : banque, stocks, créances." />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Carte titre="Compte de résultat" surTitre="Depuis la création">
+          <Groupe titre="Produits (ce que l'entreprise gagne)" comptes={comptesProduits} soldes={soldes} />
+          <Ligne libelle="Total produits" fort>{eur(totalProduits)}</Ligne>
+          <Groupe titre="Charges (ce que l'entreprise dépense)" comptes={comptesCharges} soldes={soldes} />
+          <Ligne libelle="Total charges" fort>{eur(totalCharges)}</Ligne>
+          <Ligne libelle="Résultat net" fort ton={resultat < 0 ? "critique" : "bon"}>{eur(resultat)}</Ligne>
         </Carte>
-        <Carte
-          libelle="Trésorerie"
-          aide="Argent disponible en banque (solde du compte 512). Différent du résultat."
-        >
-          <span className="chiffre">{formaterEuros(tresorerie)} €</span>
+
+        <Carte titre="Bilan" surTitre="À aujourd'hui">
+          <Groupe titre="Actif (ce qu'on possède)" comptes={comptesActifs} soldes={soldes} />
+          <Ligne libelle="Total actif" fort>{eur(totalActif)}</Ligne>
+          <Groupe titre="Passif (ce qu'on doit)" comptes={comptesPassifs} soldes={soldes} />
+          <Ligne libelle="Dont résultat">{eur(resultat)}</Ligne>
+          <Ligne libelle="Total passif + résultat" fort>{eur(totalPassif + resultat)}</Ligne>
         </Carte>
-        <Carte
-          libelle="Total actif"
-          aide="Tout ce que l'entreprise possède : banque, stocks, créances clients."
-        >
-          <span className="chiffre">{formaterEuros(totalActif)} €</span>
-        </Carte>
-      </section>
+      </div>
 
-      <section className="mt-10 grid grid-cols-2 gap-6">
-        <Document titre="Compte de résultat" sousTitre="depuis la création">
-          <GroupeLignes
-            titre="Produits (ce que l'entreprise gagne)"
-            comptes={comptesProduits}
-            soldes={soldes}
-          />
-          <Total libelle="Total produits" montant={totalProduits} />
-          <GroupeLignes
-            titre="Charges (ce que l'entreprise dépense)"
-            comptes={comptesCharges}
-            soldes={soldes}
-          />
-          <Total libelle="Total charges" montant={totalCharges} />
-          <Total libelle="Résultat net" montant={resultat} fort />
-        </Document>
+      <Carte titre="Trésorerie" surTitre="Solde du compte 512 à la fin de chaque mois">
+        <Courbe valeurs={courbe} titre="Trésorerie en fin de mois" hauteur={70} />
+        <Ligne libelle="Solde actuel" fort>{eur(tresorerie)}</Ligne>
+      </Carte>
 
-        <Document titre="Bilan" sousTitre="instantané à aujourd'hui">
-          <GroupeLignes
-            titre="Actif (ce qu'on possède)"
-            comptes={comptesActifs}
-            soldes={soldes}
-          />
-          <Total libelle="Total actif" montant={totalActif} />
-          <GroupeLignes
-            titre="Passif (ce qu'on doit)"
-            comptes={comptesPassifs}
-            soldes={soldes}
-          />
-          <Total libelle="Dont résultat" montant={resultat} discret />
-          <Total libelle="Total passif + résultat" montant={totalPassif + resultat} fort />
-        </Document>
-      </section>
-
-      <section className="mt-6">
-        <Document titre="Trésorerie" sousTitre="solde du compte 512 Banque">
-          <p className="text-sm text-[color:var(--color-g-700)]">
-            Solde actuel : <span className="chiffre font-medium">{formaterEuros(tresorerie)} €</span>.
-            Le détail des entrées et sorties sera affiché quand le processeur
-            d'événements sera branché sur Supabase.
-          </p>
-        </Document>
-      </section>
-
-      <section className="mt-6">
-        <div
-          className={`rounded-md border p-4 ${
-            bilanOk
-              ? "border-[color:var(--color-g-200)]"
-              : "border-[color:var(--color-erreur)]"
-          }`}
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-                Vérification de concordance
-              </p>
-              <p className="mt-1 text-sm">
-                Actif <span className="chiffre font-medium">{formaterEuros(totalActif)} €</span>{" "}
-                {bilanOk ? "=" : "≠"} Passif + Résultat{" "}
-                <span className="chiffre font-medium">
-                  {formaterEuros(totalPassif + resultat)} €
-                </span>
-              </p>
-            </div>
-            <p className={`text-sm font-medium ${bilanOk ? "text-[color:var(--color-succes)]" : "text-[color:var(--color-erreur)]"}`}>
-              {bilanOk ? "Équilibré" : "Déséquilibré"}
-            </p>
-          </div>
-        </div>
-      </section>
+      <Message ton={bilanOk ? "succes" : "erreur"}>
+        Vérification : actif {eur(totalActif)} {bilanOk ? "=" : "≠"} passif + résultat {eur(totalPassif + resultat)}.{" "}
+        {bilanOk ? "Le bilan est équilibré." : "Le bilan est déséquilibré."}
+      </Message>
     </div>
   );
 }
 
-function Carte({
-  libelle,
-  aide,
-  children,
-}: {
-  libelle: string;
-  aide: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-md border border-[color:var(--color-g-200)] p-4">
-      <p
-        className="cursor-help text-xs uppercase tracking-wider text-[color:var(--color-g-500)]"
-        title={aide}
-      >
-        {libelle} <span className="text-[color:var(--color-g-300)]">?</span>
-      </p>
-      <p className="mt-2 text-xl font-medium">{children}</p>
-    </div>
-  );
+function eur(c: number): string {
+  return `${formaterEuros(c)} €`;
 }
 
-function Document({
-  titre,
-  sousTitre,
-  children,
-}: {
-  titre: string;
-  sousTitre: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <article className="rounded-md border border-[color:var(--color-g-200)]">
-      <header className="border-b border-[color:var(--color-g-200)] px-5 py-3">
-        <h2 className="text-sm font-semibold">{titre}</h2>
-        <p className="text-xs text-[color:var(--color-g-500)]">{sousTitre}</p>
-      </header>
-      <div className="divide-y divide-[color:var(--color-g-200)]">{children}</div>
-    </article>
-  );
-}
-
-function GroupeLignes({
+function Groupe({
   titre,
   comptes,
   soldes,
 }: {
   titre: string;
-  comptes: readonly CompteV1Like[];
+  comptes: readonly { numero: string; libelle: string }[];
   soldes: SoldesParCompte;
 }) {
-  if (comptes.length === 0) {
-    return (
-      <div className="px-5 py-3">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          {titre}
-        </p>
-        <p className="mt-1 text-xs text-[color:var(--color-g-500)]">(aucun)</p>
-      </div>
-    );
-  }
   return (
-    <div className="px-5 py-3">
-      <p className="mb-2 text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-        {titre}
-      </p>
-      <dl className="space-y-1">
-        {comptes.map((c) => (
-          <div key={c.numero} className="flex justify-between text-sm">
-            <dt>
-              <span className="chiffre text-[color:var(--color-g-500)]">{c.numero}</span>{" "}
-              <span>{c.libelle}</span>
-            </dt>
-            <dd className="chiffre">{formaterEuros(soldes.get(c.numero) ?? 0)} €</dd>
-          </div>
-        ))}
-      </dl>
+    <div className="mb-2 mt-3 first:mt-0">
+      <p className="mb-1 text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-muted">{titre}</p>
+      {comptes.length === 0 ? (
+        <p className="text-[0.84rem] text-muted">(aucun)</p>
+      ) : (
+        comptes.map((c) => (
+          <Ligne
+            key={c.numero}
+            libelle={
+              <>
+                <span className="tabular-nums text-muted">{c.numero}</span> {c.libelle}
+              </>
+            }
+          >
+            {eur(soldes.get(c.numero) ?? 0)}
+          </Ligne>
+        ))
+      )}
     </div>
   );
 }
-
-function Total({
-  libelle,
-  montant,
-  fort,
-  discret,
-}: {
-  libelle: string;
-  montant: number;
-  fort?: boolean;
-  discret?: boolean;
-}) {
-  return (
-    <div
-      className={`flex justify-between px-5 py-2 text-sm ${
-        fort ? "bg-[color:var(--color-g-100)] font-semibold" : ""
-      } ${discret ? "text-[color:var(--color-g-500)]" : ""}`}
-    >
-      <span>{libelle}</span>
-      <span className={`chiffre ${montant < 0 && !discret ? "text-[color:var(--color-erreur)]" : ""}`}>
-        {formaterEuros(montant)} €
-      </span>
-    </div>
-  );
-}
-
-type CompteV1Like = { numero: string; libelle: string };
