@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Bouton, EcritureComptable } from "../../../components/ui";
-import { CLASSE_SAISIE, Champ, Choix, Ligne, NoteEcriture, Refus, Succes, Vide } from "../../../components/apercu/elements";
-import { apercuAtelier, apercuFaconnier, texteDelai } from "../../../lib/apercus";
+import { Choix, Curseur, Ligne, Note, Refus, Resultat, Succes, Vide } from "../../../components/ui";
+import { apercuAtelier, apercuFaconnier, bornesQuantite, texteDelai } from "../../../lib/apercus";
 import { formaterEuros } from "../../../lib/formatage";
 import { lireErreur, MESSAGE_RESEAU, type MessageErreur } from "./erreurs";
 
@@ -81,6 +81,7 @@ export function FormulaireProduction({
   produitsGrossiste,
   delaiGrossisteMinutes,
   stockMatiere,
+  tresorerie,
   params,
 }: {
   aUnAtelier: boolean;
@@ -92,12 +93,14 @@ export function FormulaireProduction({
   delaiGrossisteMinutes: number;
   /** Première matière en stock (celle que le moteur consomme en atelier), ou null. */
   stockMatiere: { quantite: number; valeurTotale: number; nom: string } | null;
+  /** Trésorerie du joueur : sert à borner le curseur de quantité. */
+  tresorerie: number;
   params: Parametres;
 }) {
   const router = useRouter();
   const [productId, setProductId] = useState<string>(produits[0]?.id ?? "");
   const [lieu, setLieu] = useState<string>(aUnAtelier ? "atelier" : (faconniers[0]?.id ?? ""));
-  const [quantite, setQuantite] = useState("100");
+  const [quantiteN, setQuantiteN] = useState<number>(faconniers[0]?.minimum_commande ?? 1);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<MessageErreur | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
@@ -105,7 +108,6 @@ export function FormulaireProduction({
   const produit = produits.find((p) => p.id === productId);
   const grossiste = lieu === ID_GROSSISTE_LOCAL;
   const faconnier = faconniers.find((f) => f.id === lieu);
-  const quantiteN = Number(quantite);
 
   /** Prix par pièce chez un façonnier pour le produit choisi (estimation pour le grossiste). */
   function prixChez(idLieu: string): number | null {
@@ -115,10 +117,22 @@ export function FormulaireProduction({
     );
   }
   const prix = lieu === "atelier" ? null : prixChez(lieu);
+  const minimum = lieu === "atelier" || grossiste ? 1 : (faconnier?.minimum_commande ?? 1);
+  // Plafond tiré des données : ta matière en stock (atelier) ou ce que ta trésorerie peut payer.
+  const bornes = bornesQuantite({
+    minimum,
+    plafonds:
+      lieu === "atelier"
+        ? [stockMatiere?.quantite ?? 0]
+        : prix && prix > 0
+          ? [tresorerie / prix]
+          : [],
+  });
+  const quantiteBornee = Math.min(Math.max(quantiteN, bornes.min), bornes.max);
 
   const apercu = useMemo(() => {
     if (!produit) return null;
-    if (lieu === "atelier") return { mode: "atelier" as const, r: apercuAtelier({ quantite: quantiteN, stockMatiere }) };
+    if (lieu === "atelier") return { mode: "atelier" as const, r: apercuAtelier({ quantite: quantiteBornee, stockMatiere }) };
     if (!faconnier) return null;
     if (prix === null) {
       return {
@@ -139,13 +153,13 @@ export function FormulaireProduction({
         },
         produit: produit.id,
         prixParPiece: prix,
-        quantite: quantiteN,
+        quantite: quantiteBornee,
         moisCourant: 0,
         prixVenteTtc: produit.prixVenteTtc,
         params,
       }),
     };
-  }, [produit, lieu, faconnier, prix, grossiste, quantiteN, stockMatiere, params]);
+  }, [produit, lieu, faconnier, prix, grossiste, quantiteBornee, stockMatiere, params]);
 
   async function lancer(e: React.FormEvent) {
     e.preventDefault();
@@ -165,14 +179,14 @@ export function FormulaireProduction({
         ? await fetch("/api/actions/commander-grossiste", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ productId: produit.id, quantite: quantiteN }),
+            body: JSON.stringify({ productId: produit.id, quantite: quantiteBornee }),
           })
         : await fetch("/api/actions/lancer-production", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               productId: produit.id,
-              quantite: quantiteN,
+              quantite: quantiteBornee,
               lieuType: lieu === "atelier" ? "atelier" : "faconnier",
               faconnierId: lieu === "atelier" ? undefined : lieu,
             }),
@@ -215,8 +229,14 @@ export function FormulaireProduction({
         <h4 className="mb-2 text-[0.9rem] font-bold">Quoi ?</h4>
         <div className="grid gap-2 sm:grid-cols-3">
           {produits.map((p) => (
-            <Choix key={p.id} actif={p.id === productId} onClick={() => setProductId(p.id)} titre={p.nom}>
-              Prix public {formaterEuros(p.prixVenteTtc)} € · en stock : {p.stock}
+            <Choix
+              key={p.id}
+              actif={p.id === productId}
+              onClick={() => setProductId(p.id)}
+              titre={p.nom}
+              prix={`Prix public ${formaterEuros(p.prixVenteTtc)} €`}
+            >
+              En stock : {p.stock}
             </Choix>
           ))}
         </div>
@@ -230,44 +250,62 @@ export function FormulaireProduction({
             onClick={() => setLieu("atelier")}
             titre="Ton atelier"
             desactive={!aUnAtelier}
+            prix={aUnAtelier ? "Matière déjà en stock · salaires en fin de mois" : undefined}
           >
             {aUnAtelier
-              ? "Tu utilises ta matière en stock. La main-d'œuvre, ce sont tes salaires, payés en fin de mois."
+              ? "Tu utilises ta matière en stock. La main-d'œuvre, ce sont tes salaires."
               : "Pas encore d'atelier : loue-en un plus bas."}
           </Choix>
           {faconniers.map((f) => {
             const p = prixChez(f.id);
+            const estGrossiste = f.id === ID_GROSSISTE_LOCAL;
             return (
-              <Choix key={f.id} actif={lieu === f.id} onClick={() => setLieu(f.id)} titre={f.nom} desactive={p === null}>
-                {f.id === ID_GROSSISTE_LOCAL
-                  ? `Livré dans environ ${delaiGrossisteMinutes} minutes, plus cher.`
-                  : `${f.pays} · ${texteDelai(f.delai_mois, params)} · minimum ${f.minimum_commande}`}
-                {p !== null ? ` · ${formaterEuros(p)} € la pièce${f.id === ID_GROSSISTE_LOCAL ? " (estimation)" : ""}` : " · ne fait pas ce produit"}
+              <Choix
+                key={f.id}
+                actif={lieu === f.id}
+                onClick={() => setLieu(f.id)}
+                titre={f.nom}
+                desactive={p === null}
+                prix={
+                  p === null
+                    ? "Ne fait pas ce produit"
+                    : `${formaterEuros(p)} € la pièce${estGrossiste ? " (estimation)" : ""} · ${
+                        estGrossiste ? `environ ${delaiGrossisteMinutes} min` : texteDelai(f.delai_mois, params)
+                      }`
+                }
+              >
+                {estGrossiste ? "Livraison express, plus cher, sans minimum." : `${f.pays} · minimum ${f.minimum_commande} pièces`}
               </Choix>
             );
           })}
         </div>
       </div>
 
-      <div className="max-w-[220px]">
-        <Champ
-          libelle="Quantité (pièces)"
-          aide={faconnier && !grossiste ? `Minimum ${faconnier.minimum_commande} chez ${faconnier.nom}` : undefined}
-        >
-          <input inputMode="numeric" value={quantite} onChange={(e) => setQuantite(e.target.value)} className={CLASSE_SAISIE} />
-        </Champ>
-      </div>
+      <Curseur
+        libelle="Quantité (pièces)"
+        valeur={quantiteBornee}
+        min={bornes.min}
+        max={bornes.max}
+        onChange={setQuantiteN}
+        aide={
+          lieu === "atelier"
+            ? `De 1 à ta matière en stock (${bornes.max} unités).`
+            : `De ${bornes.min} (minimum${faconnier && !grossiste ? ` chez ${faconnier.nom}` : ""}) à ${bornes.max} (ce que ta trésorerie peut payer).`
+        }
+      />
 
       {apercu && apercu.mode === "faconnier" && apercu.r.ok && (
         <div className="flex flex-col gap-3">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Resultat libelle="Coût total" valeur={`${formaterEuros(apercu.r.total)} €`} />
+            <Resultat libelle="Coût par pièce" valeur={`${formaterEuros(apercu.r.prixParPiece)} €`} detail="prix du façonnier" />
+            <Resultat
+              libelle="Livraison"
+              valeur={grossiste ? `${delaiGrossisteMinutes} min` : `${faconnier?.delai_mois ?? 0} mois`}
+              detail={grossiste ? "environ, en temps réel" : texteDelai(faconnier?.delai_mois ?? 0, params)}
+            />
+          </div>
           <div className="grid gap-x-6 sm:grid-cols-2">
-            <div>
-              <Ligne libelle="Coût par pièce (tout compris)">{formaterEuros(apercu.r.prixParPiece)} €</Ligne>
-              <Ligne libelle="Coût total">{formaterEuros(apercu.r.total)} €</Ligne>
-              <Ligne libelle="Livraison">
-                {grossiste ? `environ ${delaiGrossisteMinutes} min` : texteDelai(faconnier?.delai_mois ?? 0, params)}
-              </Ligne>
-            </div>
             <div>
               {apercu.r.margeParPiece !== null && (
                 <Ligne libelle="Marge par pièce vendue en ligne" ton={apercu.r.margeParPiece < 0 ? "critique" : "bon"}>
@@ -275,16 +313,18 @@ export function FormulaireProduction({
                 </Ligne>
               )}
               <Ligne libelle="Sortie de trésorerie aujourd'hui">0,00 €</Ligne>
+            </div>
+            <div>
               <Ligne libelle="Dette envers le façonnier à la livraison">{formaterEuros(apercu.r.total)} €</Ligne>
             </div>
           </div>
           {grossiste && (
-            <p className="text-[0.78rem] text-muted">Prix estimé : le serveur le recalcule et le confirme à la commande.</p>
+            <Note>Prix estimé : le serveur le recalcule et le confirme à la commande.</Note>
           )}
-          <NoteEcriture>
+          <Note>
             Rien n&apos;est écrit maintenant. À la livraison, le moteur entrera les pièces en stock et notera la facture du
             façonnier :
-          </NoteEcriture>
+          </Note>
           <EcritureComptable libelle={`Livraison : ${produit?.nom ?? ""}`} etiquette="à la livraison" lignes={apercu.r.ecritureLivraison} />
         </div>
       )}
@@ -296,16 +336,16 @@ export function FormulaireProduction({
               {apercu.r.piecesCouvertes} unités · {formaterEuros(apercu.r.valeurMatiere)} €
             </Ligne>
             <Ligne libelle="Sortie de trésorerie aujourd'hui">0,00 € (matière déjà payée ou due)</Ligne>
-            {apercu.r.piecesCouvertes < quantiteN && (
+            {apercu.r.piecesCouvertes < quantiteBornee && (
               <Ligne libelle="Pièces sans matière" ton="critique">
-                {quantiteN - apercu.r.piecesCouvertes}
+                {quantiteBornee - apercu.r.piecesCouvertes}
               </Ligne>
             )}
           </div>
-          <NoteEcriture>
+          <Note>
             Rien n&apos;est écrit maintenant. Au fil du mois, l&apos;atelier fabrique selon la production mensuelle réglée
             dans Vente et prix et la capacité de tes couturiers ; le moteur passe alors :
-          </NoteEcriture>
+          </Note>
           <EcritureComptable libelle="Fabrication en atelier" etiquette="au fil du mois" lignes={apercu.r.ecritureFabrication} />
         </div>
       )}

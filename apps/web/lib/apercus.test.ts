@@ -7,6 +7,8 @@ import {
   apercuFaconnier,
   apercuMarketing,
   apercuVente,
+  bornesQuantite,
+  effetsMarketing,
   ecritureMarketing,
   texteDelai,
 } from "./apercus";
@@ -141,5 +143,33 @@ describe("apercuAtelier", () => {
     const r = apercuAtelier({ quantite: 500, stockMatiere: { quantite: 100, valeurTotale: 35000 } });
     expect(r.ok && r.piecesCouvertes).toBe(100);
     expect(apercuAtelier({ quantite: 5, stockMatiere: null }).ok).toBe(false);
+  });
+});
+
+describe("bornesQuantite", () => {
+  it("part du minimum et monte jusqu'au plafond tiré des données", () => {
+    expect(bornesQuantite({ minimum: 50, plafonds: [120, 400] })).toEqual({ min: 50, max: 400 });
+  });
+  it("ne descend jamais sous le minimum ni sous 1, ignore les plafonds invalides", () => {
+    expect(bornesQuantite({ minimum: 50, plafonds: [10, Number.NaN] })).toEqual({ min: 50, max: 50 });
+    expect(bornesQuantite({ minimum: 0, plafonds: [] })).toEqual({ min: 1, max: 1 });
+    expect(bornesQuantite({ minimum: 1, plafonds: [12.7] })).toEqual({ min: 1, max: 12 });
+  });
+});
+
+describe("effetsMarketing", () => {
+  const coefficients = coefficientsMarketingDepuisParametres(params);
+  it("donne l'écart de chaque jauge pour les quatre actions, comme apercuMarketing", () => {
+    const marque = { notoriete: 10, desirabilite: 20 };
+    const e = effetsMarketing({ montant: 30000, marque, coefficients });
+    const pub = apercuMarketing({ action: "publicite", montant: 30000, tresorerie: 10 ** 9, marque, coefficients });
+    if (!pub.ok) throw new Error(pub.message);
+    expect(e.publicite.notoriete).toBeCloseTo(pub.apres.notoriete - 10);
+    expect(e.promotion.desirabilite).toBeLessThan(0);
+    expect(Object.keys(e).sort()).toEqual(["image_marque", "promotion", "publicite", "relations_presse"]);
+  });
+  it("rend zéro partout pour un budget nul", () => {
+    const e = effetsMarketing({ montant: 0, marque: { notoriete: 5, desirabilite: 5 }, coefficients });
+    expect(e.publicite).toEqual({ notoriete: 0, desirabilite: 0 });
   });
 });

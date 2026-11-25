@@ -1,7 +1,6 @@
 import { chargerParametresV1 } from "@kapital/content";
 import { coefficientsMarketingDepuisParametres } from "@kapital/engine";
-import { Carte, EncadreNotion, Jauge } from "../../../components/ui";
-import { EnTete, Tableau, Vide } from "../../../components/apercu/elements";
+import { Carte, EncadreNotion, EnTete, FilRouge, Jauge, Tableau, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
 import { ActionsMarketing } from "./ActionsMarketing";
@@ -89,6 +88,7 @@ export default async function PageMarketing() {
             la désirabilité d&apos;environ {pourcent(coefficients.decroissanceDesirabilite)}. Une promotion fait venir du monde
             mais abîme l&apos;image.
           </EncadreNotion>
+          <FilRouge ecran="publicite" />
         </div>
       </div>
     </div>
