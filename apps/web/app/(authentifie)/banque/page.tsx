@@ -75,7 +75,7 @@ export default async function PageBanque() {
 
   return (
     <div className="flex flex-col gap-5">
-      <EnTete surTitre="Banque du Quai" titre="Banque et prêt">
+      <EnTete surTitre="Financement" titre="Banque et prêt">
         Emprunter permet d&apos;investir sans attendre. La banque regarde l&apos;objet du prêt et ta
         trésorerie : ta dette totale ne peut pas dépasser un multiple de ce que tu as en caisse.
       </EnTete>
