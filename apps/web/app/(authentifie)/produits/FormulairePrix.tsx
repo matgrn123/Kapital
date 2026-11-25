@@ -3,10 +3,21 @@
 import type { Parametres } from "@kapital/content";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Bouton, EcritureComptable } from "../../../components/ui";
-import { CLASSE_SAISIE, Champ, Ligne, NoteEcriture, Refus, Succes } from "../../../components/apercu/elements";
+import {
+  Bouton,
+  CLASSE_SAISIE,
+  Champ,
+  Curseur,
+  EcritureComptable,
+  Ligne,
+  Note,
+  Options,
+  Refus,
+  Succes,
+} from "../../../components/ui";
 import { apercuVente } from "../../../lib/apercus";
 import { formaterEuros } from "../../../lib/formatage";
+import { bornesPrix } from "../../../lib/vente";
 
 type LignePrix = {
   id: string;
@@ -16,12 +27,6 @@ type LignePrix = {
   prix_revendeur_centimes: number;
   production_mensuelle_cible: number;
 };
-
-/** "25,50" ou "25.5" → 2550 centimes ; NaN si la saisie n'est pas un montant. */
-function enCentimes(saisie: string): number {
-  const n = Number(saisie.replace(/\s/g, "").replace(",", "."));
-  return Number.isFinite(n) ? Math.round(n * 100) : NaN;
-}
 
 function pourcent(x: number): string {
   return `${(x * 100).toLocaleString("fr-FR", { maximumFractionDigits: 0 })} %`;
@@ -44,16 +49,22 @@ export function FormulairePrix({
   aUnAtelier: boolean;
 }) {
   const router = useRouter();
-  const [directe, setDirecte] = useState(formaterEuros(lignePrix.prix_vente_directe_centimes));
-  const [revendeur, setRevendeur] = useState(formaterEuros(lignePrix.prix_revendeur_centimes));
+  const [pDirecte, setDirecte] = useState(lignePrix.prix_vente_directe_centimes);
+  const [pRevendeur, setRevendeur] = useState(lignePrix.prix_revendeur_centimes);
   const [production, setProduction] = useState(String(lignePrix.production_mensuelle_cible));
-  const [qualite, setQualite] = useState(String(lignePrix.qualite_visee));
+  const [q, setQualite] = useState(lignePrix.qualite_visee);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
 
-  const pDirecte = enCentimes(directe);
-  const pRevendeur = enCentimes(revendeur);
+  const tauxTva = params["tva_standard"]?.valeur ?? 0;
+  // Bornes figées au chargement : le curseur ne doit pas fuir sous le doigt.
+  const [bornesTtc] = useState(() =>
+    bornesPrix({ coutRevient, prixActuel: lignePrix.prix_vente_directe_centimes, tauxTva }),
+  );
+  const [bornesHt] = useState(() =>
+    bornesPrix({ coutRevient, prixActuel: lignePrix.prix_revendeur_centimes, tauxTva: 0 }),
+  );
   const apercu = useMemo(
     () =>
       apercuVente({
@@ -73,9 +84,8 @@ export function FormulairePrix({
     setErreur(null);
     setOk(false);
     const prod = Number(production);
-    const q = Number(qualite);
     if (!Number.isInteger(pDirecte) || !Number.isInteger(pRevendeur) || pDirecte <= 0 || pRevendeur <= 0) {
-      setErreur("Les deux prix doivent être des montants positifs (par exemple 24,90).");
+      setErreur("Les deux prix doivent être positifs : pousse les curseurs vers la droite.");
       return;
     }
     if (!Number.isInteger(prod) || prod < 0) {
@@ -115,21 +125,45 @@ export function FormulairePrix({
 
   return (
     <form onSubmit={enregistrer} className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Champ libelle="Prix public (€ TTC)" aide="Ce que paie ton client en ligne.">
-          <input inputMode="decimal" value={directe} onChange={(e) => setDirecte(e.target.value)} className={CLASSE_SAISIE} />
-        </Champ>
-        <Champ libelle="Prix revendeur (€ HT)" aide="Ce que te paie une boutique.">
-          <input inputMode="decimal" value={revendeur} onChange={(e) => setRevendeur(e.target.value)} className={CLASSE_SAISIE} />
-        </Champ>
+      <Curseur
+        libelle="Prix public TTC"
+        valeur={pDirecte}
+        min={bornesTtc.min}
+        max={bornesTtc.max}
+        pas={10}
+        onChange={setDirecte}
+        affichage={`${formaterEuros(pDirecte)} €`}
+        aide={
+          apercu.ok
+            ? `Marge par pièce ${formaterEuros(apercu.margeDirecte)} € (${pourcent(apercu.tauxMargeDirecte)}), retours compris`
+            : "Ce que paie ton client."
+        }
+      />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Curseur
+          libelle="Prix revendeur HT"
+          valeur={pRevendeur}
+          min={bornesHt.min}
+          max={bornesHt.max}
+          pas={10}
+          onChange={setRevendeur}
+          affichage={`${formaterEuros(pRevendeur)} €`}
+          aide="Ce que te paie une boutique."
+        />
+        <Curseur
+          libelle="Qualité visée"
+          valeur={q}
+          min={0}
+          max={100}
+          onChange={setQualite}
+          affichage={`${q} / 100`}
+          aide="Plus haut, plus de clients."
+        />
         <Champ
           libelle="Production mensuelle"
           aide={aUnAtelier ? "Ce que ton atelier fabrique chaque mois." : "Servira quand tu auras un atelier."}
         >
           <input inputMode="numeric" value={production} onChange={(e) => setProduction(e.target.value)} className={CLASSE_SAISIE} />
-        </Champ>
-        <Champ libelle="Qualité visée (0 à 100)" aide="Plus haut, plus de clients.">
-          <input inputMode="numeric" value={qualite} onChange={(e) => setQualite(e.target.value)} className={CLASSE_SAISIE} />
         </Champ>
       </div>
 
@@ -148,10 +182,10 @@ export function FormulairePrix({
             <p className="mt-2 text-[0.78rem] text-muted">{origineCout}</p>
           </div>
           <div className="flex flex-col gap-2">
-            <NoteEcriture>
+            <Note>
               Changer un prix n&apos;écrit rien en comptabilité. Chaque vente, elle, est écrite au fil du temps par le
               moteur. Pour une pièce de {nomProduit.toLowerCase()} :
-            </NoteEcriture>
+            </Note>
             <EcritureComptable libelle="Vente en ligne d'une pièce" etiquette="aperçu" lignes={apercu.ecritureDirecte} />
             <EcritureComptable
               libelle="Vente d'une pièce à un revendeur"
@@ -175,7 +209,25 @@ export function FormulairePrix({
   );
 }
 
-export function AjouterProduitBouton({ productId, premier }: { productId: string; premier: boolean }) {
+export type ProduitAAjouter = { id: string; nom: string; detail: string; prix: string | null };
+
+/** Tuiles des produits que tu peux ajouter ; un seul bouton pour celui choisi. */
+export function AjouterProduit({ produits, premier }: { produits: ProduitAAjouter[]; premier: boolean }) {
+  const [choisi, setChoisi] = useState(produits[0]?.id ?? "");
+  return (
+    <div className="flex flex-col gap-3">
+      <Options
+        libelle="Produit à ajouter"
+        valeur={choisi}
+        onChange={setChoisi}
+        options={produits.map((p) => ({ id: p.id, titre: p.nom, detail: p.detail, prix: p.prix ?? undefined }))}
+      />
+      {choisi && <AjouterProduitBouton productId={choisi} premier={premier} />}
+    </div>
+  );
+}
+
+function AjouterProduitBouton({ productId, premier }: { productId: string; premier: boolean }) {
   const router = useRouter();
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
