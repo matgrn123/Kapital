@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Bouton, EcritureComptable } from "../../../components/ui";
 import { Choix, Curseur, Ligne, Note, Refus, Resultat, Succes, Vide } from "../../../components/ui";
-import { centimes, idMatiere, piecesPermisesParLaMatiere } from "@kapital/engine";
+import { centimes, idMatiere, piecesPermisesParLaMatiere, quantiteMaxPayable } from "@kapital/engine";
 import { apercuAtelier, apercuFaconnier, bornesQuantite, texteDelai } from "../../../lib/apercus";
 import { formaterEuros } from "../../../lib/formatage";
 import { lireErreur, MESSAGE_RESEAU, type MessageErreur } from "./erreurs";
@@ -149,7 +149,7 @@ export function FormulaireProduction({
               : 0,
           ]
         : prix && prix > 0
-          ? [tresorerie / prix]
+          ? [quantiteMaxPayable(tresorerie, prix)]
           : [],
   });
   const quantiteBornee = Math.min(Math.max(quantiteN, bornes.min), bornes.max);
