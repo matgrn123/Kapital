@@ -1,12 +1,11 @@
 import { chargerModulesV1, type TypeBatiment, type TypeModule } from "@kapital/content";
-import { centimes, type Atelier, type Bail } from "@kapital/engine";
+import { centimes, resoudreModules, type Atelier, type Bail } from "@kapital/engine";
 
 // Le seul endroit du banc qui construit l'Atelier du moteur.
 //
-// Aujourd'hui, le moteur compte les postes avec `nombreMachines` (un artisan produit s'il
-// a une machine). Le ticket 3D-3 remplace ce compteur par la liste des modules posés :
-// quand il sera fusionné, seule cette fonction change (passer `modulesPoses` à l'Atelier,
-// au lieu de les compter), le reste du banc manipule déjà une liste de modules.
+// Depuis 3D-3, le moteur lit la liste des modules posés (Atelier.modules) : postes équipés,
+// énergie et amortissement du matériel en découlent. Le banc ne suit que le type de chaque
+// module ; leur position n'influe pas sur la production, on les range donc sur une ligne.
 
 /** Un module posé dans l'atelier, tel que le banc le suit (type de module seulement). */
 export type ModulePose = { readonly id_type: string };
@@ -31,7 +30,10 @@ export function construireAtelier(e: {
   return {
     surfaceM2: e.batiment.surface_m2,
     loyerMensuel: centimes(e.batiment.loyer_mensuel_centimes),
-    nombreMachines: nombrePostes(e.modulesPoses),
+    modules: resoudreModules(
+      e.modulesPoses.map((m, i) => ({ id_type: m.id_type, x: i + 1, y: 1, pivote: false })),
+      chargerModulesV1(),
+    ),
     bail: e.bail,
   };
 }

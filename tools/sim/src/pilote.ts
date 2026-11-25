@@ -1,6 +1,7 @@
 import { chargerBatimentsV1, chargerModulesV1, type Parametres } from "@kapital/content";
 import {
   achatModulesAmenagement,
+  postesEquipesAtelier,
   centimes,
   coefficientsSalairesDepuisParametres,
   commanderAuGrossiste,
@@ -612,7 +613,7 @@ export function avancerMois(etat: EtatBanc, graine: number, options: OptionsAvan
     piecesVenduesCumulees: entreprise.cumulsEtape?.piecesVendues ?? 0,
     stockFiniPieces: entreprise.stocksFinis.reduce((s, l) => s + l.quantite, 0),
     salaries: entreprise.salaries.length,
-    postes: entreprise.atelier?.nombreMachines ?? 0,
+    postes: postesEquipesAtelier(entreprise.atelier ?? null),
     ventesPerdues: r.ventesPerdues,
     anomalies,
   };
