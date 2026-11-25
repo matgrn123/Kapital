@@ -15,7 +15,11 @@ import {
   apercuBail,
   apercuEmbauche,
   apercuLicenciement,
+  apercuPaieEquipe,
   apercuPret,
+  bornesSalaire,
+  curseurMontant,
+  dureesProposees,
   extraitEcheancier,
   lignesAffichees,
   lireEuros,
@@ -193,5 +197,62 @@ describe("apercuLicenciement", () => {
       { compte: "641", debit: 5000 },
       { compte: "512", credit: 5000 },
     ]);
+  });
+});
+
+describe("curseurMontant", () => {
+  it("va d'un pas au plus gros prêt possible, pas arrondi pour environ 100 crans", () => {
+    const c = curseurMontant(2_345_678);
+    expect(c.pas).toBe(10_000);
+    expect(c.min).toBe(10_000);
+    expect(c.max).toBe(2_340_000);
+  });
+  it("rien à emprunter : curseur vide", () => {
+    expect(curseurMontant(0)).toEqual({ min: 0, max: 0, pas: 100 });
+  });
+  it("petite capacité : le pas ne descend pas sous 1 €", () => {
+    const c = curseurMontant(5_000);
+    expect(c.pas).toBe(100);
+    expect(c.max).toBe(5_000);
+  });
+});
+
+describe("dureesProposees", () => {
+  it("donne la borne basse, chaque année pleine, puis la borne haute", () => {
+    expect(dureesProposees(6, 30)).toEqual([6, 12, 24, 30]);
+    expect(dureesProposees(12, 36)).toEqual([12, 24, 36]);
+  });
+  it("respecte les bornes de chaque objet du paramètre", () => {
+    for (const r of Object.values(regles.parObjet)) {
+      const d = dureesProposees(r.dureeMinMois, r.dureeMaxMois);
+      expect(d[0]).toBe(r.dureeMinMois);
+      expect(d[d.length - 1]).toBe(r.dureeMaxMois);
+    }
+  });
+});
+
+describe("bornesSalaire", () => {
+  it("part du SMIC du paramètre et monte jusqu'au seuil des cotisations pleines", () => {
+    const co = coefficientsSalairesDepuisParametres(params);
+    const b = bornesSalaire(co);
+    expect(b.min).toBe(co.smicMensuelBrut);
+    expect(b.max).toBe(Math.round(co.smicMensuelBrut * co.seuilCotisationsPleinesEnSmic));
+    expect(b.pas).toBeGreaterThan(0);
+  });
+});
+
+describe("apercuPaieEquipe", () => {
+  const co = coefficientsSalairesDepuisParametres(params);
+  it("additionne la paie de chaque salarié, calculée par le moteur", () => {
+    const a = apercuEmbauche({ salaireBrut: 200_000, coefficients: co, mois: 3 });
+    const b = apercuEmbauche({ salaireBrut: 300_000, coefficients: co, mois: 3 });
+    const e = apercuPaieEquipe({ salairesBruts: [200_000, 300_000], coefficients: co, mois: 3 });
+    expect(e).not.toBeNull();
+    expect(e!.coutEmployeur).toBe(a.coutEmployeur + b.coutEmployeur);
+    expect(somme(e!.paie.lignes, "debit")).toBe(somme(e!.paie.lignes, "credit"));
+    expect(somme(e!.paie.lignes, "debit")).toBe(somme(a.paie.lignes, "debit") + somme(b.paie.lignes, "debit"));
+  });
+  it("sans salarié : rien", () => {
+    expect(apercuPaieEquipe({ salairesBruts: [], coefficients: co, mois: 3 })).toBeNull();
   });
 });

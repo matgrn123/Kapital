@@ -9,8 +9,7 @@ import {
   tauxPret,
 } from "@kapital/engine";
 import { reglesPretV1 } from "@kapital/server";
-import { Carte, EcritureComptable, EncadreNotion, Kpi, Puce } from "../../../components/ui";
-import { BandeauEtape, EnTeteEcran, LigneValeur } from "../../../components/ui/lot4";
+import { BandeauEtape, Carte, EncadreNotion, EnTete, Etapes, Faits, FilRouge, Puce } from "../../../components/ui";
 import { apercuBail } from "../../../lib/apercu-lot4";
 import { formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
@@ -138,61 +137,77 @@ export default async function PageLocaux() {
 
   return (
     <div className="flex flex-col gap-5">
-      <EnTeteEcran surTitre="Immobilier d'entreprise" titre="Locaux">
+      <EnTete surTitre="Immobilier d'entreprise" titre="Locaux">
         Louer garde ta trésorerie libre. Acheter te rend propriétaire, mais immobilise de l&apos;argent et
         alourdit ta dette.
-      </EnTeteEcran>
+      </EnTete>
 
       {!local ? (
         <Carte surTitre="Aujourd'hui" titre="Pas encore de local">
-          <p className="text-[0.9rem]">
-            Tu fais fabriquer chez des façonniers : pas de loyer, mais chaque pièce coûte plus cher. Avec ton
-            propre atelier, tu installes des machines et tu embauches des artisans.
-          </p>
-          <ol className="mt-2 flex flex-col gap-1 text-[0.86rem] text-muted">
-            <li>1. Compare louer et acheter sur une offre ci-dessous.</li>
-            <li>2. Vérifie l&apos;écriture et l&apos;effet sur ta trésorerie ({formaterEuros(tresorerie)} € aujourd&apos;hui).</li>
-            <li>3. Signe : l&apos;atelier apparaît dans le village.</li>
-          </ol>
+          <div className="grid gap-4 md:grid-cols-2">
+            <p className="text-[0.9rem]">
+              Tu fais fabriquer chez des façonniers : pas de loyer, mais chaque pièce coûte plus cher. Avec ton
+              propre atelier, tu installes des machines et tu embauches des artisans.
+            </p>
+            <Etapes
+              etapes={[
+                "Compare louer et acheter sur une offre ci-dessous.",
+                `Vérifie l'écriture et l'effet sur ta trésorerie (${formaterEuros(tresorerie)} € aujourd'hui).`,
+                "Signe : l'atelier apparaît dans le village.",
+              ]}
+            />
+          </div>
         </Carte>
       ) : local.mode_detention === "bail" ? (
         <Carte surTitre="Aujourd'hui" titre={nomLocal} action={<Puce ton="accent">Locataire</Puce>}>
-          <div className="mt-1 grid grid-cols-2 gap-4 xl:grid-cols-4">
-            <Kpi libelle="Loyer" valeur={`${formaterEuros(local.loyer_mensuel_centimes)} €`} detail="par mois, compte 613" />
-            <Kpi libelle="Charges" valeur={`${formaterEuros(local.charges_mensuelles_centimes)} €`} detail="par mois, compte 614" />
-            <Kpi libelle="Dépôt de garantie" valeur={`${formaterEuros(local.depot_garantie_centimes)} €`} detail="rendu en fin de bail, compte 275" />
-            <Kpi libelle="Surface" valeur={`${local.surface_m2} m²`} detail={`${local.nombre_machines} poste(s) de travail`} />
-          </div>
-          <div className="mt-3">
-            {local.mois_fin !== null ? (
-              <p className="text-[0.9rem]">
-                Congé donné : le bail prend fin au mois de jeu {local.mois_fin}
-                {local.mois_fin > moisCourant ? ` (dans ${local.mois_fin - moisCourant} mois)` : ""}. Le loyer reste
-                dû jusque-là, puis le dépôt de garantie t&apos;est rendu.
-              </p>
-            ) : (
-              <BoutonConge preavisMois={bail.preavisMois} />
-            )}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Faits
+              lignes={[
+                ["Surface", `${local.surface_m2} m²`],
+                ["Statut", "Locataire, bail commercial"],
+                ["Loyer (613)", `${formaterEuros(local.loyer_mensuel_centimes)} € / mois`],
+                ["Charges (614)", `${formaterEuros(local.charges_mensuelles_centimes)} € / mois`],
+                ["Dépôt de garantie (275)", `${formaterEuros(local.depot_garantie_centimes)} €`],
+                ["Postes de travail", local.nombre_machines],
+              ]}
+            />
+            <div>
+              {local.mois_fin !== null ? (
+                <p className="text-[0.9rem]">
+                  Congé donné : le bail prend fin au mois de jeu {local.mois_fin}
+                  {local.mois_fin > moisCourant ? ` (dans ${local.mois_fin - moisCourant} mois)` : ""}. Le loyer reste
+                  dû jusque-là, puis le dépôt de garantie t&apos;est rendu.
+                </p>
+              ) : (
+                <BoutonConge preavisMois={bail.preavisMois} />
+              )}
+            </div>
           </div>
         </Carte>
       ) : (
         <Carte surTitre="Aujourd'hui" titre={nomLocal} action={<Puce ton="bon">Propriétaire</Puce>}>
-          <LigneValeur libelle="Prix payé (compte 213)">{formaterEuros(local.prix_achat_centimes)} €</LigneValeur>
-          <LigneValeur libelle="Apport versé">{formaterEuros(local.apport_centimes)} €</LigneValeur>
-          <LigneValeur libelle="Dette immobilière restante (164)">{formaterEuros(detteCredit)} €</LigneValeur>
-          <LigneValeur libelle="Mensualité du crédit">
-            {mensualiteCredit === null ? "aucune" : `${formaterEuros(mensualiteCredit)} € / mois`}
-          </LigneValeur>
-          <LigneValeur libelle="Charges d'entretien (614)">{formaterEuros(local.charges_mensuelles_centimes)} € / mois</LigneValeur>
-          <LigneValeur libelle="Amortissement">
-            {local.duree_amortissement_mois
-              ? `${formaterEuros(Math.round(local.prix_achat_centimes / local.duree_amortissement_mois))} € / mois sur ${local.duree_amortissement_mois} mois`
-              : "non défini"}
-          </LigneValeur>
-          <p className="mt-2 text-[0.8rem] text-muted">
-            Propriétaire, tu ne paies plus de loyer. L&apos;amortissement répartit le prix du bâtiment sur sa durée
-            de vie : c&apos;est une charge comptable, pas une sortie d&apos;argent.
-          </p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Faits
+              lignes={[
+                ["Surface", `${local.surface_m2} m²`],
+                ["Prix payé (213)", `${formaterEuros(local.prix_achat_centimes)} €`],
+                ["Apport versé", `${formaterEuros(local.apport_centimes)} €`],
+                ["Dette immobilière (164)", `${formaterEuros(detteCredit)} €`],
+                ["Mensualité du crédit", mensualiteCredit === null ? "aucune" : `${formaterEuros(mensualiteCredit)} € / mois`],
+                ["Charges d'entretien (614)", `${formaterEuros(local.charges_mensuelles_centimes)} € / mois`],
+                [
+                  "Amortissement",
+                  local.duree_amortissement_mois
+                    ? `${formaterEuros(Math.round(local.prix_achat_centimes / local.duree_amortissement_mois))} € / mois sur ${local.duree_amortissement_mois} mois`
+                    : "non défini",
+                ],
+              ]}
+            />
+            <p className="text-[0.84rem] text-muted">
+              Propriétaire, tu ne paies plus de loyer. L&apos;amortissement répartit le prix du bâtiment sur sa durée
+              de vie : c&apos;est une charge comptable, pas une sortie d&apos;argent.
+            </p>
+          </div>
         </Carte>
       )}
 
@@ -200,7 +215,7 @@ export default async function PageLocaux() {
         <>
           {verrou && <BandeauEtape verrou={verrou} action="La location d'un local" />}
           {verrouAchat && !verrou && <BandeauEtape verrou={verrouAchat} action="L'achat d'un local" />}
-          <div className="grid items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
             {offres.map((o) => (
               <CarteOffre
                 key={o.id}
@@ -235,6 +250,7 @@ export default async function PageLocaux() {
           loyer. Le dépôt de garantie, {bail.depotMoisDeLoyer} mois de loyer, revient en banque à la fin du bail.
         </EncadreNotion>
       </div>
+      <FilRouge ecran="locaux" />
     </div>
   );
 }
