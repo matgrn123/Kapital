@@ -1,5 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { EMPLACEMENTS_LIBRES, EMPLACEMENTS_FIXES, nomLisibleSociete, placerActeurs, raccourcirEnseigne, type ActeurVillage } from "./vue3d";
+import {
+  AUCUN_AUTRE_BATIMENT,
+  EMPLACEMENTS_FIXES,
+  EMPLACEMENTS_LIBRES,
+  PLAN,
+  acteursDuJoueur,
+  horsBatiments,
+  idBoutique,
+  idLocal,
+  nomLisibleSociete,
+  placerActeurs,
+  raccourcirEnseigne,
+  type ActeurVillage,
+} from "./vue3d";
 
 const A = (id: string, genre: ActeurVillage["genre"]): ActeurVillage => ({ id, genre });
 
@@ -38,9 +51,6 @@ describe("placerActeurs", () => {
     const { places } = placerActeurs(VILLAGE);
     for (let i = 0; i < places.length; i++)
       for (let j = i + 1; j < places.length; j++) expect(chevauche(places[i]!, places[j]!)).toBe(false);
-    const tous = [...Object.values(EMPLACEMENTS_FIXES), ...EMPLACEMENTS_LIBRES];
-    for (let i = 0; i < tous.length; i++)
-      for (let j = i + 1; j < tous.length; j++) expect(chevauche(tous[i]!, tous[j]!)).toBe(false);
   });
 
   it("alterne les genres pour que chacun soit représenté", () => {
@@ -59,6 +69,74 @@ describe("placerActeurs", () => {
 
   it("un village vide ne plante pas", () => {
     expect(placerActeurs([])).toEqual({ places: [], nonPlaces: [] });
+  });
+
+  it("offre au moins 8 emplacements aux acteurs du monde", () => {
+    expect(EMPLACEMENTS_LIBRES.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("place un deuxième local du joueur sur son emplacement réservé", () => {
+    const { places, nonPlaces } = placerActeurs([...VILLAGE, A("local-1", "local2")]);
+    expect(places.find((p) => p.id === "local-1")).toMatchObject(EMPLACEMENTS_FIXES.local2);
+    expect(nonPlaces).toEqual([]);
+  });
+
+  it("emplacements réservés et libres ne se chevauchent pas (la boutique remplace le terrain)", () => {
+    const { boutique, ...fixes } = EMPLACEMENTS_FIXES;
+    expect(boutique).toEqual(EMPLACEMENTS_FIXES.terrain);
+    const tous = [...Object.values(fixes), ...EMPLACEMENTS_LIBRES];
+    for (let i = 0; i < tous.length; i++)
+      for (let j = i + 1; j < tous.length; j++) expect(chevauche(tous[i]!, tous[j]!)).toBe(false);
+    for (const e of tous) {
+      expect(e.x).toBeGreaterThanOrEqual(0);
+      expect(e.y).toBeGreaterThanOrEqual(0);
+      expect(e.x + e.w).toBeLessThanOrEqual(PLAN.W);
+      expect(e.y + e.d).toBeLessThanOrEqual(PLAN.D);
+    }
+  });
+});
+
+describe("bâtiments du joueur", () => {
+  const MONDE = VILLAGE.filter((a) => !["joueur", "terrain"].includes(a.genre));
+
+  it("sans point de vente : l'atelier et le terrain du futur magasin, inchangés", () => {
+    const acteurs = acteursDuJoueur(AUCUN_AUTRE_BATIMENT);
+    expect(acteurs).toEqual([A("societe", "joueur"), A("terrain", "terrain")]);
+    const { places } = placerActeurs([...acteurs, ...MONDE]);
+    expect(places.find((p) => p.id === "terrain")).toMatchObject(EMPLACEMENTS_FIXES.terrain);
+    expect(places.some((p) => p.genre === "boutique")).toBe(false);
+  });
+
+  it("avec un point de vente : la boutique occupe le terrain, qui disparaît", () => {
+    const pdv = { id: "p1", nom: "Rue du Commerce" };
+    const acteurs = acteursDuJoueur({ locaux: [], pointsDeVente: [pdv] });
+    expect(acteurs).toEqual([A("societe", "joueur"), A(idBoutique(pdv), "boutique")]);
+    const { places, nonPlaces } = placerActeurs([...acteurs, ...MONDE]);
+    expect(places.find((p) => p.id === idBoutique(pdv))).toMatchObject(EMPLACEMENTS_FIXES.terrain);
+    expect(places.some((p) => p.genre === "terrain")).toBe(false);
+    expect(nonPlaces).toEqual([]);
+  });
+
+  it("même si le terrain est fourni, la boutique gagne ; une 2e boutique va dans la liste", () => {
+    const { places, nonPlaces } = placerActeurs([A("terrain", "terrain"), A("boutique-b", "boutique"), A("boutique-a", "boutique")]);
+    expect(places.map((p) => p.id)).toEqual(["boutique-a"]);
+    expect(nonPlaces.map((p) => p.id)).toEqual(["boutique-b"]);
+  });
+
+  it("un deuxième local devient un acteur local2", () => {
+    const local = { id: "l1", nom: "Entrepôt" };
+    expect(acteursDuJoueur({ locaux: [local], pointsDeVente: [] })).toContainEqual(A(idLocal(local), "local2"));
+  });
+});
+
+describe("horsBatiments", () => {
+  it("retire les arbres posés sur un bâtiment, garde les autres", () => {
+    const arbres = [
+      { x: 1, y: 1 },
+      { x: 5, y: 5 },
+    ];
+    expect(horsBatiments(arbres, [{ x: 0.5, y: 0.5, w: 1, d: 1 }])).toEqual([{ x: 5, y: 5 }]);
+    expect(horsBatiments(arbres, [])).toEqual(arbres);
   });
 });
 
