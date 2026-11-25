@@ -3,19 +3,14 @@
 import type { CoefficientsMarketing } from "@kapital/engine";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Bouton, EcritureComptable, Jauge } from "../../../components/ui";
-import { CLASSE_SAISIE, Champ, Choix, Ligne, NoteEcriture, Refus, Succes } from "../../../components/apercu/elements";
-import { apercuMarketing, type TypeActionMarketing } from "../../../lib/apercus";
+import { Bouton, Choix, Curseur, EcritureComptable, Jauge, Ligne, Note, Refus, Succes } from "../../../components/ui";
+import { apercuMarketing, bornesQuantite, effetsMarketing, type TypeActionMarketing } from "../../../lib/apercus";
 import { formaterEuros } from "../../../lib/formatage";
 import { ACTIONS } from "./actions";
 
 type Marque = { notoriete: number; desirabilite: number };
 
 
-function enCentimes(saisie: string): number {
-  const n = Number(saisie.replace(/\s/g, "").replace(",", "."));
-  return Number.isFinite(n) ? Math.round(n * 100) : NaN;
-}
 
 function arrondi(x: number): string {
   return x.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
@@ -37,12 +32,18 @@ export function ActionsMarketing({
 }) {
   const router = useRouter();
   const [action, setAction] = useState<TypeActionMarketing>("publicite");
-  const [montant, setMontant] = useState("500");
+  // Budget en euros entiers, du minimum d'un euro à toute la trésorerie disponible.
+  const bornes = bornesQuantite({ minimum: 1, plafonds: [tresorerie / 100] });
+  const [euros, setEuros] = useState<number>(Math.min(bornes.max, Math.max(bornes.min, Math.floor(bornes.max / 10))));
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
-  const montantCentimes = enCentimes(montant);
+  const montantCentimes = Math.min(Math.max(euros, bornes.min), bornes.max) * 100;
+  const effets = useMemo(
+    () => effetsMarketing({ montant: montantCentimes, marque, coefficients }),
+    [montantCentimes, marque, coefficients],
+  );
   const apercu = useMemo(
     () => apercuMarketing({ action, montant: montantCentimes, tresorerie, marque, coefficients }),
     [action, montantCentimes, tresorerie, marque, coefficients],
@@ -82,46 +83,60 @@ export function ActionsMarketing({
     <form onSubmit={lancer} className="flex flex-col gap-4">
       <div className="grid gap-2 sm:grid-cols-2">
         {ACTIONS.map((a) => (
-          <Choix key={a.type} actif={a.type === action} onClick={() => setAction(a.type)} titre={a.libelle}>
+          <Choix
+            key={a.type}
+            actif={a.type === action}
+            onClick={() => setAction(a.type)}
+            titre={a.libelle}
+            prix={`notoriété ${ecart(marque.notoriete + effets[a.type].notoriete, marque.notoriete)} · désirabilité ${ecart(
+              marque.desirabilite + effets[a.type].desirabilite,
+              marque.desirabilite,
+            )}`}
+          >
             {a.desc}
           </Choix>
         ))}
       </div>
 
-      <div className="max-w-[220px]">
-        <Champ libelle="Budget (€)" aide={`Trésorerie disponible : ${formaterEuros(tresorerie)} €`}>
-          <input inputMode="decimal" value={montant} onChange={(e) => setMontant(e.target.value)} className={CLASSE_SAISIE} />
-        </Champ>
-      </div>
+      <Curseur
+        libelle="Budget"
+        valeur={montantCentimes / 100}
+        min={bornes.min}
+        max={bornes.max}
+        onChange={setEuros}
+        affichage={`${formaterEuros(montantCentimes)} €`}
+        aide={`Trésorerie disponible : ${formaterEuros(tresorerie)} €. L'effet de chaque action au budget choisi s'affiche sur sa tuile.`}
+      />
 
       {apercu.ok ? (
         <div className="flex flex-col gap-3">
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2 rounded-[10px] border border-line p-3">
+            <div className="flex flex-col gap-2">
               <Jauge libelle="Notoriété aujourd'hui" valeur={marque.notoriete} max={100} texte={arrondi(marque.notoriete)} />
-              <Jauge
-                libelle="Après l'action"
-                valeur={apercu.apres.notoriete}
-                max={100}
-                texte={`${arrondi(apercu.apres.notoriete)} (${ecart(apercu.apres.notoriete, marque.notoriete)})`}
-              />
+              <Jauge libelle="Après l'action" valeur={apercu.apres.notoriete} max={100} texte={arrondi(apercu.apres.notoriete)} />
             </div>
-            <div className="flex flex-col gap-2 rounded-[10px] border border-line p-3">
+            <div className="flex flex-col gap-2">
               <Jauge libelle="Désirabilité aujourd'hui" valeur={marque.desirabilite} max={100} ton="or" texte={arrondi(marque.desirabilite)} />
               <Jauge
                 libelle="Après l'action"
                 valeur={apercu.apres.desirabilite}
                 max={100}
                 ton={apercu.apres.desirabilite < marque.desirabilite ? "critique" : "or"}
-                texte={`${arrondi(apercu.apres.desirabilite)} (${ecart(apercu.apres.desirabilite, marque.desirabilite)})`}
+                texte={arrondi(apercu.apres.desirabilite)}
               />
             </div>
           </div>
           <div>
+            <Ligne libelle="Notoriété">
+              {arrondi(marque.notoriete)} → {arrondi(apercu.apres.notoriete)}
+            </Ligne>
+            <Ligne libelle="Désirabilité" ton={apercu.apres.desirabilite < marque.desirabilite ? "critique" : undefined}>
+              {arrondi(marque.desirabilite)} → {arrondi(apercu.apres.desirabilite)}
+            </Ligne>
             <Ligne libelle="Sortie de trésorerie">tout de suite</Ligne>
             <Ligne libelle="Trésorerie après l'action">{formaterEuros(apercu.tresorerieApres)} €</Ligne>
           </div>
-          <NoteEcriture>Cette écriture est passée dès que tu lances l&apos;action :</NoteEcriture>
+          <Note>Cette écriture est passée dès que tu lances l&apos;action :</Note>
           <EcritureComptable libelle={`Marketing : ${libelle.toLowerCase()}`} etiquette="aperçu" lignes={apercu.ecriture} />
         </div>
       ) : (

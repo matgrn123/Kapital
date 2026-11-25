@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Carte, EncadreNotion, Kpi, Puce } from "../../../components/ui";
-import { EnTete, Tableau, Vide } from "../../../components/apercu/elements";
+import { Carte, EncadreNotion, EnTete, FilRouge, Kpi, Puce, Tableau, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
 import { chargerParametresV1 } from "@kapital/content";
@@ -46,7 +45,7 @@ type ProductionOrder = {
 export default async function PageAtelier() {
   const supabase = await creerClientServeur();
 
-  const { data: entreprises } = await supabase.from("companies").select("id").limit(1);
+  const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes").limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
@@ -147,6 +146,7 @@ export default async function PageAtelier() {
               produitsGrossiste={produitsGrossiste}
               delaiGrossisteMinutes={delaiMinutes}
               stockMatiere={stockMatiere}
+              tresorerie={Number(entreprise.tresorerie_centimes ?? 0)}
               params={params}
             />
           </Carte>
@@ -221,6 +221,7 @@ export default async function PageAtelier() {
             Tu paies la production avant de vendre. L&apos;argent immobilisé dans le stock, c&apos;est ton BFR. Le façonnier qui
             te facture à la livraison finance ton stock un moment : c&apos;est une dette fournisseur.
           </EncadreNotion>
+          <FilRouge ecran="production" />
         </div>
       </div>
     </div>

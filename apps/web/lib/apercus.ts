@@ -426,6 +426,40 @@ export function apercuMarketing(e: {
   };
 }
 
+/** Écart attendu sur chaque jauge pour les quatre actions, au budget donné (moteur : fluxMarque). */
+export function effetsMarketing(e: {
+  montant: number;
+  marque: { notoriete: number; desirabilite: number };
+  coefficients: CoefficientsMarketing;
+}): Record<TypeActionMarketing, { notoriete: number; desirabilite: number }> {
+  const types: TypeActionMarketing[] = ["publicite", "image_marque", "promotion", "relations_presse"];
+  const sortie = {} as Record<TypeActionMarketing, { notoriete: number; desirabilite: number }>;
+  for (const action of types) {
+    if (!entier(e.montant)) {
+      sortie[action] = { notoriete: 0, desirabilite: 0 };
+      continue;
+    }
+    const apres = fluxMarque(e.marque, 0, [{ action, montant: centimes(e.montant) }], e.coefficients);
+    sortie[action] = {
+      notoriete: apres.notoriete - e.marque.notoriete,
+      desirabilite: apres.desirabilite - e.marque.desirabilite,
+    };
+  }
+  return sortie;
+}
+
+/* -------------------------------------------------------- Bornes de curseur */
+
+/**
+ * Bornes d'un curseur de quantité : du minimum imposé (au moins 1) au plus grand
+ * plafond tiré des données (trésorerie / prix, stock de matière…), jamais sous le minimum.
+ */
+export function bornesQuantite(e: { minimum: number; plafonds: readonly number[] }): { min: number; max: number } {
+  const min = Math.max(1, Math.floor(e.minimum));
+  const valides = e.plafonds.filter((p) => Number.isFinite(p)).map((p) => Math.floor(p));
+  return { min, max: Math.max(min, ...valides) };
+}
+
 /* ------------------------------------------------------------------ Délais */
 
 /** « 2 mois de jeu (2 jours réels) », d'après le ratio des paramètres. */

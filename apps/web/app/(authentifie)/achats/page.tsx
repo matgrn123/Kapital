@@ -1,6 +1,5 @@
 import { chargerParametresV1 } from "@kapital/content";
-import { Carte, EncadreNotion, Puce } from "../../../components/ui";
-import { EnTete, Tableau, Vide } from "../../../components/apercu/elements";
+import { Carte, EncadreNotion, EnTete, Puce, Tableau, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
 import { FormulaireCommande } from "./FormulaireCommande";
@@ -32,7 +31,7 @@ type Commande = {
 export default async function PageAchats() {
   const supabase = await creerClientServeur();
 
-  const { data: entreprises } = await supabase.from("companies").select("id").limit(1);
+  const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes").limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
@@ -70,6 +69,7 @@ export default async function PageAchats() {
               fournisseurs={fournisseursTab}
               catalogue={(catalogue ?? []) as LigneCatalogue[]}
               materials={Array.from(materialsMap.entries()).map(([id, nom]) => ({ id, nom }))}
+              tresorerie={Number(entreprise.tresorerie_centimes ?? 0)}
               params={params}
             />
           </Carte>
