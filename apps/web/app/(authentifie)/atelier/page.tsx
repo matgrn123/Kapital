@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Carte, EncadreNotion, EnTete, FilRouge, Kpi, Puce, Tableau, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
+import { COLONNES_MODULES_POSES, postesPoses, type AvecModulesPoses } from "../../../lib/api-helpers";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
 import { chargerParametresV1 } from "@kapital/content";
 import { centimes, delaiGrossisteMinutes, prixGrossiste } from "@kapital/engine";
@@ -12,10 +13,9 @@ import {
   type ProduitGrossiste,
 } from "./FormulaireProduction";
 
-type Workshop = {
+type Workshop = AvecModulesPoses & {
   surface_m2: number;
   loyer_mensuel_centimes: number;
-  nombre_machines: number;
 };
 
 type Faconnier = {
@@ -52,7 +52,7 @@ export default async function PageAtelier() {
   const [{ data: workshop }, { data: faconniers }, { data: catalogueFac }, { data: ordres }, { data: produits }] = await Promise.all([
     supabase
       .from("workshops")
-      .select("surface_m2, loyer_mensuel_centimes, nombre_machines")
+      .select(`surface_m2, loyer_mensuel_centimes, ${COLONNES_MODULES_POSES}`)
       .eq("company_id", entreprise.id)
       .maybeSingle(),
     supabase.from("faconniers").select("id, nom, pays, delai_mois, minimum_commande").order("nom"),
@@ -193,10 +193,20 @@ export default async function PageAtelier() {
 
           <Carte titre="Ton atelier">
             {atelier ? (
+              <div className="flex flex-col gap-3">
               <div className="grid gap-3 sm:grid-cols-3">
                 <Kpi libelle="Surface" valeur={`${atelier.surface_m2} m²`} />
                 <Kpi libelle="Loyer mensuel" valeur={`${formaterEuros(atelier.loyer_mensuel_centimes)} €`} />
-                <Kpi libelle="Machines" valeur={atelier.nombre_machines} />
+                <Kpi libelle="Postes de travail" valeur={postesPoses(atelier)} />
+              </div>
+              <p className="text-[0.84rem] text-muted">
+                Un poste, c&apos;est une machine posée dans ton plan : un artisan par poste, pas plus. Ajoute ou
+                retire des postes dans{" "}
+                <Link href="/atelier-3d" className="text-accent underline">
+                  l&apos;aménagement de l&apos;atelier
+                </Link>
+                .
+              </p>
               </div>
             ) : (
               <div className="flex flex-col gap-3">

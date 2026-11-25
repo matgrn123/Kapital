@@ -7,6 +7,7 @@ import type {
   IdSalarie,
   MoisJeu,
 } from "./primitifs.js";
+import type { MaterielAtelier, ModulePose } from "../atelier/effetsPlan.js";
 
 export type Gamme = "entree" | "milieu" | "haut";
 export type EtapeEntreprise = 0 | 1 | 2;
@@ -64,7 +65,13 @@ export type AchatLocal = {
 export type Atelier = {
   readonly surfaceM2: number;
   readonly loyerMensuel: Centimes;
-  readonly nombreMachines: number;
+  /**
+   * 3D-3 : modules posés dans l'atelier (table placed_modules), avec ce que le catalogue en dit.
+   * Les postes équipés, le stockage et l'amortissement du matériel en découlent (atelier/effetsPlan).
+   */
+  readonly modules: readonly ModulePose[];
+  /** Soldes 2154 / 2815 du grand livre ; absent = calculé depuis les modules achetés. */
+  readonly materiel?: MaterielAtelier;
   /** Absent pour un atelier loué avant AE-5 : loyer seul, pas de dépôt. */
   readonly bail?: Bail;
   /** Présent pour un local acheté (loyerMensuel vaut alors 0, pas de bail). */

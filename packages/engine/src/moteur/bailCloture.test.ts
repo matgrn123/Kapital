@@ -5,6 +5,10 @@ import type { Entreprise } from "../types/entreprise.js";
 import { centimes, idEntreprise, moisJeu } from "../types/primitifs.js";
 import { cloturerMois } from "./cloture.js";
 import { cumulVide } from "./donneesMois.js";
+import { postesALaSignature } from "../atelier/effetsPlan.js";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 const PARAMS = chargerParametresV1();
 const FIN = { tvaAPayerCeMois: centimes(0), moisDecouvertConsecutifs: 0 };
@@ -24,7 +28,7 @@ function entreprise(o: Partial<Entreprise> = {}): Entreprise {
     atelier: {
       surfaceM2: 150,
       loyerMensuel: centimes(250_000),
-      nombreMachines: 0,
+      modules: postesALaSignature(0, MODULES_CATALOGUE),
       bail: { depotGarantie: centimes(250_000), chargesMensuelles: centimes(105_000), moisSignature: moisJeu(1), moisFin: null },
     },
     marque: { notoriete: 50, desirabilite: 50 },
@@ -110,15 +114,55 @@ describe("clôture : loyer, charges et fin de bail", () => {
   });
 });
 
-describe("anomalie signalée : amortissement des machines (681 / 2815)", () => {
-  it("l'amortissement sans immobilisation en face ne fausse pas actif = passif + résultat", () => {
+describe("3D-3 : amortissement du matériel posé (681 / 2815)", () => {
+  it("les 2 postes fournis avec le local ne sont ni à l'actif ni amortis", () => {
     const e = entreprise();
-    const r = cloturer({ ...e, atelier: { ...e.atelier!, nombreMachines: 2 } }, 5);
-    const amort = r.ecritures.find((x) => x.id.startsWith("amort_"));
-    expect(amort).toBeDefined();
-    const gl = grandLivreDe(r.ecritures);
-    // 2 machines x 5 000 € sur 60 mois = 16 667 centimes (arrondi)
-    expect(soldeCompte(gl, "681")).toBe(16_667);
-    expect(enEquilibre(gl)).toBe(true);
+    const r = cloturer({ ...e, atelier: { ...e.atelier!, modules: postesALaSignature(2, MODULES_CATALOGUE) } }, 5);
+    expect(r.ecritures.find((x) => x.id.startsWith("amort_"))).toBeUndefined();
+  });
+
+  it("achat d'un poste (2154 / 512) puis clôtures : amortissement = prix / durée, grand livre équilibré", () => {
+    const e = entreprise();
+    const poste = MODULES_CATALOGUE.find((t) => t.id === "poste_couture_base")!;
+    let gl = enregistrer(planComptableV1(), {
+      id: "achat_modules",
+      mois: moisJeu(4),
+      libelle: "Achat de modules d'aménagement",
+      lignes: [
+        { compte: "2154", sens: "debit", montant: centimes(poste.prix_centimes) },
+        { compte: "512", sens: "credit", montant: centimes(poste.prix_centimes) },
+      ],
+    });
+    let ent: Entreprise = { ...e, atelier: { ...e.atelier!, modules: postesALaSignature(3, MODULES_CATALOGUE) } };
+    const dotation = Math.round(poste.prix_centimes / poste.amortissement_mois);
+    for (const mois of [5, 6, 7]) {
+      const r = cloturer(ent, mois);
+      for (const x of r.ecritures) gl = enregistrer(gl, x);
+      expect(enEquilibre(gl)).toBe(true);
+      ent = r.entrepriseApres;
+    }
+    expect(soldeCompte(gl, "681")).toBe(3 * dotation);
+    expect(soldeCompte(gl, "2815")).toBe(3 * dotation);
+    expect(ent.atelier?.materiel).toEqual({
+      valeurBrute: poste.prix_centimes,
+      amortissementsCumules: 3 * dotation,
+    });
+  });
+
+  it("le matériel entièrement amorti ne l'est plus", () => {
+    const e = entreprise();
+    const poste = MODULES_CATALOGUE.find((t) => t.id === "poste_couture_base")!;
+    const r = cloturer(
+      {
+        ...e,
+        atelier: {
+          ...e.atelier!,
+          modules: postesALaSignature(3, MODULES_CATALOGUE),
+          materiel: { valeurBrute: centimes(poste.prix_centimes), amortissementsCumules: centimes(poste.prix_centimes) },
+        },
+      },
+      5,
+    );
+    expect(r.ecritures.find((x) => x.id.startsWith("amort_"))).toBeUndefined();
   });
 });

@@ -2,6 +2,7 @@ import type { Parametres } from "@kapital/content";
 import { enregistrer, planComptableV1 } from "../comptabilite/index.js";
 import type { EcritureComptable, GrandLivre } from "../comptabilite/types.js";
 import { capaciteMinutes, rendement } from "../atelier/calculs.js";
+import { postesEquipesAtelier } from "../atelier/effetsPlan.js";
 import { artisansAuPoste } from "../personnel/postes.js";
 import { calculerVentesMois } from "../marche/ventesMois.js";
 import { coefficientsMarketingDepuisParametres, fluxMarque } from "../marketing/index.js";
@@ -181,7 +182,9 @@ export function planProductionDuMois(ent: Entreprise, params: Parametres): reado
   if (ent.atelier === null) return [];
   // AE-7 : seuls les artisans qui occupent un poste équipé produisent et comptent dans le
   // rendement (les plus expérimentés d'abord) ; embaucher sans poste libre ne change rien.
-  const artisans = artisansAuPoste(ent.salaries, ent.atelier.nombreMachines);
+  // 3D-3 : les postes sont les modules réellement posés dans le plan d'aménagement.
+  const postesEquipes = postesEquipesAtelier(ent.atelier);
+  const artisans = artisansAuPoste(ent.salaries, postesEquipes);
   const nbArtisans = artisans.length;
   if (nbArtisans === 0) return [];
 
@@ -193,7 +196,7 @@ export function planProductionDuMois(ent: Entreprise, params: Parametres): reado
   const rendementEffectif = rendement(avgExperience, rMin, rMax, tau);
   let capaciteRestante = capaciteMinutes(
     nbArtisans,
-    ent.atelier.nombreMachines,
+    postesEquipes,
     heuresMensuelles,
     rendementEffectif,
   );

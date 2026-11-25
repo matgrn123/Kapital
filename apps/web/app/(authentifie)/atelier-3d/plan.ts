@@ -8,7 +8,17 @@
 // retranche 1 uniquement au moment de dessiner.
 
 import type { EffetModule, Parametres, TypeModule } from "@kapital/content";
-import { artisansAuPoste, capaciteMinutes, idSalarie, centimes, rendement, validerPlanEtage, type ResultatValidation } from "@kapital/engine";
+import {
+  artisansAuPoste,
+  capaciteMinutes,
+  centimes,
+  effetsPlan,
+  idSalarie,
+  rendement,
+  resoudreModules,
+  validerPlanEtage,
+  type ResultatValidation,
+} from "@kapital/engine";
 import { TAILLE_MEUBLE as TAILLES, type TypeMeuble } from "../../../components/iso/interieur";
 
 export type ModulePlace = { module_type_id: string; x: number; y: number; pivote: boolean };
@@ -48,8 +58,6 @@ export function apercuPlacement(
   return validerPlan(atelier, [...plan, candidat], catalogue);
 }
 
-const estPoste = (e: EffetModule) => e.type === "poste_artisan" || e.type === "poste_artisan_specialise";
-
 function lire(p: Parametres, cle: string): number {
   const v = p[cle];
   if (!v) throw new Error(`Paramètre manquant : ${cle}`);
@@ -75,9 +83,13 @@ export function resumeProduction(
   catalogue: readonly TypeModule[],
   parametres: Parametres,
 ): ResumeProduction {
-  const types = plan.map((m) => catalogue.find((c) => c.id === m.module_type_id)).filter((t): t is TypeModule => !!t);
-  const postes = types.filter((t) => estPoste(t.effet)).length;
-  const stockageM3 = types.reduce((s, t) => s + (t.effet.type === "stockage" ? t.effet.capacite_m3 : 0), 0);
+  // 3D-3 : même calcul que le moteur à la clôture (atelier/effetsPlan) : postes équipés, stockage.
+  const { postesEquipes: postes, stockageM3 } = effetsPlan(
+    resoudreModules(
+      plan.map((m) => ({ id_type: m.module_type_id, x: m.x, y: m.y, pivote: m.pivote })),
+      catalogue,
+    ),
+  );
 
   const heures = lire(parametres, "heures_mensuelles_legales");
   const rMin = lire(parametres, "rendement_atelier_min");

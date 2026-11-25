@@ -8,6 +8,10 @@ import {
 import { describe, expect, it } from "vitest";
 import { validerDecision } from "./validerDecision.js";
 import type { ContexteValidation } from "./types.js";
+import { postesALaSignature } from "@kapital/engine";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 function salarie(id: string, over: Partial<Salarie> = {}): Salarie {
   return {
@@ -33,7 +37,7 @@ function ctx(over: Partial<Entreprise> = {}): ContexteValidation {
       stocksMatiere: [],
       stocksFinis: [],
       salaries: [salarie("a")],
-      atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), nombreMachines: 1 },
+      atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(1, MODULES_CATALOGUE) },
       marque: { notoriete: 40, desirabilite: 40 },
       prets: [],
       catalogue: [],
@@ -42,10 +46,48 @@ function ctx(over: Partial<Entreprise> = {}): ContexteValidation {
   };
 }
 
-describe("AE-7 : embauche sans poste libre", () => {
-  it("est acceptée (le salarié sera payé) : le moteur l'écarte de la production", () => {
-    // 1 machine, 1 artisan déjà en place : plus aucun poste libre.
-    const r = validerDecision(ctx(), { type: "embauche", poste: "artisan", salaireBrutMensuel: centimes(200_000) });
+describe("3D-3 : embauche sans poste libre", () => {
+  const artisan = { type: "embauche", poste: "artisan", salaireBrutMensuel: centimes(200_000) } as const;
+
+  it("est refusée pour un artisan, avec un message qui renvoie à l'écran Atelier", () => {
+    // 1 poste posé, 1 artisan déjà en place : plus aucun poste libre.
+    const r = validerDecision(ctx(), artisan);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe("aucun_poste_libre");
+      expect(r.message).toContain("Pose d'abord un poste de travail dans ton atelier");
+    }
+  });
+
+  it("2 postes posés et 2 artisans : le 3e artisan est refusé", () => {
+    const r = validerDecision(
+      ctx({
+        salaries: [salarie("a"), salarie("b")],
+        atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(2, MODULES_CATALOGUE) },
+      }),
+      artisan,
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it("aucun module posé : même le premier artisan est refusé", () => {
+    const r = validerDecision(
+      ctx({ salaries: [], atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), modules: [] } }),
+      artisan,
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it("un poste libre : l'artisan est accepté", () => {
+    const r = validerDecision(
+      ctx({ atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(2, MODULES_CATALOGUE) } }),
+      artisan,
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it("un encadrant n'occupe pas de poste : il reste embauchable", () => {
+    const r = validerDecision(ctx(), { type: "embauche", poste: "encadrement", salaireBrutMensuel: centimes(300_000) });
     expect(r.ok).toBe(true);
   });
 });

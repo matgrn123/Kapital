@@ -21,6 +21,10 @@ import {
   type LivraisonFaconnier,
   type LivraisonMatiere,
 } from "./simulerMois.js";
+import { postesALaSignature, resoudreModules } from "../atelier/effetsPlan.js";
+import { chargerModulesV1 } from "@kapital/content";
+
+const MODULES_CATALOGUE = chargerModulesV1();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -469,7 +473,7 @@ describe("simulerMoisEntreprise — charges fixes", () => {
     const atelier: Atelier = {
       surfaceM2: 100,
       loyerMensuel: centimes(200000), // 2000€
-      nombreMachines: 2,
+      modules: postesALaSignature(2, MODULES_CATALOGUE),
     };
     const ent: Entreprise = {
       ...entreprisePnjBase(),
@@ -494,7 +498,7 @@ describe("simulerMoisEntreprise — charges fixes", () => {
     const atelier: Atelier = {
       surfaceM2: 100,
       loyerMensuel: centimes(200000),
-      nombreMachines: 3,
+      modules: postesALaSignature(3, MODULES_CATALOGUE),
     };
     const ent: Entreprise = {
       ...entreprisePnjBase(),
@@ -511,15 +515,19 @@ describe("simulerMoisEntreprise — charges fixes", () => {
     );
     const ecEnergie = result.ecritures.find((e) => e.id === `energie_${MOIS_1}_ent_test`);
     expect(ecEnergie).toBeDefined();
-    // 3 machines × 100 kwh × 16 centimes = 4800 centimes
+    // 3 postes posés × 100 kWh × 16 centimes = 4800 centimes (paramètres energie_kwh_par_poste_mois, prix_electricite_pro)
     expect(ecEnergie!.lignes.find((l) => l.compte === "606" && l.sens === "debit")?.montant).toBe(4800);
   });
 
-  it("amortissement machines : 681 débit, 2815 crédit (non-cash)", () => {
+  it("amortissement du matériel acheté : 681 débit, 2815 crédit (non-cash)", () => {
+    // 2 postes fournis avec le local (pas amortis) + 1 table de coupe achetée.
     const atelier: Atelier = {
       surfaceM2: 100,
       loyerMensuel: centimes(200000),
-      nombreMachines: 2,
+      modules: [
+        ...postesALaSignature(2, MODULES_CATALOGUE),
+        ...resoudreModules([{ id_type: "table_coupe_simple", x: 2, y: 4, pivote: true }], MODULES_CATALOGUE),
+      ],
     };
     const ent: Entreprise = {
       ...entreprisePnjBase(),
@@ -536,8 +544,8 @@ describe("simulerMoisEntreprise — charges fixes", () => {
     );
     const ecAmort = result.ecritures.find((e) => e.id === `amort_${MOIS_1}_ent_test`);
     expect(ecAmort).toBeDefined();
-    // 2 machines × 500000c / 60 = 16666c
-    const expectedAmort = Math.round((500000 * 2) / 60);
+    const table = MODULES_CATALOGUE.find((t) => t.id === "table_coupe_simple")!;
+    const expectedAmort = Math.round(table.prix_centimes / table.amortissement_mois);
     expect(ecAmort!.lignes.find((l) => l.compte === "681" && l.sens === "debit")?.montant).toBe(expectedAmort);
     expect(ecAmort!.lignes.find((l) => l.compte === "2815" && l.sens === "credit")?.montant).toBe(expectedAmort);
   });

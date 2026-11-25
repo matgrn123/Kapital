@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { chargerModulesV1, type TypeModule } from "@kapital/content";
 import {
   centimes,
+  resoudreModules,
   idEntreprise,
   idMatiere,
   idPret,
@@ -16,6 +18,8 @@ import {
   type DonneesFinMois,
   type Entreprise,
   type FicheFabrication,
+  type MaterielAtelier,
+  type ModulePose,
 } from "@kapital/engine";
 import {
   ErreurPasDejaTraite,
@@ -40,6 +44,42 @@ type LigneProduitNomenclature = {
 
 const COLONNES_NOMENCLATURE =
   "products(matiere_id, consommation_par_piece, fournitures_par_piece_centimes, temps_standard_minutes)";
+
+// ---------------------------------------------------------------------------
+// 3D-3 : modules posés (placed_modules) et matériel au bilan (2154 / 2815)
+// ---------------------------------------------------------------------------
+
+export type LigneModulePose = {
+  module_type_id: string;
+  x: number;
+  y: number;
+  pivote: boolean | null;
+};
+
+/** Modules posés lus en base, complétés par le catalogue modules-v1 (effet, prix, durée). */
+export function modulesDepuisLignes(
+  lignes: readonly LigneModulePose[] | null | undefined,
+  catalogue: readonly TypeModule[],
+): ModulePose[] {
+  return resoudreModules(
+    (lignes ?? []).map((m) => ({ id_type: m.module_type_id, x: m.x, y: m.y, pivote: m.pivote ?? false })),
+    catalogue,
+  );
+}
+
+/** Soldes 2154 (débit) et 2815 (crédit) à partir des lignes du grand livre. */
+export function materielDepuisLedger(
+  lignes: readonly { compte: string; sens: string; montant_centimes: number }[],
+): MaterielAtelier {
+  let brut = 0;
+  let amorti = 0;
+  for (const l of lignes) {
+    const signe = l.sens === "debit" ? 1 : -1;
+    if (l.compte === "2154") brut += signe * Number(l.montant_centimes);
+    if (l.compte === "2815") amorti -= signe * Number(l.montant_centimes);
+  }
+  return { valeurBrute: centimes(brut), amortissementsCumules: centimes(amorti) };
+}
 
 /** Une jointure PostgREST rend un objet, parfois une liste d'un élément. */
 function uneLigne<T>(v: T | T[] | null | undefined): T | null {
@@ -246,7 +286,7 @@ export class StockageSupabase implements StockageMonde {
   }
 
   async chargerEtat(companyId: string, moisEnCours: number): Promise<EtatChargeEntreprise> {
-    const [companyR, matR, pfR, empR, atelierR, pretsR, produitsR, marqueR, etatR] =
+    const [companyR, matR, pfR, empR, atelierR, pretsR, produitsR, marqueR, etatR, materielR] =
       await Promise.all([
         this.supabase
           .from("companies")
@@ -268,7 +308,7 @@ export class StockageSupabase implements StockageMonde {
           .eq("statut", "actif"),
         this.supabase
           .from("workshops")
-          .select("surface_m2, loyer_mensuel_centimes, nombre_machines, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin, mode_detention, prix_achat_centimes, apport_centimes, mois_achat, duree_amortissement_mois")
+          .select("surface_m2, loyer_mensuel_centimes, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin, mode_detention, prix_achat_centimes, apport_centimes, mois_achat, duree_amortissement_mois, placed_modules(module_type_id, x, y, pivote)")
           .eq("company_id", companyId)
           .maybeSingle(),
         this.supabase
@@ -290,6 +330,11 @@ export class StockageSupabase implements StockageMonde {
           .select("cumul")
           .eq("company_id", companyId)
           .maybeSingle(),
+        this.supabase
+          .from("ledger_entries")
+          .select("compte, sens, montant_centimes")
+          .eq("company_id", companyId)
+          .in("compte", ["2154", "2815"]),
       ]);
 
     const company = verifier("companies", companyR) as LigneCompany | null;
@@ -305,7 +350,8 @@ export class StockageSupabase implements StockageMonde {
       anciennete_mois_debut: number; experience_mois_debut: number; mois_jeu_debut: number | null;
     }>;
     const workshop = verifier("workshops", atelierR) as {
-      surface_m2: number; loyer_mensuel_centimes: number; nombre_machines: number;
+      surface_m2: number; loyer_mensuel_centimes: number;
+      placed_modules: LigneModulePose[] | null;
       depot_garantie_centimes: number; charges_mensuelles_centimes: number;
       mois_signature: number | null; mois_fin: number | null;
       mode_detention: string; prix_achat_centimes: number; apport_centimes: number;
@@ -322,6 +368,10 @@ export class StockageSupabase implements StockageMonde {
     }>;
     const marque = verifier("brand_state", marqueR) as { notoriete: number; desirabilite: number } | null;
     const etat = verifier("etat_mois_entreprise", etatR) as { cumul: CumulMois } | null;
+    const materiel = materielDepuisLedger(
+      (verifier("ledger 2154 / 2815", materielR) ?? []) as Array<{ compte: string; sens: string; montant_centimes: number }>,
+    );
+    const modules = modulesDepuisLignes(workshop?.placed_modules, chargerModulesV1());
 
     const entreprise: Entreprise = {
       id: idEntreprise(company.id),
@@ -362,7 +412,8 @@ export class StockageSupabase implements StockageMonde {
           ? {
               surfaceM2: workshop.surface_m2,
               loyerMensuel: centimes(workshop.loyer_mensuel_centimes),
-              nombreMachines: workshop.nombre_machines,
+              modules,
+              materiel,
               bail: {
                 depotGarantie: centimes(Number(workshop.depot_garantie_centimes)),
                 chargesMensuelles: centimes(Number(workshop.charges_mensuelles_centimes)),
@@ -374,7 +425,8 @@ export class StockageSupabase implements StockageMonde {
               // Local acheté à crédit (AE-6) : plus de loyer, une immobilisation à amortir.
               surfaceM2: workshop.surface_m2,
               loyerMensuel: centimes(0),
-              nombreMachines: workshop.nombre_machines,
+              modules,
+              materiel,
               achat: {
                 prixAchat: centimes(Number(workshop.prix_achat_centimes)),
                 apport: centimes(Number(workshop.apport_centimes)),
