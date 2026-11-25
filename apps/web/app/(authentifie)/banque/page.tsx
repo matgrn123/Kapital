@@ -1,6 +1,5 @@
 import { reglesPretV1 } from "@kapital/server";
-import { Carte, EncadreNotion, Kpi } from "../../../components/ui";
-import { EnTeteEcran, LigneValeur } from "../../../components/ui/lot4";
+import { Carte, EncadreNotion, EnTete, FilRouge, Ligne } from "../../../components/ui";
 import { formaterDate, formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { lireEstrAnnuel } from "../_partage/estr";
@@ -76,17 +75,10 @@ export default async function PageBanque() {
 
   return (
     <div className="flex flex-col gap-5">
-      <EnTeteEcran surTitre="Financement" titre="Banque et prêt">
+      <EnTete surTitre="Banque du Quai" titre="Banque et prêt">
         Emprunter permet d&apos;investir sans attendre. La banque regarde l&apos;objet du prêt et ta
         trésorerie : ta dette totale ne peut pas dépasser un multiple de ce que tu as en caisse.
-      </EnTeteEcran>
-
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <Kpi libelle="Trésorerie" valeur={`${formaterEuros(tresorerie)} €`} detail="Compte 512 Banque" ton={tresorerie < 0 ? "critique" : "neutre"} />
-        <Kpi libelle="Dette en cours" valeur={`${formaterEuros(detteTotale)} €`} detail="Compte 164 Emprunts" />
-        <Kpi libelle="Prêts actifs" valeur={pretActifs.length} />
-        <Kpi libelle="€STR du mois" valeur={pourcent(Math.max(estrAnnuel, 0))} detail="Taux de la BCE, base de tous les prêts" />
-      </div>
+      </EnTete>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <FormulairePret
@@ -100,19 +92,23 @@ export default async function PageBanque() {
 
         <div className="flex flex-col gap-4">
           <Carte titre="Tes prêts en cours">
+            <Ligne libelle="Trésorerie (512)">{formaterEuros(tresorerie)} €</Ligne>
+            <Ligne libelle="Dette en cours (164)" fort>
+              {formaterEuros(detteTotale)} €
+            </Ligne>
             {pretActifs.length === 0 ? (
-              <p className="text-[0.88rem] text-muted">
+              <p className="mt-2 text-[0.88rem] text-muted">
                 Aucun prêt pour l&apos;instant. Simule un prêt à gauche : tu vois la mensualité et l&apos;écriture
                 avant de signer.
               </p>
             ) : (
               pretActifs.map((p) => (
-                <LigneValeur
+                <Ligne
                   key={p.id}
                   libelle={`${OBJETS[p.objet ?? ""] ?? "Prêt"} de ${formaterEuros(p.capital_initial_centimes)} € sur ${p.duree_mois} mois à ${pourcent(p.taux_annuel)}`}
                 >
                   {formaterEuros(p.capital_restant_centimes)} € restants
-                </LigneValeur>
+                </Ligne>
               ))
             )}
           </Carte>
@@ -151,6 +147,7 @@ export default async function PageBanque() {
             Seuls les intérêts sont une charge (compte 661). La part de capital remboursée diminue ta dette au
             passif (164) et ta trésorerie à l&apos;actif (512) : le résultat ne bouge pas.
           </EncadreNotion>
+          <FilRouge ecran="banque" />
         </div>
       </div>
     </div>

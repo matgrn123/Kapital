@@ -3,17 +3,22 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { capaciteEmprunt, centimes, tauxPret, type ObjetPret, type ReglesPret } from "@kapital/engine";
-import { Bouton, Carte, EcritureComptable, Jauge } from "../../../components/ui";
 import {
   BandeauEtape,
-  classeChamp,
-  classeEtiquette,
+  Bouton,
+  Carte,
+  CLASSE_SAISIE,
+  Champ,
+  Curseur,
+  EcritureComptable,
+  Jauge,
   Message,
-  NoteMoteur,
+  Note,
   Options,
   Resultat,
-} from "../../../components/ui/lot4";
-import { apercuPret, extraitEcheancier, lireEuros } from "../../../lib/apercu-lot4";
+  Tableau,
+} from "../../../components/ui";
+import { apercuPret, curseurMontant, dureesProposees, extraitEcheancier } from "../../../lib/apercu-lot4";
 import { formaterEuros } from "../../../lib/formatage";
 import { appelerAction } from "../_partage/reponses";
 import type { VerrouAffiche } from "../_partage/verrou";
@@ -43,19 +48,23 @@ export function FormulairePret({
 }) {
   const router = useRouter();
   const [objet, setObjet] = useState<ObjetPret>("tresorerie");
-  const [capital, setCapital] = useState("10000");
   const [duree, setDuree] = useState(String(regles.parObjet.tresorerie.dureeMinMois));
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [succes, setSucces] = useState<string | null>(null);
 
   const regle = regles.parObjet[objet];
-  const capitalCentimes = lireEuros(capital);
   const dureeN = Number.parseInt(duree, 10);
   const capacite = useMemo(
     () => capaciteEmprunt({ tresorerie: centimes(tresorerieActuelle), detteEnCours: centimes(detteActuelle) }, objet, regles),
     [tresorerieActuelle, detteActuelle, objet, regles],
   );
+  // Curseur : de la plus petite valeur au plus gros prêt que le moteur accepte aujourd'hui.
+  const curseur = curseurMontant(capacite.montantMaximal);
+  const [montantChoisi, setMontantChoisi] = useState<number | null>(null);
+  const milieu = Math.max(curseur.min, Math.floor(curseur.max / 2 / curseur.pas) * curseur.pas);
+  const capitalCentimes: number | null =
+    curseur.max <= 0 ? null : Math.min(curseur.max, Math.max(curseur.min, montantChoisi ?? milieu));
   const apercu = useMemo(
     () =>
       apercuPret({
@@ -70,12 +79,12 @@ export function FormulairePret({
     [tresorerieActuelle, detteActuelle, objet, capitalCentimes, dureeN, estrAnnuel, moisCourant, regles],
   );
   const sim = apercu.simulation;
-  const refus = capitalCentimes === null ? "Indique un montant en euros, supérieur à zéro." : apercu.evaluation.ok ? null : apercu.evaluation.message;
+  const refus = capitalCentimes === null ? "Ta capacité d'emprunt est nulle aujourd'hui pour cet objet." : apercu.evaluation.ok ? null : apercu.evaluation.message;
 
   function choisirObjet(o: ObjetPret) {
     setObjet(o);
     const r = regles.parObjet[o];
-    if (!(dureeN >= r.dureeMinMois && dureeN <= r.dureeMaxMois)) setDuree(String(r.dureeMinMois));
+    if (!dureesProposees(r.dureeMinMois, r.dureeMaxMois).includes(dureeN)) setDuree(String(r.dureeMinMois));
   }
 
   async function demander(e: React.FormEvent) {
@@ -106,32 +115,38 @@ export function FormulairePret({
       <form onSubmit={demander} className="flex flex-col gap-4">
         {verrou && <BandeauEtape verrou={verrou} action="L'emprunt" />}
 
-        <div className="flex flex-col gap-1.5">
-          <span className={classeEtiquette}>Objet du prêt</span>
-          <Options
-            libelle="Objet du prêt"
-            valeur={objet}
-            onChange={choisirObjet}
-            options={OBJETS.map((o) => ({
-              id: o.id,
-              titre: `${o.libelle} · ${pourcent(tauxPret(o.id, estrAnnuel, regles))}`,
-              detail: o.aide,
-            }))}
-          />
-        </div>
+        <Options
+          libelle="Objet du prêt"
+          valeur={objet}
+          onChange={choisirObjet}
+          options={OBJETS.map((o) => ({
+            id: o.id,
+            titre: o.libelle,
+            detail: o.aide,
+            prix: `Taux ${pourcent(tauxPret(o.id, estrAnnuel, regles))}`,
+          }))}
+        />
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1.5" htmlFor="pret-capital">
-            <span className={classeEtiquette}>Montant (€)</span>
-            <input id="pret-capital" type="text" inputMode="decimal" value={capital} onChange={(e) => setCapital(e.target.value)} className={classeChamp} />
-            <span className="text-[0.78rem] text-muted">Au plus {formaterEuros(capacite.montantMaximal)} € aujourd&apos;hui.</span>
-          </label>
-          <label className="flex flex-col gap-1.5" htmlFor="pret-duree">
-            <span className={classeEtiquette}>Durée (mois)</span>
-            <input id="pret-duree" type="number" min={regle.dureeMinMois} max={regle.dureeMaxMois} value={duree} onChange={(e) => setDuree(e.target.value)} className={classeChamp} />
-            <span className="text-[0.78rem] text-muted">De {regle.dureeMinMois} à {regle.dureeMaxMois} mois pour cet objet.</span>
-          </label>
-        </div>
+        <Curseur
+          libelle="Montant"
+          valeur={capitalCentimes ?? 0}
+          min={curseur.min}
+          max={curseur.max}
+          pas={curseur.pas}
+          onChange={setMontantChoisi}
+          affichage={`${formaterEuros(capitalCentimes ?? 0)} €`}
+          aide={`Jusqu'à ${formaterEuros(capacite.montantMaximal)} € aujourd'hui : le plus gros prêt que la banque accepte pour cet objet.`}
+        />
+
+        <Champ libelle="Durée" aide={`De ${regle.dureeMinMois} à ${regle.dureeMaxMois} mois pour cet objet.`}>
+          <select value={duree} onChange={(e) => setDuree(e.target.value)} className={CLASSE_SAISIE}>
+            {dureesProposees(regle.dureeMinMois, regle.dureeMaxMois).map((d) => (
+              <option key={d} value={d}>
+                {d} mois{d % 12 === 0 ? ` (${d / 12} an${d > 12 ? "s" : ""})` : ""}
+              </option>
+            ))}
+          </select>
+        </Champ>
 
         <div className="grid gap-3 sm:grid-cols-3">
           <Resultat
@@ -144,36 +159,31 @@ export function FormulairePret({
         </div>
 
         {sim && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[0.86rem]">
-              <thead className="text-[0.7rem] uppercase tracking-[0.06em] text-muted">
-                <tr>
-                  <th className="py-1 text-left font-semibold">Échéance</th>
-                  <th className="py-1 text-right font-semibold">Mensualité</th>
-                  <th className="py-1 text-right font-semibold">Intérêts</th>
-                  <th className="py-1 text-right font-semibold">Capital</th>
-                  <th className="py-1 text-right font-semibold">Restant dû</th>
+          <Tableau
+            entetes={[
+              { texte: "Échéance" },
+              { texte: "Mensualité", droite: true },
+              { texte: "Intérêts", droite: true },
+              { texte: "Capital", droite: true },
+              { texte: "Restant dû", droite: true },
+            ]}
+          >
+            {lignesEcheancier.map((e, i) =>
+              e === null ? (
+                <tr key={`trou-${i}`} className="text-muted">
+                  <td colSpan={5}>…</td>
                 </tr>
-              </thead>
-              <tbody>
-                {lignesEcheancier.map((e, i) =>
-                  e === null ? (
-                    <tr key={`trou-${i}`} className="border-t border-line text-muted">
-                      <td colSpan={5} className="py-1">…</td>
-                    </tr>
-                  ) : (
-                    <tr key={e.numero} className="border-t border-line tabular-nums">
-                      <td className="py-1.5">{e.numero}</td>
-                      <td className="py-1.5 text-right">{formaterEuros(e.montant)} €</td>
-                      <td className="py-1.5 text-right">{formaterEuros(e.interets)} €</td>
-                      <td className="py-1.5 text-right">{formaterEuros(e.amortissement)} €</td>
-                      <td className="py-1.5 text-right">{formaterEuros(e.capitalRestantApres)} €</td>
-                    </tr>
-                  ),
-                )}
-              </tbody>
-            </table>
-          </div>
+              ) : (
+                <tr key={e.numero}>
+                  <td>{e.numero}</td>
+                  <td className="text-right">{formaterEuros(e.montant)} €</td>
+                  <td className="text-right">{formaterEuros(e.interets)} €</td>
+                  <td className="text-right">{formaterEuros(e.amortissement)} €</td>
+                  <td className="text-right">{formaterEuros(e.capitalRestantApres)} €</td>
+                </tr>
+              ),
+            )}
+          </Tableau>
         )}
 
         <Jauge
@@ -204,9 +214,9 @@ export function FormulairePret({
           <Bouton type="submit" variante="principal" disabled={enCours || verrou !== null || refus !== null}>
             {enCours ? "Signature…" : "Signer l'offre de prêt"}
           </Bouton>
-          <NoteMoteur>
+          <Note>
             Le serveur revérifie ta capacité au moment de signer et prend l&apos;€STR du jour.
-          </NoteMoteur>
+          </Note>
         </div>
       </form>
     </Carte>

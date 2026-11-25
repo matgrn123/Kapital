@@ -237,3 +237,32 @@ export function apercuLicenciement(a: { indemnite: number; mois: number; idSalar
   const e = ecritureLicenciement("apercu", moisJeu(a.mois), versIdSalarie(a.idSalarie), centimes(a.indemnite));
   return e ? affichee(e) : null;
 }
+
+/* ------------------------------------------------- Bornes des curseurs */
+
+// Réglages d'affichage seulement (finesse d'un curseur) : aucune règle métier ici.
+const CRANS_VISES = 100;
+const PAS_MINIMAL = 100; // 1 €
+const MOIS_PAR_AN = 12;
+
+/** Curseur de montant : d'un pas au plus gros prêt du moteur, pas arrondi (1, 10, 100… €). */
+export function curseurMontant(maximum: number): { min: number; max: number; pas: number } {
+  if (!(maximum > 0)) return { min: 0, max: 0, pas: PAS_MINIMAL };
+  const pas = Math.max(PAS_MINIMAL, 10 ** Math.floor(Math.log10(maximum / CRANS_VISES)));
+  const max = Math.floor(maximum / pas) * pas;
+  return max < pas ? { min: maximum, max: maximum, pas: PAS_MINIMAL } : { min: pas, max, pas };
+}
+
+/** Durées de la liste déroulante : borne basse, chaque année pleine entre les deux, borne haute. */
+export function dureesProposees(minMois: number, maxMois: number): number[] {
+  const d = new Set<number>([minMois]);
+  for (let m = Math.ceil(minMois / MOIS_PAR_AN) * MOIS_PAR_AN; m < maxMois; m += MOIS_PAR_AN) if (m > minMois) d.add(m);
+  d.add(maxMois);
+  return [...d].sort((a, b) => a - b);
+}
+
+/** Curseur de salaire brut : du SMIC (paramètre) au seuil des cotisations pleines (paramètre). */
+export function bornesSalaire(c: CoefficientsSalaires): { min: number; max: number; pas: number } {
+  const min = c.smicMensuelBrut;
+  return { min, max: Math.round(min * c.seuilCotisationsPleinesEnSmic), pas: PAS_MINIMAL };
+}
