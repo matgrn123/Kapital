@@ -1,5 +1,6 @@
 import { chargerBatimentsV1, chargerModulesV1, chargerParametresV1 } from "@kapital/content";
 import { BoutonLien, Carte, EnTete, Etapes } from "../../../components/ui";
+import { postesFournisDepuisParametres, valeurNetteMaterielEnService } from "../../../lib/amenagement";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { EcranAtelier } from "./EcranAtelier";
 import type { ModulePlace } from "./plan";
@@ -7,6 +8,8 @@ import type { SalarieFiche } from "./salaries";
 
 // Écran « L'atelier » (design V2, maquette V.atelier), dessiné en SVG isométrique.
 // placed_modules.x / y comptent les cases à partir de 1 (convention de validerPlanEtage).
+// 3D-5 : placed_modules.statut sépare le plan en service ('actif') du plan prévu ('prevu'),
+// appliqué à la clôture du mois de jeu (migration 0037).
 
 type Employe = {
   id: string;
@@ -20,14 +23,14 @@ type Employe = {
 
 export default async function PageAtelier() {
   const supabase = await creerClientServeur();
-  const { data: entreprises } = await supabase.from("companies").select("id, nom").limit(1);
-  const entreprise = entreprises?.[0] as { id: string; nom: string } | undefined;
+  const { data: entreprises } = await supabase.from("companies").select("id, nom, tresorerie_centimes").limit(1);
+  const entreprise = entreprises?.[0] as { id: string; nom: string; tresorerie_centimes: number } | undefined;
   if (!entreprise) return null;
 
   const [{ data: workshop }, { data: employes }, { data: monde }] = await Promise.all([
     supabase
       .from("workshops")
-      .select("id, batiment_id, surface_m2, largeur_grille, hauteur_grille, entree_x, entree_y")
+      .select("id, batiment_id, surface_m2, largeur_grille, hauteur_grille, entree_x, entree_y, plan_prevu_mois, plan_prevu_cout_centimes")
       .eq("company_id", entreprise.id)
       .maybeSingle(),
     supabase
@@ -56,12 +59,31 @@ export default async function PageAtelier() {
     );
   }
 
-  const w = workshop as { id: string; batiment_id: string | null; surface_m2: number; largeur_grille: number; hauteur_grille: number; entree_x: number; entree_y: number };
-  const { data: places } = await supabase
-    .from("placed_modules")
-    .select("module_type_id, x, y, pivote")
-    .eq("workshop_id", w.id)
-    .order("cree_le");
+  const w = workshop as {
+    id: string; batiment_id: string | null; surface_m2: number; largeur_grille: number; hauteur_grille: number;
+    entree_x: number; entree_y: number; plan_prevu_mois: number | null; plan_prevu_cout_centimes: number | null;
+  };
+  const [{ data: places }, { data: materiel }] = await Promise.all([
+    supabase
+      .from("placed_modules")
+      .select("module_type_id, x, y, pivote, statut")
+      .eq("workshop_id", w.id)
+      .order("cree_le"),
+    supabase
+      .from("ledger_entries")
+      .select("compte, sens, montant_centimes")
+      .eq("company_id", entreprise.id)
+      .in("compte", ["2154", "2815"]),
+  ]);
+  const lignes = (places ?? []) as (ModulePlace & { statut: string | null })[];
+  const versPlan = (statut: string) =>
+    lignes
+      .filter((m) => (m.statut ?? "actif") === statut)
+      .map((m) => ({ module_type_id: m.module_type_id, x: m.x, y: m.y, pivote: !!m.pivote }));
+  const planActif = versPlan("actif");
+  const aPlanPrevu = w.plan_prevu_mois !== null && w.plan_prevu_mois !== undefined;
+  const coutPlanPrevu = aPlanPrevu ? Number(w.plan_prevu_cout_centimes ?? 0) : 0;
+  const parametres = chargerParametresV1();
 
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
   const salaries: SalarieFiche[] = ((employes ?? []) as Employe[]).map((e) => {
@@ -84,10 +106,18 @@ export default async function PageAtelier() {
       surfaceM2={w.surface_m2}
       workshopId={w.id}
       atelier={{ largeur: w.largeur_grille, hauteur: w.hauteur_grille, entree_x: w.entree_x, entree_y: w.entree_y }}
-      planInitial={((places ?? []) as ModulePlace[]).map((m) => ({ ...m, pivote: !!m.pivote }))}
+      planActif={planActif}
+      planPrevu={aPlanPrevu ? versPlan("prevu") : null}
+      coutPlanPrevu={coutPlanPrevu}
+      tresorerie={Number(entreprise.tresorerie_centimes)}
+      postesFournis={postesFournisDepuisParametres(parametres)}
+      valeurNetteMateriel={valeurNetteMaterielEnService(
+        (materiel ?? []) as { compte: string; sens: string; montant_centimes: number }[],
+        coutPlanPrevu,
+      )}
       salaries={salaries}
       catalogue={chargerModulesV1()}
-      parametres={chargerParametresV1()}
+      parametres={parametres}
     />
   );
 }

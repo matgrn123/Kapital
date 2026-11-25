@@ -30,7 +30,12 @@ export default function PageDemoAtelier() {
         surfaceM2={60}
         workshopId={null}
         atelier={{ largeur: 10, hauteur: 5, entree_x: 0, entree_y: 3 }}
-        planInitial={plan}
+        planActif={plan}
+        planPrevu={null}
+        coutPlanPrevu={0}
+        tresorerie={null}
+        postesFournis={parametres["bail_machines_a_la_signature"]?.valeur ?? 0}
+        valeurNetteMateriel={0}
         salaries={[
           { id: "ex-1", poste: "artisan", experienceMois: 8, ancienneteMois: 8, depuis: "2026-03-02", salaireBrutCentimes: smic },
           { id: "ex-2", poste: "artisan", experienceMois: 1, ancienneteMois: 1, depuis: "2026-10-05", salaireBrutCentimes: smic },

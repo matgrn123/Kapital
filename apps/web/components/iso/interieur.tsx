@@ -27,7 +27,28 @@ const pieds = (x: number, y: number, w: number, d: number, h: number, c = "#3A3F
   </>
 );
 
-export function Meuble({ type, x, y }: { type: TypeMeuble; x: number; y: number }): ReactElement {
+/** Encombrement au sol d'un meuble, pivoté d'un quart de tour ou non (largeur et profondeur échangées). */
+export function tailleMeuble(type: TypeMeuble, pivote = false): { w: number; d: number } {
+  const t = TAILLE_MEUBLE[type];
+  return pivote ? { w: t.d, d: t.w } : t;
+}
+
+/**
+ * Un meuble posé en (x, y). Pivoté, il occupe tailleMeuble(type, true) : on le dessine en (y, x)
+ * puis on le retourne en miroir sur l'axe vertical de l'écran. La projection iso (sans décalage)
+ * échange alors les axes x et y du monde : le meuble tourne d'un quart de tour au sol. Seul défaut
+ * connu : la face éclairée passe de l'autre côté (lumière par face approchée).
+ */
+export function Meuble({ type, x, y, pivote = false }: { type: TypeMeuble; x: number; y: number; pivote?: boolean }): ReactElement {
+  if (!pivote) return <MeubleDroit type={type} x={x} y={y} />;
+  return (
+    <g transform="scale(-1 1)">
+      <MeubleDroit type={type} x={y} y={x} />
+    </g>
+  );
+}
+
+function MeubleDroit({ type, x, y }: { type: TypeMeuble; x: number; y: number }): ReactElement {
   const t = TAILLE_MEUBLE[type];
   const s: ReactNode[] = [<OmbrePied key="o" x={x + 0.05} y={y + 0.08} w={t.w - 0.1} d={t.d - 0.12} opacite={0.3} />];
   switch (type) {

@@ -58,6 +58,38 @@ export function apercuPlacement(
   return validerPlan(atelier, [...plan, candidat], catalogue);
 }
 
+export type ModificationPlan = { plan: ModulePlace[]; validation: ResultatValidation };
+
+/**
+ * Remplace le module n° `index` et fait juger le plan entier par le moteur. Refusé, le plan rendu
+ * est l'ancien (inchangé) : l'appelant affiche la raison sans rien perdre.
+ */
+function modifier(atelier: DimensionsAtelier, plan: readonly ModulePlace[], index: number, nouveau: ModulePlace, catalogue: readonly TypeModule[]): ModificationPlan {
+  const candidat = plan.map((m, i) => (i === index ? nouveau : m));
+  const validation = validerPlan(atelier, candidat, catalogue);
+  return { plan: validation.valide ? candidat : [...plan], validation };
+}
+
+/** Pivote le module d'un quart de tour sur place (même coin haut-gauche), si le moteur l'accepte. */
+export function pivoterModule(atelier: DimensionsAtelier, plan: readonly ModulePlace[], index: number, catalogue: readonly TypeModule[]): ModificationPlan {
+  const m = plan[index];
+  if (!m) return { plan: [...plan], validation: { valide: false, erreurs: [] } };
+  return modifier(atelier, plan, index, { ...m, pivote: !m.pivote }, catalogue);
+}
+
+/** Déplace le module vers une case (coin haut-gauche, à partir de 1), si le moteur l'accepte. */
+export function deplacerModule(
+  atelier: DimensionsAtelier,
+  plan: readonly ModulePlace[],
+  index: number,
+  vers: { x: number; y: number },
+  catalogue: readonly TypeModule[],
+): ModificationPlan {
+  const m = plan[index];
+  if (!m) return { plan: [...plan], validation: { valide: false, erreurs: [] } };
+  return modifier(atelier, plan, index, { ...m, x: vers.x, y: vers.y }, catalogue);
+}
+
 function lire(p: Parametres, cle: string): number {
   const v = p[cle];
   if (!v) throw new Error(`Paramètre manquant : ${cle}`);
@@ -166,16 +198,26 @@ const MEUBLES_PAR_EFFET: Record<EffetModule["type"], readonly TypeMeuble[]> = {
  * Meubles du moteur de rendu à dessiner dans l'emprise d'un module, en coordonnées de dessin
  * (à partir de 0). Les meubles trop grands pour l'emprise sont remplacés par des cartons.
  */
-export function meublesDuModule(effet: EffetModule["type"], e: Emprise): { meuble: TypeMeuble; x: number; y: number }[] {
+export function meublesDuModule(
+  effet: EffetModule["type"],
+  e: Emprise,
+  pivote = false,
+): { meuble: TypeMeuble; x: number; y: number; pivote: boolean }[] {
   const ox = e.x - 1;
   const oy = e.y - 1;
-  const sortie: { meuble: TypeMeuble; x: number; y: number }[] = [];
+  // Pivoté : on range les meubles dans l'emprise d'origine (largeur et profondeur échangées),
+  // puis on échange les axes, comme le dessin du meuble pivoté (components/iso/interieur).
+  const w = pivote ? e.d : e.w;
+  const d = pivote ? e.w : e.d;
+  const sortie: { meuble: TypeMeuble; x: number; y: number; pivote: boolean }[] = [];
   let ligne = 0;
   for (const voulu of MEUBLES_PAR_EFFET[effet]) {
-    const meuble: TypeMeuble = TAILLES[voulu].w <= e.w && TAILLES[voulu].d <= e.d ? voulu : "cartons";
+    const meuble: TypeMeuble = TAILLES[voulu].w <= w && TAILLES[voulu].d <= d ? voulu : "cartons";
     const t = TAILLES[meuble];
-    if (ligne + t.d > e.d && sortie.length > 0) break;
-    sortie.push({ meuble, x: ox + (e.w - t.w) / 2, y: oy + Math.min(ligne, e.d - t.d) + (sortie.length === 0 && MEUBLES_PAR_EFFET[effet].length === 1 ? (e.d - t.d) / 2 : 0) });
+    if (ligne + t.d > d && sortie.length > 0) break;
+    const lx = (w - t.w) / 2;
+    const ly = Math.min(ligne, d - t.d) + (sortie.length === 0 && MEUBLES_PAR_EFFET[effet].length === 1 ? (d - t.d) / 2 : 0);
+    sortie.push(pivote ? { meuble, x: ox + ly, y: oy + lx, pivote } : { meuble, x: ox + lx, y: oy + ly, pivote });
     ligne += t.d;
   }
   return sortie;

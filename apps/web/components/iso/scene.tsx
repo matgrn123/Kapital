@@ -5,7 +5,7 @@ import type { KeyboardEvent, ReactElement, ReactNode } from "react";
 import { boiteEnglobante, cleProfondeur, coinsPave, trierProfondeur, viewBox as vb, type Cadre, type Point3 } from "./geometrie";
 import { Defs } from "./defs";
 import { Batiment, sommetBatiment, type BatimentProps } from "./batiment";
-import { Meuble, TAILLE_MEUBLE, type TypeMeuble } from "./interieur";
+import { Meuble, tailleMeuble, type TypeMeuble } from "./interieur";
 import { Arbre, Buisson, Etiquette, Lampadaire, Personnage, Poly, Voiture } from "./primitives";
 
 type Commun = {
@@ -27,7 +27,7 @@ type Commun = {
 
 export type ObjetIso =
   | (Commun & { type: "batiment" } & Omit<BatimentProps, "x" | "y">)
-  | (Commun & { type: "meuble"; meuble: TypeMeuble })
+  | (Commun & { type: "meuble"; meuble: TypeMeuble; pivote?: boolean })
   | (Commun & { type: "arbre"; echelle?: number; variante?: number })
   | (Commun & { type: "buisson"; w: number; d: number })
   | (Commun & { type: "lampadaire" })
@@ -74,7 +74,7 @@ export function encombrement(o: ObjetIso): { w: number; d: number; h: number } {
     case "batiment":
       return { w: o.w, d: o.d, h: sommetBatiment(o) };
     case "meuble":
-      return { ...TAILLE_MEUBLE[o.meuble], h: o.meuble === "etagere" ? 2 : 1.2 };
+      return { ...tailleMeuble(o.meuble, o.pivote), h: o.meuble === "etagere" ? 2 : 1.2 };
     case "arbre":
       return { w: 0.5, d: 0.5, h: 2 * (o.echelle ?? 1) };
     case "buisson":
@@ -97,7 +97,7 @@ function dessin(o: ObjetIso): ReactNode {
       return <Batiment {...b} />;
     }
     case "meuble":
-      return <Meuble type={o.meuble} x={o.x} y={o.y} />;
+      return <Meuble type={o.meuble} x={o.x} y={o.y} pivote={o.pivote} />;
     case "arbre":
       return <Arbre x={o.x} y={o.y} echelle={o.echelle} variante={o.variante} />;
     case "buisson":
