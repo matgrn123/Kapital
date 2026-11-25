@@ -1,6 +1,6 @@
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
-import { libelleGamme, libelleLisible } from "../../../lib/lisible";
+import { libelleGamme, libelleLisible, nomLisibleSociete } from "../../../lib/lisible";
 import { Carte, Puce } from "../../../components/ui";
 import { EnTete, TableauRang, Vide } from "../../../components/ui/formulaire";
 
@@ -134,7 +134,7 @@ export default async function PageMarche() {
     company_id: string;
   }>).map((e) => ({
     ...e,
-    nom_entreprise: nomPar.get(e.company_id) ?? "—",
+    nom_entreprise: nomLisibleSociete(nomPar.get(e.company_id) ?? "—"),
   }));
 
   // Groupage par produit, tri par prix
@@ -179,7 +179,7 @@ export default async function PageMarche() {
                 moi: estMoi,
                 cellules: [
                   <>
-                    {o.nom}
+                    {nomLisibleSociete(o.nom)}
                     {estMoi && <span className="ml-2 text-[0.78rem] text-muted">(toi)</span>}
                   </>,
                   `${formaterEuros(o.prix_vente_directe_centimes)} €`,

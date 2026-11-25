@@ -6,7 +6,8 @@ import { Puce } from "../../../components/ui";
 import { formaterEuros } from "../../../lib/formatage";
 import { libelleGamme } from "../../../lib/lisible";
 import { creerClientServeur } from "../../../lib/supabase/server";
-import { AUCUN_AUTRE_BATIMENT, idBoutique, idLocal, nomLisibleSociete, type ActeurVillage, type BatimentsDuJoueur } from "../../../lib/vue3d";
+import { nomLisibleSociete } from "../../../lib/lisible";
+import { AUCUN_AUTRE_BATIMENT, idBoutique, idLocal, type ActeurVillage, type BatimentsDuJoueur } from "../../../lib/vue3d";
 import { lireEstrAnnuel } from "../_partage/estr";
 import { Village, type FicheActeur } from "./Village";
 
