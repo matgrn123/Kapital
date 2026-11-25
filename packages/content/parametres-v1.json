@@ -317,6 +317,12 @@
     "source": "docs/cahier-des-charges-v1.md section 4 (démarrage sans attente) ; docs/plan-architecture-entreprise.md section 5 (une marque nouvelle vend 50 à 300 pièces par mois) : valeur de départ à calibrer au banc d'essai",
     "date": "2026-11-24"
   },
+  "alerte_stock_bas_jours": {
+    "valeur": 15,
+    "unite": "jours",
+    "source": "hypothèse de jeu, à valider : un demi-mois de jeu (12 h réelles), pour qu'un joueur qui passe une fois par jour réel voie l'alerte avant la rupture ; affichage seulement (écran Stock, alerte du tableau de bord), aucun effet sur le moteur",
+    "date": "2026-11-25"
+  },
   "grossiste_majoration_sur_cout_usine": {
     "valeur": 0.4,
     "unite": "ratio",

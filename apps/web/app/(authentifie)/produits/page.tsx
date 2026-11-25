@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { chargerParametresV1 } from "@kapital/content";
 import { parametreObligatoire } from "@kapital/engine";
 import { ID_GROSSISTE_LOCAL } from "@kapital/server";
@@ -6,6 +7,8 @@ import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros } from "../../../lib/formatage";
 import { nomMatiere } from "../../../lib/lisible";
 import { besoinFondsRoulementDepuisLignes, coutRevientEstimeSansStock } from "../../../lib/vente";
+import { libelleJours } from "../../../lib/stock";
+import { chargerSituationStock } from "../stock/donnees";
 import { AjouterProduit, FormulairePrix } from "./FormulairePrix";
 
 type Produit = {
@@ -35,6 +38,8 @@ export default async function PageProduits() {
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
+  // Jours de stock de chaque produit (écran Stock), lus en même temps que le reste.
+  const situationStock = chargerSituationStock(supabase, entreprise.id);
   const [
     { data: produitsRef },
     { data: catalogue },
@@ -82,6 +87,8 @@ export default async function PageProduits() {
     }>,
   );
 
+  const { lignes: lignesStock, temps } = await situationStock;
+  const joursParProduit = new Map(lignesStock.map((l) => [l.id, l]));
   const params = chargerParametresV1();
   const nomsMatieres: Record<string, string> = {};
   for (const m of (matieres ?? []) as Array<{ id: string; nom: string }>) nomsMatieres[m.id] = m.nom;
@@ -157,12 +164,22 @@ export default async function PageProduits() {
                 {auCatalogue.map((p) => {
                   const ligne = cataMap.get(p.id)!;
                   const stock = stockMap.get(p.id)?.quantite_pieces ?? 0;
+                  const situation = joursParProduit.get(p.id);
                   const { cout, origine } = coutDe(p.id);
                   return (
                     <section key={p.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <h3 className="font-bold">{p.nom}</h3>
-                        <Puce ton={stock > 0 ? "bon" : "alerte"}>{stock > 0 ? `${stock} en stock` : "Stock vide"}</Puce>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Puce ton={stock > 0 ? "bon" : "alerte"}>{stock > 0 ? `${stock} en stock` : "Stock vide"}</Puce>
+                          {situation && situation.jours !== null && situation.jours > 0 && (
+                            <Link href="/stock">
+                              <Puce ton={situation.statut === "bas" ? "critique" : "neutre"}>
+                                {libelleJours(situation.jours, temps.joursParMois)} de stock
+                              </Puce>
+                            </Link>
+                          )}
+                        </div>
                       </div>
                       <p className="text-[0.8rem] text-muted">
                         {p.consommation_par_piece.toLocaleString("fr-FR")} m de {nomMatiere(p.matiere_id, nomsMatieres)} ·{" "}

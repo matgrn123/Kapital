@@ -26,6 +26,8 @@ import {
   type LigneGrandLivre,
 } from "../../../lib/tableau";
 import { CarteEtape } from "./CarteEtape";
+import { produitsEnStockBas } from "../../../lib/stock";
+import { chargerSituationStock } from "../stock/donnees";
 
 // Tableau de bord (design V2, docs/maquette) : ce que voit un dirigeant chaque
 // matin. Tout vient de la base : grand livre, marque, stock, classement.
@@ -48,6 +50,7 @@ export default async function PageJeu() {
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
+  const situationStock = chargerSituationStock(supabase, entreprise.id);
   const [monde, grandLivre, marque, stocks, catalogue, produits, classement, progressions] = await Promise.all([
     supabase.from("worlds").select("mois_courant").limit(1).maybeSingle(),
     supabase
@@ -87,6 +90,7 @@ export default async function PageJeu() {
     stockPieces,
     moisDecouvert: Number(entreprise.mois_decouvert_consecutifs ?? 0),
     aUnProduit,
+    stocksBas: produitsEnStockBas((await situationStock).lignes),
   });
   const notoriete = marque.data?.notoriete ?? null;
   const desirabilite = marque.data?.desirabilite ?? null;
