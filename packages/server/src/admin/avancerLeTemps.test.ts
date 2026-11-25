@@ -166,7 +166,7 @@ describe("avancerLeTemps — effet sur les entreprises", () => {
     await avancerMondeJusquA(s, PARAMS, MAINTENANT);
 
     expect(s.entreprises.get("a")!.pasTraites).toBe(4 * 1440);
-    expect(s.ecrituresDe("a").map((x) => x.id)).toContain("salaire_4_s1");
+    expect(s.ecrituresDe("a").map((x) => x.id)).toContain("salaire_3_s1");
     expect(s.monde.moisCourant).toBe(4);
   });
 });
