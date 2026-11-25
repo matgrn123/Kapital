@@ -229,6 +229,9 @@ async function traiterLot(
   const livraisons: LivraisonsEnAttente = await stockage.chargerLivraisons(companyId, finDuLotMs);
   const creances =
     position.indexDansMois === 0 ? await stockage.chargerCreances(companyId, moisEnCours) : [];
+  // Fournisseurs et façonniers : réglés à leur échéance, au premier pas du mois.
+  const dettesEchues =
+    position.indexDansMois === 0 ? await stockage.chargerDettesEchues(companyId, moisEnCours) : [];
   const donneesFin: DonneesFinMois | null = cloture
     ? await stockage.chargerFinDeMois(companyId, moisEnCours)
     : null;
@@ -252,6 +255,7 @@ async function traiterLot(
       ),
       depensesMarketing: [], // le marketing s'enregistre à l'action du joueur
       creancesAEncaisser: index === 0 ? creances : [],
+      dettesEchues: index === 0 ? dettesEchues : [],
     };
     const r = simulerPas(
       entreprise,

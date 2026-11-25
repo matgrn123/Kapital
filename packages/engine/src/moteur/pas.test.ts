@@ -52,6 +52,7 @@ function paramsNeutres(minutesParPas = 10): Parametres {
   fixer("decroissance_notoriete_mois", 0);
   fixer("decroissance_desirabilite_mois", 0);
   fixer("temps_minutes_reelles_par_pas", minutesParPas);
+  fixer("taux_chute_matiere_defaut", 0);
   return p;
 }
 
@@ -109,6 +110,13 @@ function entrepriseDeTest(surcharge: Partial<Entreprise> = {}): Entreprise {
         qualiteVisee: 60,
         prix: { vente_directe: centimes(3000), revendeur: centimes(1800) },
         productionMensuelleCible: 60,
+        // 1 unité par pièce, sans fournitures, 30 min : le coût moyen reste à 15 €.
+        fabrication: {
+          matiere: MATIERE,
+          consommationParPiece: 1,
+          fournituresParPiece: centimes(0),
+          tempsStandardMinutes: 30,
+        },
       },
     ],
     ...surcharge,

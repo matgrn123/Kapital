@@ -227,16 +227,33 @@ describe("simulerMoisEntreprise — livraisons de matière", () => {
 });
 
 describe("simulerMoisEntreprise — livraisons façonniers", () => {
-  it("livraison façonnier : 35 débit, 31+401 crédit", () => {
+  it("livraison façonnier : la matière sort du stock du joueur (31), façon + fournitures au 401", () => {
+    // T-shirt chez le façonnier portugais (référentiel) : 0,8 m de jersey à 4,20 €, chute 15 %,
+    // 0,60 € de fournitures, 4,50 € de façon. Coût complet attendu ≈ 8,96 € (entre 8 et 11 €).
+    const tauxChute = PARAMS["taux_chute_matiere_defaut"]!.valeur;
+    const jersey = idMatiere("mat_jersey_coton");
     const livraison: LivraisonFaconnier = {
       id: "lf1",
-      produit: idProduit("prod_chemise"),
-      quantite: 30,
-      prixFaconParPiece: centimes(500),
-      coutMatiereParPiece: centimes(300),
+      produit: idProduit("prod_tshirt"),
+      quantite: 100,
+      prixFaconParPiece: centimes(450),
+      matiereDuJoueur: {
+        matiere: jersey,
+        consommationParPiece: 0.8,
+        fournituresParPiece: centimes(60),
+        tempsStandardMinutes: 25,
+      },
+    };
+    const ent: Entreprise = {
+      ...entreprisePnjBase(),
+      // Une autre matière en premier : le façonnier doit prendre la bonne.
+      stocksMatiere: [
+        { matiere: idMatiere("mat_popeline"), quantite: 50, valeurTotale: centimes(45_000) },
+        { matiere: jersey, quantite: 200, valeurTotale: centimes(84_000) },
+      ],
     };
     const result = simulerMoisEntreprise(
-      entreprisePnjBase(),
+      ent,
       { ...donneeesVides(), livraisonsFaconniers: [livraison] },
       marketInputsTest(),
       PARAMS,
@@ -245,13 +262,20 @@ describe("simulerMoisEntreprise — livraisons façonniers", () => {
     );
     const ec = result.ecritures.find((e) => e.id === `livraison_fac_${MOIS_1}_lf1`);
     expect(ec).toBeDefined();
+    const besoin = 100 * 0.8 * (1 + tauxChute); // 92 m
+    const totalMatiere = Math.round(besoin * 420);
+    const totalFacture = 100 * (450 + 60);
     const lignes = ec!.lignes;
-    const totalMatiere = 30 * 300;
-    const totalFacon = 30 * 500;
-    const totalPF = totalMatiere + totalFacon;
-    expect(lignes.find((l) => l.compte === "35" && l.sens === "debit")?.montant).toBe(totalPF);
+    expect(lignes.find((l) => l.compte === "35" && l.sens === "debit")?.montant).toBe(totalMatiere + totalFacture);
     expect(lignes.find((l) => l.compte === "31" && l.sens === "credit")?.montant).toBe(totalMatiere);
-    expect(lignes.find((l) => l.compte === "401" && l.sens === "credit")?.montant).toBe(totalFacon);
+    expect(lignes.find((l) => l.compte === "401" && l.sens === "credit")?.montant).toBe(totalFacture);
+    const coutParPiece = (totalMatiere + totalFacture) / 100;
+    expect(coutParPiece).toBeGreaterThanOrEqual(800);
+    expect(coutParPiece).toBeLessThanOrEqual(1100);
+    const stockJersey = result.entrepriseApres.stocksMatiere.find((s) => s.matiere === jersey)!;
+    expect(stockJersey.quantite).toBeCloseTo(200 - besoin, 6);
+    const stockPopeline = result.entrepriseApres.stocksMatiere.find((s) => s.matiere === idMatiere("mat_popeline"))!;
+    expect(stockPopeline.quantite).toBe(50);
   });
 
   it("livraison sans matière (produit fini acheté tel quel) : 35 débit / 401 crédit, sans ligne à zéro", () => {
@@ -260,7 +284,7 @@ describe("simulerMoisEntreprise — livraisons façonniers", () => {
       produit: idProduit("prod_chemise"),
       quantite: 30,
       prixFaconParPiece: centimes(900),
-      coutMatiereParPiece: centimes(0),
+      matiereDuJoueur: null,
     };
     const result = simulerMoisEntreprise(
       entreprisePnjBase(),
@@ -284,7 +308,7 @@ describe("simulerMoisEntreprise — livraisons façonniers", () => {
       produit: idProduit("prod_sac"),
       quantite: 20,
       prixFaconParPiece: centimes(1000),
-      coutMatiereParPiece: centimes(600),
+      matiereDuJoueur: null,
     };
     const result = simulerMoisEntreprise(
       entreprisePnjBase(),
@@ -299,7 +323,7 @@ describe("simulerMoisEntreprise — livraisons façonniers", () => {
     );
     expect(stock).toBeDefined();
     expect(stock!.quantite).toBe(20);
-    expect(stock!.valeurTotale).toBe(20 * (600 + 1000));
+    expect(stock!.valeurTotale).toBe(20 * 1000);
   });
 });
 

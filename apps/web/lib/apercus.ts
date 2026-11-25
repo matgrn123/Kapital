@@ -117,8 +117,9 @@ function ecrituresDuMoteurPourLivraison(
                 produit: idProduit(livraison.produit),
                 quantite: livraison.quantite,
                 prixFaconParPiece: centimes(livraison.prixFaconParPiece),
-                // Comme le serveur : la matière n'est pas sortie du stock du joueur.
-                coutMatiereParPiece: centimes(0),
+                // Aperçu de la facture du façonnier seule : la sortie de matière du stock
+                // du joueur (31) dépend de son stock réel, calculée par le serveur à la livraison.
+                matiereDuJoueur: null,
               },
             ]
           : [],

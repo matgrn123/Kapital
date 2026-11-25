@@ -69,6 +69,12 @@ function entreprise(id: string): Entreprise {
         qualiteVisee: 60,
         prix: { vente_directe: centimes(3000), revendeur: centimes(1800) },
         productionMensuelleCible: 60,
+        fabrication: {
+          matiere: MATIERE,
+          consommationParPiece: 1,
+          fournituresParPiece: centimes(0),
+          tempsStandardMinutes: 30,
+        },
       },
     ],
   };
@@ -270,6 +276,26 @@ describe("avancerMondeJusquA — démarrages", () => {
       .reduce((a, b) => a + b, 0);
     expect(vendues).toBeLessThanOrEqual(3);
     expect(s.entreprises.get("nouvelle")!.pasTraites).toBe(N + 730);
+  });
+});
+
+describe("avancerMondeJusquA — règlement des fournisseurs à l'échéance", () => {
+  it("une dette échue est réglée une seule fois, au premier pas du mois, 401 débit / 512 crédit", async () => {
+    const s = monde();
+    s.dettesParMois.set("a|1", [{ ordreId: "po1", nature: "matiere", montant: centimes(42_000) }]);
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 0.5 * JOUR);
+    expect(idsEcritures(s, "a")).not.toContain("reglement_matiere_po1");
+    await avancerMondeJusquA(s, PARAMS, DEBUT + JOUR + 2 * MIN);
+    const reglements = s.ecrituresDe("a").filter((e) => e.id === "reglement_matiere_po1");
+    expect(reglements).toHaveLength(1);
+    expect(reglements[0]!.lignes).toEqual([
+      { compte: "401", sens: "debit", montant: 42_000 },
+      { compte: "512", sens: "credit", montant: 42_000 },
+    ]);
+    // Rejouer le mois suivant ne la repaie pas.
+    s.dettesParMois.set("a|2", s.dettesParMois.get("a|1")!);
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 2 * JOUR + 2 * MIN);
+    expect(s.ecrituresDe("a").filter((e) => e.id === "reglement_matiere_po1")).toHaveLength(1);
   });
 });
 
