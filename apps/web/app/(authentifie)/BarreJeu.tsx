@@ -116,6 +116,12 @@ export function BarreJeu({
 
   const mois = horloge?.moisEnCours ?? null;
 
+  // Après une action, l'écran appelle router.refresh() : le serveur renvoie la nouvelle
+  // trésorerie. On la reprend aussitôt, et l'effet suivant relit la marque et les ventes.
+  useEffect(() => {
+    setEtat((e) => ({ ...e, tresorerie: tresorerieInitiale, etape: etapeInitiale }));
+  }, [tresorerieInitiale, etapeInitiale]);
+
   // Trésorerie, étape, ventes du mois, marque : relues à chaque écran et régulièrement.
   useEffect(() => {
     let actif = true;
@@ -152,7 +158,7 @@ export function BarreJeu({
       actif = false;
       clearInterval(t);
     };
-  }, [companyId, chemin, mois]);
+  }, [companyId, chemin, mois, tresorerieInitiale]);
 
   useEffect(() => {
     setMaintenant(Date.now());
