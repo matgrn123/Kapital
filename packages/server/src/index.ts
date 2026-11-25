@@ -5,7 +5,13 @@ export { validerSaisiePrix, type ResultatSaisiePrix, type SaisiePrix } from "./v
 export { validerCommanderMatiere } from "./validations/commanderMatiere.js";
 export { validerOrdreProduction } from "./validations/ordreProduction.js";
 export { validerActionMarketing } from "./validations/actionMarketing.js";
-export { MESSAGE_AUCUN_POSTE_LIBRE, validerEmbauche } from "./validations/embauche.js";
+export { MESSAGE_AUCUN_POSTE_LIBRE, MESSAGE_SANS_BOUTIQUE, validerEmbauche } from "./validations/embauche.js";
+export { chargerPointsDeVenteSupabase, COLONNES_POINTS_DE_VENTE } from "./boutique/lecture.js";
+export {
+  fonctionDePas,
+  pointsDeVenteDepuisLignes,
+  type LignePointDeVente,
+} from "./avance/stockageSupabase.js";
 export { validerLicenciement } from "./validations/licenciement.js";
 export { reglesPretV1, validerDemandePret } from "./validations/demandePret.js";
 export * from "./avance/index.js";

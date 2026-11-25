@@ -1,8 +1,8 @@
 import type { Parametres } from "@kapital/content";
-import type { Entreprise, Gamme, ProduitEntreprise } from "../types/entreprise.js";
+import { facteurEmplacement, pointsDeVenteOuverts, prixBoutique } from "../boutique/boutique.js";
+import type { Canal, Entreprise, Gamme, ProduitEntreprise } from "../types/entreprise.js";
 import type { Monde } from "../types/monde.js";
 import {
-  centimes,
   type Centimes,
   type IdEntreprise,
   type IdProduit,
@@ -17,12 +17,13 @@ export type VenteGeneree = {
   readonly entreprise: IdEntreprise;
   readonly produit: IdProduit;
   readonly gamme: Gamme;
-  readonly canal: "vente_directe" | "revendeur";
+  readonly canal: Canal;
   readonly quantite: number;
   readonly prixUnitaireCentimes: Centimes;
 };
 
 const GAMMES: readonly Gamme[] = ["entree", "milieu", "haut"];
+const CANAUX: readonly Canal[] = ["vente_directe", "revendeur", "boutique"];
 
 function tailleMarcheMois(params: Parametres, gamme: Gamme): number {
   const p = params[`taille_marche_mois_${gamme}`];
@@ -32,13 +33,31 @@ function tailleMarcheMois(params: Parametres, gamme: Gamme): number {
   return p.valeur;
 }
 
+/** Prix TTC d'un produit sur un canal ; en boutique, le prix direct quand aucun prix boutique n'est fixé. */
+export function prixDuCanal(produit: ProduitEntreprise, canal: Canal): Centimes {
+  return canal === "boutique" ? prixBoutique(produit) : produit.prix[canal];
+}
+
+/**
+ * AE-10, branchement simple en attendant le marché complet (lot C) : une boutique ouverte
+ * s'adresse à la même demande que la vente en ligne (même part de canal, même attrait, mais
+ * au prix boutique), multipliée par ses passants rapportés aux passants moyens des boutiques
+ * du catalogue (facteurEmplacement : 1 pour une boutique moyenne). Plusieurs boutiques : les
+ * facteurs s'additionnent. 0 sans boutique ouverte : pendant les travaux, aucune demande.
+ */
+export function facteurDemandeBoutique(ent: Entreprise, mois: Monde["moisCourant"]): number {
+  return pointsDeVenteOuverts(ent, mois).reduce((s, p) => s + facteurEmplacement(p), 0);
+}
+
 function entrepriseVendProduit(
   ent: Entreprise,
   produit: ProduitEntreprise,
-  canal: "vente_directe" | "revendeur",
+  canal: Canal,
+  facteur: number,
 ): boolean {
   if (ent.statut !== "active") return false;
-  const prix = produit.prix[canal];
+  if (!(facteur > 0)) return false;
+  const prix = prixDuCanal(produit, canal);
   if (prix <= 0) return false;
   return true;
 }
@@ -46,7 +65,7 @@ function entrepriseVendProduit(
 function construireOffre(
   ent: Entreprise,
   produit: ProduitEntreprise,
-  canal: "vente_directe" | "revendeur",
+  canal: Canal,
 ): OffreEntreprise {
   const presenceRev = canal === "revendeur" ? 1 : 0;
   return {
@@ -55,7 +74,7 @@ function construireOffre(
     notoriete: ent.marque.notoriete,
     desirabilite: ent.marque.desirabilite,
     presenceRevendeur: presenceRev,
-    prix: produit.prix[canal],
+    prix: prixDuCanal(produit, canal),
   };
 }
 
@@ -90,19 +109,22 @@ export function calculerVentesMois(
     const taille = tailleMarcheMois(params, gamme);
     if (taille <= 0) continue;
 
-    for (const canal of ["vente_directe", "revendeur"] as const) {
+    for (const canal of CANAUX) {
       const offresAvecContexte: Array<{
         entreprise: Entreprise;
         produit: ProduitEntreprise;
         offre: OffreEntreprise;
+        facteur: number;
       }> = [];
       for (const ent of entreprisesGamme) {
+        const facteur = canal === "boutique" ? facteurDemandeBoutique(ent, monde.moisCourant) : 1;
         for (const prod of ent.catalogue) {
-          if (!entrepriseVendProduit(ent, prod, canal)) continue;
+          if (!entrepriseVendProduit(ent, prod, canal, facteur)) continue;
           offresAvecContexte.push({
             entreprise: ent,
             produit: prod,
             offre: construireOffre(ent, prod, canal),
+            facteur,
           });
         }
       }
@@ -118,13 +140,14 @@ export function calculerVentesMois(
         offresAvecContexte.map((o) => o.offre),
       );
 
-      // Volume total adressable par ce canal dans cette gamme sur la durée
-      const partCanal = canal === "vente_directe" ? 0.6 : 0.4;
+      // Volume total adressable par ce canal dans cette gamme sur la durée.
+      // La boutique reprend la part de la vente en ligne (voir facteurDemandeBoutique).
+      const partCanal = canal === "revendeur" ? 0.4 : 0.6;
       const volumeTotal = taille * dureeMois * partCanal;
 
       for (const o of offresAvecContexte) {
         const part = parts.parts[o.entreprise.id] ?? 0;
-        const quantite = Math.floor(volumeTotal * part);
+        const quantite = Math.floor(volumeTotal * part * o.facteur);
         if (quantite <= 0) continue;
         ventes.push({
           entreprise: o.entreprise.id,
@@ -132,7 +155,7 @@ export function calculerVentesMois(
           gamme,
           canal,
           quantite,
-          prixUnitaireCentimes: centimes(o.produit.prix[canal]),
+          prixUnitaireCentimes: prixDuCanal(o.produit, canal),
         });
       }
     }

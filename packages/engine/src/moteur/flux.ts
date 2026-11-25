@@ -5,6 +5,13 @@ import { capaciteMinutes, rendement } from "../atelier/calculs.js";
 import { postesEquipesAtelier } from "../atelier/effetsPlan.js";
 import { artisansAuPoste } from "../personnel/postes.js";
 import { calculerVentesMois } from "../marche/ventesMois.js";
+import {
+  capaciteVendeursMois,
+  ecritureVenteBoutique,
+  parametresBoutiqueDepuis,
+  pointsDeVenteOuverts,
+  sortirDesBoutiques,
+} from "../boutique/boutique.js";
 import { coefficientsMarketingDepuisParametres, fluxMarque } from "../marketing/index.js";
 import type { DepenseMarketing } from "../marketing/types.js";
 import type { Entreprise, LigneStockFini, LigneStockMatiere } from "../types/entreprise.js";
@@ -413,6 +420,13 @@ export function avancerFlux(
       coeffsMarketing,
     ),
   };
+  // AE-10 : chaque boutique ouverte ajoute le bonus de son emplacement (points par mois,
+  // catalogue des bâtiments) à la désirabilité, au prorata de la part du mois écoulée.
+  const bonusBoutiques = pointsDeVenteOuverts(ent, mois).reduce((s, p) => s + p.bonusDesirabiliteParMois, 0);
+  if (bonusBoutiques > 0) {
+    const desirabilite = ent.marque.desirabilite + (bonusBoutiques * (pasFin - pasDebut)) / pasParMois;
+    ent = { ...ent, marque: { ...ent.marque, desirabilite: Math.min(100, desirabilite) } };
+  }
   for (const depense of donnees.depensesMarketing) {
     if (depense.montant <= 0) continue;
     enr({
@@ -453,6 +467,19 @@ export function avancerFlux(
 
   let stocksFinis = ent.stocksFinis;
 
+  // AE-10 : boutiques ouvertes ce mois (pendant les travaux, aucune vente) et plafond des
+  // vendeurs, cumulé depuis le début du mois comme la demande : vendeurs × ventes max × part du mois.
+  let pointsDeVente = ent.pointsDeVente ?? [];
+  const ouverts = new Set(pointsDeVenteOuverts(ent, mois).map((p) => p.id));
+  const plafondVendeursCumule =
+    ouverts.size === 0
+      ? 0
+      : Math.floor(
+          (capaciteVendeursMois(ent, mois, parametresBoutiqueDepuis(params)) * pasVecus) / pasParMois,
+        );
+  const serviBoutique = (): number =>
+    Object.entries(serviParLigne).reduce((s, [cle, q]) => (cle.endsWith("|boutique") ? s + q : s), 0);
+
   for (const vente of ventesTriees) {
     if (vente.entreprise !== ent.id) continue;
 
@@ -461,6 +488,35 @@ export function avancerFlux(
     const demandeDuFlux = Math.max(0, vente.quantite - dejaTraite);
     if (demandeDuFlux <= 0) continue;
     demandeParLigne[cle] = dejaTraite + demandeDuFlux;
+
+    if (vente.canal === "boutique") {
+      // Vente en boutique : plafonnée par le stock de la boutique ET par les vendeurs.
+      // Sans vendeur ou sans stock en boutique, aucune vente (le stock de l'atelier n'est pas servi).
+      let stockBoutique = 0;
+      for (const pdv of pointsDeVente) {
+        if (!ouverts.has(pdv.id)) continue;
+        for (const s of pdv.stock) if (s.produit === vente.produit) stockBoutique += s.quantite;
+      }
+      const resteVendeurs = Math.max(0, plafondVendeursCumule - serviBoutique());
+      const quantiteBoutique = Math.min(demandeDuFlux, stockBoutique, resteVendeurs);
+      incrementer(serviParLigne, cle, quantiteBoutique);
+      if (quantiteBoutique <= 0) continue;
+      const sortie = sortirDesBoutiques(pointsDeVente, ouverts, vente.produit, quantiteBoutique);
+      pointsDeVente = sortie.pointsDeVente;
+      enr(
+        ecritureVenteBoutique({
+          idEcriture: `vente_${mois}_${ent.id}_${vente.produit}_boutique${suffixeId}`,
+          mois,
+          produit: vente.produit,
+          quantite: quantiteBoutique,
+          prixTtcUnitaire: vente.prixUnitaireCentimes,
+          tauxTva: tvaStandard,
+          coutRevientTotal: sortie.valeur,
+        }),
+      );
+      chiffreAffairesHt += prixHtDepuisTtc(vente.prixUnitaireCentimes, tvaStandard) * quantiteBoutique;
+      continue;
+    }
 
     const stockDispo = stockRestant.get(vente.produit as string) ?? 0;
     const quantiteServie = Math.min(demandeDuFlux, stockDispo);
@@ -534,7 +590,7 @@ export function avancerFlux(
       chiffreAffairesHt += prixHtDepuisTtc(vente.prixUnitaireCentimes, tvaStandard) * quantiteServie;
     }
   }
-  ent = { ...ent, stocksFinis };
+  ent = { ...ent, stocksFinis, ...(ent.pointsDeVente === undefined ? {} : { pointsDeVente }) };
 
   // Encaissements des créances revendeurs arrivées à échéance
   for (const creance of donnees.creancesAEncaisser) {

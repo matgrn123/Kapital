@@ -13,6 +13,10 @@ import { verifierDeblocage } from "./verrouEtape.js";
 export const MESSAGE_AUCUN_POSTE_LIBRE =
   "Pose d'abord un poste de travail dans ton atelier (écran Atelier) : tous tes postes sont occupés.";
 
+/** Message montré au joueur qui veut embaucher un vendeur sans boutique (AE-10). */
+export const MESSAGE_SANS_BOUTIQUE =
+  "Un vendeur travaille en boutique : ouvre d'abord une boutique (écran Magasin). Tu peux l'embaucher pendant les travaux.";
+
 /**
  * 3D-3 (décision du 25 novembre 2026) : embaucher un ARTISAN sans poste libre est REFUSÉ. Les
  * postes sont les modules « poste » posés dans le plan de l'atelier (atelier/effetsPlan) ; un
@@ -26,6 +30,10 @@ export function validerEmbauche(
 ): Result {
   const verrou = verifierDeblocage(ctx, "embauche");
   if (!verrou.ok) return verrou;
+  // AE-10 : un vendeur travaille en boutique ; sans boutique ouverte ou en travaux, refus.
+  if (d.poste === "vendeur" && (ctx.entreprise.pointsDeVente ?? []).length === 0) {
+    return refuse("sans_boutique", MESSAGE_SANS_BOUTIQUE);
+  }
   if (
     d.poste === "artisan" &&
     postesLibres(ctx.entreprise.salaries, postesEquipesAtelier(ctx.entreprise.atelier)) === 0

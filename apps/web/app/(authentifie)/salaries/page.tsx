@@ -20,7 +20,7 @@ import { BoutonLicencier, FormulaireEmbauche } from "./FormulaireEmbauche";
 
 type Employee = {
   id: string;
-  poste: "artisan" | "encadrement";
+  poste: "artisan" | "encadrement" | "vendeur";
   salaire_brut_mensuel_centimes: number;
   cree_le: string;
   anciennete_mois_debut: number;
@@ -29,7 +29,7 @@ type Employee = {
 };
 
 const pourcent = (x: number) => `${(x * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
-const POSTES = { artisan: "Artisan", encadrement: "Encadrement" } as const;
+const POSTES = { artisan: "Artisan", encadrement: "Encadrement", vendeur: "Vendeur" } as const;
 
 export default async function PageSalaries() {
   const supabase = await creerClientServeur();

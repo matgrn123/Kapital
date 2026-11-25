@@ -114,7 +114,8 @@ describe("migration 0035 : comptes annuels publics", () => {
   it("totalise le bilan sur exactement les comptes d'actif du plan comptable du moteur", () => {
     const liste = /l\.compte in \(([^)]*)\)/.exec(code)?.[1] ?? "";
     const comptes = [...liste.matchAll(/'(\w+)'/g)].map((m) => m[1]).sort();
-    const actifs = PLAN_COMPTABLE_V1.filter((c) => c.type === "actif")
+    // 2135 (agencements de la boutique) arrive avec la migration 0038, qui reprend la vue.
+    const actifs = PLAN_COMPTABLE_V1.filter((c) => c.type === "actif" && c.numero !== "2135")
       .map((c) => c.numero)
       .sort();
     expect(comptes).toEqual(actifs);

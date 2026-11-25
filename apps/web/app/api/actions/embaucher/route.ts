@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { centimes } from "@kapital/engine";
-import { validerDecision } from "@kapital/server";
+import { centimes, type Poste } from "@kapital/engine";
+import { chargerPointsDeVenteSupabase, validerDecision } from "@kapital/server";
 import {
   chargerContexte,
   chargerEntreprisePersonnel,
@@ -21,19 +21,24 @@ export async function POST(request: Request) {
   if (verrou) return verrou;
 
   const body = (await request.json()) as {
-    poste?: "artisan" | "encadrement";
+    poste?: Poste;
     salaireBrutMensuelCentimes?: number;
   };
   const poste = body.poste;
   const salaire = body.salaireBrutMensuelCentimes ?? 0;
-  if (poste !== "artisan" && poste !== "encadrement") {
+  if (poste !== "artisan" && poste !== "encadrement" && poste !== "vendeur") {
     return NextResponse.json({ error: "Poste invalide." }, { status: 400 });
   }
   if (!Number.isInteger(salaire) || salaire <= 0) {
     return NextResponse.json({ error: "Salaire invalide." }, { status: 400 });
   }
 
-  const entreprise = await chargerEntreprisePersonnel(ctx);
+  // AE-10 : un vendeur n'est embauché que pour une boutique ouverte ou en travaux.
+  const personnel = await chargerEntreprisePersonnel(ctx);
+  const entreprise =
+    poste === "vendeur"
+      ? { ...personnel, pointsDeVente: await chargerPointsDeVenteSupabase(ctx.supabaseAdmin, ctx.companyId) }
+      : personnel;
   const decision = validerDecision(
     { entreprise },
     { type: "embauche", poste, salaireBrutMensuel: centimes(salaire) },

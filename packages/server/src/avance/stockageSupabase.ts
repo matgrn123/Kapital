@@ -1,7 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { chargerModulesV1, type TypeModule } from "@kapital/content";
+import { chargerBatimentsV1, chargerModulesV1, type TypeBatiment, type TypeModule } from "@kapital/content";
 import {
   centimes,
+  estEmplacementBoutique,
+  passantsReferenceBoutiques,
+  PREFIXE_AMORTISSEMENT_AGENCEMENT,
+  type PointDeVente,
+  type Poste,
   resoudreModules,
   idEntreprise,
   idMatiere,
@@ -81,6 +86,76 @@ export function materielDepuisLedger(
   return { valeurBrute: centimes(brut), amortissementsCumules: centimes(amorti) };
 }
 
+// ---------------------------------------------------------------------------
+// AE-10 : boutiques (points_de_vente, stock_boutique), migration 0038
+// ---------------------------------------------------------------------------
+
+export type LignePointDeVente = {
+  id: string;
+  batiment_id: string;
+  surface_m2: number;
+  loyer_mensuel_centimes: number;
+  charges_mensuelles_centimes: number;
+  depot_garantie_centimes: number;
+  travaux_centimes: number;
+  duree_amortissement_mois: number;
+  mois_signature: number;
+  mois_ouverture: number;
+  stock_boutique: { product_id: string; quantite_pieces: number; valeur_totale_centimes: number }[] | null;
+};
+
+/**
+ * Boutiques lues en base, complétées par le catalogue (passants, bonus de désirabilité) et par
+ * les amortissements déjà passés (écritures 28135 « boutique_amort_<mois>_<id> » de chacune).
+ */
+export function pointsDeVenteDepuisLignes(
+  lignes: readonly LignePointDeVente[] | null | undefined,
+  amortissements: readonly { ecriture_id: string; sens: string; montant_centimes: number }[],
+  catalogue: readonly TypeBatiment[],
+): PointDeVente[] {
+  if (!lignes || lignes.length === 0) return [];
+  const reference = passantsReferenceBoutiques(catalogue);
+  return lignes.map((l) => {
+    const b = catalogue.find((x) => x.id === l.batiment_id);
+    const effet = b && estEmplacementBoutique(b) ? b.effet : null;
+    let amorti = 0;
+    for (const a of amortissements) {
+      if (!a.ecriture_id.startsWith(PREFIXE_AMORTISSEMENT_AGENCEMENT) || !a.ecriture_id.endsWith(`_${l.id}`)) continue;
+      amorti += a.sens === "credit" ? Number(a.montant_centimes) : -Number(a.montant_centimes);
+    }
+    return {
+      id: l.id,
+      batimentId: l.batiment_id,
+      surfaceM2: l.surface_m2,
+      loyerMensuel: centimes(Number(l.loyer_mensuel_centimes)),
+      chargesMensuelles: centimes(Number(l.charges_mensuelles_centimes)),
+      depotGarantie: centimes(Number(l.depot_garantie_centimes)),
+      moisSignature: moisJeu(l.mois_signature),
+      moisOuverture: moisJeu(l.mois_ouverture),
+      agencement: {
+        valeurBrute: centimes(Number(l.travaux_centimes)),
+        amortissementsCumules: centimes(amorti),
+        dureeAmortissementMois: l.duree_amortissement_mois,
+      },
+      // Emplacement retiré du catalogue : la boutique vend encore (référence), sans bonus.
+      passantsParJour: effet?.passants_par_jour ?? reference,
+      passantsReference: reference,
+      bonusDesirabiliteParMois: effet?.bonus_desirabilite_points_par_mois ?? 0,
+      stock: (l.stock_boutique ?? []).map((s) => ({
+        produit: idProduit(s.product_id),
+        quantite: s.quantite_pieces,
+        valeurTotale: centimes(Number(s.valeur_totale_centimes)),
+      })),
+    };
+  });
+}
+
+/** Avant la migration 0038, la table points_de_vente n'existe pas : aucune boutique. */
+function tableAbsente(error: { message: string; code?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === "42P01" || error.code === "PGRST205" || /points_de_vente|stock_boutique/.test(error.message);
+}
+
 /** Une jointure PostgREST rend un objet, parfois une liste d'un élément. */
 function uneLigne<T>(v: T | T[] | null | undefined): T | null {
   if (Array.isArray(v)) return v[0] ?? null;
@@ -116,6 +191,13 @@ export type ChargeUtilePas = {
     readonly valeur_totale_centimes: number;
   }[];
   readonly stocks_finis: readonly {
+    readonly product_id: string;
+    readonly quantite_pieces: number;
+    readonly valeur_totale_centimes: number;
+  }[];
+  /** AE-10 : stocks des boutiques (lus par appliquer_pas_boutique, migration 0038). */
+  readonly stocks_boutique?: readonly {
+    readonly point_de_vente_id: string;
     readonly product_id: string;
     readonly quantite_pieces: number;
     readonly valeur_totale_centimes: number;
@@ -159,6 +241,18 @@ export function chargeUtileDepuisLot(lot: ResultatLotAEnregistrer): ChargeUtileP
       quantite_pieces: s.quantite,
       valeur_totale_centimes: s.valeurTotale,
     })),
+    ...(e.pointsDeVente && e.pointsDeVente.length > 0
+      ? {
+          stocks_boutique: e.pointsDeVente.flatMap((pdv) =>
+            pdv.stock.map((s) => ({
+              point_de_vente_id: pdv.id,
+              product_id: s.produit as string,
+              quantite_pieces: s.quantite,
+              valeur_totale_centimes: s.valeurTotale,
+            })),
+          ),
+        }
+      : {}),
     prets: e.prets.map((p) => ({
       id: p.id as string,
       capital_restant_centimes: p.capitalRestant,
@@ -178,6 +272,11 @@ export function chargeUtileDepuisLot(lot: ResultatLotAEnregistrer): ChargeUtileP
     ordres_faconnier_livres: lot.ordresFaconnierLivres,
     cumul: lot.cumul,
   };
+}
+
+/** Fonction Postgres du pas : celle des boutiques seulement quand la société en a une (0038). */
+export function fonctionDePas(etat: ChargeUtilePas): "appliquer_pas_entreprise" | "appliquer_pas_boutique" {
+  return etat.stocks_boutique === undefined ? "appliquer_pas_entreprise" : "appliquer_pas_boutique";
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +385,7 @@ export class StockageSupabase implements StockageMonde {
   }
 
   async chargerEtat(companyId: string, moisEnCours: number): Promise<EtatChargeEntreprise> {
-    const [companyR, matR, pfR, empR, atelierR, pretsR, produitsR, marqueR, etatR, materielR] =
+    const [companyR, matR, pfR, empR, atelierR, pretsR, produitsR, marqueR, etatR, materielR, boutiquesR, amortBoutiqueR] =
       await Promise.all([
         this.supabase
           .from("companies")
@@ -318,7 +417,8 @@ export class StockageSupabase implements StockageMonde {
           .eq("statut", "actif"),
         this.supabase
           .from("company_products")
-          .select(`product_id, qualite_visee, prix_vente_directe_centimes, prix_revendeur_centimes, production_mensuelle_cible, ${COLONNES_NOMENCLATURE}`)
+          // « * » : prix_boutique_centimes (0038) est lu quand la colonne existe, sans casser avant.
+          .select(`*, ${COLONNES_NOMENCLATURE}`)
           .eq("company_id", companyId),
         this.supabase
           .from("brand_state")
@@ -335,6 +435,17 @@ export class StockageSupabase implements StockageMonde {
           .select("compte, sens, montant_centimes")
           .eq("company_id", companyId)
           .in("compte", ["2154", "2815"]),
+        this.supabase
+          .from("points_de_vente")
+          .select("id, batiment_id, surface_m2, loyer_mensuel_centimes, charges_mensuelles_centimes, depot_garantie_centimes, travaux_centimes, duree_amortissement_mois, mois_signature, mois_ouverture, stock_boutique(product_id, quantite_pieces, valeur_totale_centimes)")
+          .eq("company_id", companyId)
+          .eq("statut", "actif")
+          .order("cree_le"),
+        this.supabase
+          .from("ledger_entries")
+          .select("ecriture_id, sens, montant_centimes")
+          .eq("company_id", companyId)
+          .eq("compte", "28135"),
       ]);
 
     const company = verifier("companies", companyR) as LigneCompany | null;
@@ -346,7 +457,7 @@ export class StockageSupabase implements StockageMonde {
       product_id: string; quantite_pieces: number; valeur_totale_centimes: number;
     }>;
     const employees = (verifier("employees", empR) ?? []) as Array<{
-      id: string; poste: "artisan" | "encadrement"; salaire_brut_mensuel_centimes: number;
+      id: string; poste: Poste; salaire_brut_mensuel_centimes: number;
       anciennete_mois_debut: number; experience_mois_debut: number; mois_jeu_debut: number | null;
     }>;
     const workshop = verifier("workshops", atelierR) as {
@@ -364,6 +475,7 @@ export class StockageSupabase implements StockageMonde {
     const produits = (verifier("company_products", produitsR) ?? []) as Array<{
       product_id: string; qualite_visee: number; prix_vente_directe_centimes: number;
       prix_revendeur_centimes: number; production_mensuelle_cible: number;
+      prix_boutique_centimes?: number | null;
       products: LigneProduitNomenclature | LigneProduitNomenclature[] | null;
     }>;
     const marque = verifier("brand_state", marqueR) as { notoriete: number; desirabilite: number } | null;
@@ -372,6 +484,17 @@ export class StockageSupabase implements StockageMonde {
       (verifier("ledger 2154 / 2815", materielR) ?? []) as Array<{ compte: string; sens: string; montant_centimes: number }>,
     );
     const modules = modulesDepuisLignes(workshop?.placed_modules, chargerModulesV1());
+    // AE-10 : boutiques (aucune tant que la migration 0038 n'est pas appliquée).
+    const lignesBoutiques = tableAbsente(boutiquesR.error)
+      ? []
+      : ((verifier("points_de_vente", boutiquesR) ?? []) as LignePointDeVente[]);
+    const pointsDeVente = pointsDeVenteDepuisLignes(
+      lignesBoutiques,
+      lignesBoutiques.length === 0
+        ? []
+        : ((verifier("ledger 28135", amortBoutiqueR) ?? []) as Array<{ ecriture_id: string; sens: string; montant_centimes: number }>),
+      chargerBatimentsV1(),
+    );
 
     const entreprise: Entreprise = {
       id: idEntreprise(company.id),
@@ -452,10 +575,13 @@ export class StockageSupabase implements StockageMonde {
         prix: {
           vente_directe: centimes(p.prix_vente_directe_centimes),
           revendeur: centimes(p.prix_revendeur_centimes),
+          // AE-10 : null ou absent (avant 0038) = prix de la vente directe.
+          ...(p.prix_boutique_centimes == null ? {} : { boutique: centimes(Number(p.prix_boutique_centimes)) }),
         },
         productionMensuelleCible: p.production_mensuelle_cible,
         ...(uneLigne(p.products) ? { fabrication: ficheDepuisLigne(uneLigne(p.products)!) } : {}),
       })),
+      ...(pointsDeVente.length > 0 ? { pointsDeVente } : {}),
     };
     return { entreprise, cumul: etat?.cumul ?? null };
   }
@@ -626,17 +752,21 @@ export class StockageSupabase implements StockageMonde {
     nbPas: number,
     lot: ResultatLotAEnregistrer,
   ): Promise<void> {
-    const { error } = await this.supabase.rpc("appliquer_pas_entreprise", {
+    const etat = chargeUtileDepuisLot(lot);
+    // AE-10 : une société avec boutique passe par appliquer_pas_boutique (0038), qui appelle
+    // appliquer_pas_entreprise puis enregistre les stocks des boutiques, dans la même transaction.
+    const fonction = fonctionDePas(etat);
+    const { error } = await this.supabase.rpc(fonction, {
       p_company_id: companyId,
       p_pas_attendu: pasAttendu,
-      p_etat: chargeUtileDepuisLot(lot),
+      p_etat: etat,
       p_nb_pas: nbPas,
     });
     if (error) {
       if (error.code === "KP409" || /pas_deja_traite/.test(error.message)) {
         throw new ErreurPasDejaTraite(error.message);
       }
-      throw new Error(`appliquer_pas_entreprise ${companyId} : ${error.message}`);
+      throw new Error(`${fonction} ${companyId} : ${error.message}`);
     }
   }
 }

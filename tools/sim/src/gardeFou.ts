@@ -34,6 +34,7 @@ export type CodeAnomalie =
   | "stock_fini_sans_ecriture"
   | "pret_sans_ecriture"
   | "depot_garantie_sans_ecriture"
+  | "agencement_sans_ecriture"
   | "stock_negatif";
 
 export type Anomalie = {
@@ -169,16 +170,18 @@ export function verifierGardeFouMonetaire(e: EntreesGardeFou): readonly Anomalie
       obtenu: stockMatiere,
     });
   }
-  const stockFini = somme(ent.stocksFinis.map((s) => s.valeurTotale));
+  // AE-10 : le stock des boutiques est aussi au compte 35.
+  const stocksBoutiques = (ent.pointsDeVente ?? []).flatMap((p) => p.stock);
+  const stockFini = somme([...ent.stocksFinis, ...stocksBoutiques].map((s) => s.valeurTotale));
   if (stockFini !== soldeCompte(glApres, "35")) {
     ajouter({
       code: "stock_fini_sans_ecriture",
-      message: "La valeur du stock de produits finis du moteur n'est pas le solde du compte 35.",
+      message: "La valeur du stock de produits finis du moteur (atelier et boutiques) n'est pas le solde du compte 35.",
       attendu: soldeCompte(glApres, "35"),
       obtenu: stockFini,
     });
   }
-  for (const s of [...ent.stocksMatiere, ...ent.stocksFinis]) {
+  for (const s of [...ent.stocksMatiere, ...ent.stocksFinis, ...stocksBoutiques]) {
     if (s.quantite < 0 || s.valeurTotale < 0) {
       ajouter({
         code: "stock_negatif",
@@ -198,13 +201,26 @@ export function verifierGardeFouMonetaire(e: EntreesGardeFou): readonly Anomalie
     });
   }
 
-  const depot = ent.atelier?.bail?.depotGarantie ?? 0;
+  const depot =
+    (ent.atelier?.bail?.depotGarantie ?? 0) + somme((ent.pointsDeVente ?? []).map((p) => p.depotGarantie));
   if (depot !== soldeCompte(glApres, "275")) {
     ajouter({
       code: "depot_garantie_sans_ecriture",
-      message: "Le dépôt de garantie du bail n'est pas le solde du compte 275.",
+      message: "Les dépôts de garantie (atelier et boutiques) ne sont pas le solde du compte 275.",
       attendu: soldeCompte(glApres, "275"),
       obtenu: depot,
+    });
+  }
+
+  // AE-10 : agencements des boutiques (2135) et leurs amortissements (28135).
+  const agencements = somme((ent.pointsDeVente ?? []).map((p) => p.agencement.valeurBrute));
+  const amortis = somme((ent.pointsDeVente ?? []).map((p) => p.agencement.amortissementsCumules));
+  if (agencements !== soldeCompte(glApres, "2135") || amortis !== soldeCompte(glApres, "28135")) {
+    ajouter({
+      code: "agencement_sans_ecriture",
+      message: "Les agencements des boutiques (ou leurs amortissements) ne sont pas les soldes des comptes 2135 et 28135.",
+      attendu: soldeCompte(glApres, "2135") - soldeCompte(glApres, "28135"),
+      obtenu: agencements - amortis,
     });
   }
 
