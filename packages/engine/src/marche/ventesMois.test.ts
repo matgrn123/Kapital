@@ -41,7 +41,7 @@ function entrepriseMilieu(
     stocksMatiere: [],
     stocksFinis: [],
     salaries: [],
-    atelier: null,
+    ateliers: [],
     marque: { notoriete: noto, desirabilite: desi },
     prets: [],
     catalogue: [prod],

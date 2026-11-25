@@ -46,7 +46,6 @@ function demande(o: Partial<Parameters<typeof acheterLocal>[0]> = {}): Parameter
     tauxEstrAnnuel: ESTR,
     tresorerie: centimes(100_000_000),
     detteEnCours: centimes(0),
-    aDejaUnLocal: false,
     params: PARAMS_SANS_PRIME,
     ...o,
   };
@@ -129,8 +128,9 @@ describe("acheterLocal : décision", () => {
     expect(r).toMatchObject({ ok: false, code: "tresorerie_insuffisante", manque: 571_400 });
   });
 
-  it("refuse si l'entreprise a déjà un local", () => {
-    expect(acheterLocal(demande({ aDejaUnLocal: true }))).toMatchObject({ ok: false, code: "local_deja_detenu" });
+  it("3D-7 : détenir déjà un local n'empêche plus d'en acheter un autre ; les écritures portent l'id du local", () => {
+    const r = ok(acheterLocal(demande({ idLocal: "local_b" })));
+    expect(r.ecritures.map((e) => e.id)).toEqual(r.ecritures.map((e) => e.id).filter((id) => id.endsWith("_local_b")));
   });
 
   it("respecte la capacité d'emprunt : dette totale au plus 10 fois la trésorerie (refus chiffré du moteur)", () => {
@@ -242,7 +242,7 @@ describe("louer ou acheter le même local pendant 24 mois (calcul à la main)", 
       stocksMatiere: [],
       stocksFinis: [],
       salaries: [],
-      atelier: null,
+      ateliers: [],
       marque: { notoriete: 50, desirabilite: 50 },
       prets: [],
       catalogue: [],
@@ -278,7 +278,7 @@ describe("louer ou acheter le même local pendant 24 mois (calcul à la main)", 
     const gl = enregistrer(planComptableV1(), signature);
     const e = base({
       tresorerie: centimes(tresoDepart - bail.depotGarantie),
-      atelier: { surfaceM2: PETIT.surface_m2, loyerMensuel: centimes(PETIT.loyer_mensuel_centimes), modules: postesALaSignature(0, MODULES_CATALOGUE), bail },
+      ateliers: [{ surfaceM2: PETIT.surface_m2, loyerMensuel: centimes(PETIT.loyer_mensuel_centimes), modules: postesALaSignature(0, MODULES_CATALOGUE), bail }],
     });
     return derouler(e, gl);
   }
@@ -289,7 +289,7 @@ describe("louer ou acheter le même local pendant 24 mois (calcul à la main)", 
     for (const ec of r.ecritures) gl = enregistrer(gl, ec);
     const e = base({
       tresorerie: centimes(tresoDepart - r.apport),
-      atelier: { surfaceM2: PETIT.surface_m2, loyerMensuel: centimes(0), modules: postesALaSignature(0, MODULES_CATALOGUE), achat: r.achat },
+      ateliers: [{ surfaceM2: PETIT.surface_m2, loyerMensuel: centimes(0), modules: postesALaSignature(0, MODULES_CATALOGUE), achat: r.achat }],
       prets: [
         {
           id: idPret("pret_achat"),

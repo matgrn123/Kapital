@@ -17,6 +17,7 @@ import {
 import {
   ecritureAmortissementConstruction,
   ecritureEntretienLocal,
+  suffixeLocal,
 } from "../locaux/achat.js";
 import {
   bailTermineAu,
@@ -30,7 +31,7 @@ import {
 } from "../atelier/effetsPlan.js";
 import { constaterEtape, seuilsEtapesDepuis } from "../etapes/etapes.js";
 import { ecrituresClotureBoutique } from "../boutique/boutique.js";
-import type { Entreprise, Pret } from "../types/entreprise.js";
+import type { Atelier, Entreprise, Pret } from "../types/entreprise.js";
 import { centimes, type MoisJeu } from "../types/primitifs.js";
 import type { Explication } from "../types/resultatMois.js";
 import type {
@@ -85,6 +86,22 @@ function ventesPerduesDepuisCumul(cumul: CumulMois): readonly VentePerdueParProd
  * totaux des écritures du mois déjà passées. Le résultat ne liste que les
  * écritures passées par la clôture elle-même.
  */
+/**
+ * 3D-7 : avec plusieurs locaux, chacun doit avoir un identifiant distinct, sinon leurs
+ * écritures (loyer, énergie, amortissements…) porteraient le même identifiant.
+ */
+function verifierIdentifiantsLocaux(ateliers: readonly Atelier[]): void {
+  if (ateliers.length <= 1) return;
+  const ids = new Set<string>();
+  for (const a of ateliers) {
+    if (a.id === undefined || a.id.length === 0) {
+      throw new Error("Plusieurs locaux : chaque local doit avoir un identifiant (Atelier.id).");
+    }
+    if (ids.has(a.id)) throw new Error(`Deux locaux portent le même identifiant : ${a.id}.`);
+    ids.add(a.id);
+  }
+}
+
 export function cloturerMois(
   entreprise: Entreprise,
   cumul: CumulMois,
@@ -95,7 +112,8 @@ export function cloturerMois(
   let ent = { ...entreprise };
   let gl: GrandLivre = planComptableV1();
   const ecrituresCloture: EcritureComptable[] = [];
-  const atelierDuMois = ent.atelier;
+  const loyerAteliersDuMois = ent.ateliers.reduce((s, a) => s + a.loyerMensuel, 0);
+  const nbAteliersLoues = ent.ateliers.filter((a) => a.loyerMensuel > 0).length;
 
   function enr(ecriture: EcritureComptable): void {
     gl = enregistrer(gl, ecriture);
@@ -151,9 +169,14 @@ export function cloturerMois(
     totalSalairesBruts += salarie.salaireBrutMensuel;
   }
 
-  // Atelier : loyer, énergie, amortissement
-  if (ent.atelier !== null) {
-    const atelier = ent.atelier;
+  // Ateliers : loyer, énergie, amortissement. 3D-7 : chaque local paie les siens ; ses écritures
+  // portent son identifiant (suffixeLocal) dès qu'il en a un.
+  verifierIdentifiantsLocaux(ent.ateliers);
+  const kwhParPoste = lireParametre(params, "energie_kwh_par_poste_mois");
+  const prixElecParKwh = lireParametre(params, "prix_electricite_pro");
+  const postesFournis = lireParametre(params, "bail_machines_a_la_signature");
+  const ateliersApres = ent.ateliers.map((atelier) => {
+    const suffixe = suffixeLocal(atelier.id);
 
     // Loyer (613) et charges locatives (614) ; un atelier d'avant AE-5 n'a pas de charges.
     for (const ecriture of ecrituresMensuellesBail(
@@ -161,26 +184,25 @@ export function cloturerMois(
       mois,
       atelier.loyerMensuel,
       atelier.bail?.chargesMensuelles ?? centimes(0),
+      atelier.id,
     )) {
       enr(ecriture);
     }
 
     // Propriétaire (AE-6) : entretien du local (614) et amortissement de la construction (681 / 2813)
     if (atelier.achat) {
-      const entretien = ecritureEntretienLocal(ent.id, mois, atelier.achat);
+      const entretien = ecritureEntretienLocal(ent.id, mois, atelier.achat, atelier.id);
       if (entretien) enr(entretien);
-      const amortConstruction = ecritureAmortissementConstruction(ent.id, mois, atelier.achat);
+      const amortConstruction = ecritureAmortissementConstruction(ent.id, mois, atelier.achat, atelier.id);
       if (amortConstruction) enr(amortConstruction);
     }
 
     // 3D-3 : énergie par poste posé (paramètre energie_kwh_par_poste_mois × prix du kWh).
     const postesPoses = effetsPlan(atelier.modules).postesEquipes;
-    const kwhParPoste = lireParametre(params, "energie_kwh_par_poste_mois");
-    const prixElecParKwh = lireParametre(params, "prix_electricite_pro");
     const energieCentimes = centimes(Math.round(postesPoses * kwhParPoste * prixElecParKwh));
     if (energieCentimes > 0) {
       enr({
-        id: `energie_${mois}_${ent.id}`,
+        id: `energie_${mois}_${ent.id}${suffixe}`,
         mois,
         libelle: `Énergie atelier (${postesPoses} poste${postesPoses > 1 ? "s" : ""})`,
         lignes: [
@@ -193,11 +215,10 @@ export function cloturerMois(
     // 3D-3 : amortissement linéaire du matériel réellement acheté (prix / amortissement_mois du
     // catalogue), plafonné au matériel restant au bilan. Les postes fournis avec le local
     // (bail_machines_a_la_signature) ne sont pas à l'actif, donc pas amortis.
-    const postesFournis = lireParametre(params, "bail_machines_a_la_signature");
     const amortMensuel = amortissementMensuelModules(atelier.modules, postesFournis, atelier.materiel);
     if (amortMensuel > 0) {
       enr({
-        id: `amort_${mois}_${ent.id}`,
+        id: `amort_${mois}_${ent.id}${suffixe}`,
         mois,
         libelle: `Amortissement du matériel de l'atelier`,
         lignes: [
@@ -209,17 +230,15 @@ export function cloturerMois(
     const valeurBrute =
       atelier.materiel?.valeurBrute ??
       centimes(modulesAchetes(atelier.modules, postesFournis).reduce((s, m) => s + m.prix, 0));
-    ent = {
-      ...ent,
-      atelier: {
-        ...atelier,
-        materiel: {
-          valeurBrute,
-          amortissementsCumules: centimes((atelier.materiel?.amortissementsCumules ?? 0) + amortMensuel),
-        },
+    return {
+      ...atelier,
+      materiel: {
+        valeurBrute,
+        amortissementsCumules: centimes((atelier.materiel?.amortissementsCumules ?? 0) + amortMensuel),
       },
     };
-  }
+  });
+  ent = { ...ent, ateliers: ateliersApres };
 
   // AE-10 : boutiques : loyer et charges dès la signature, amortissement des agencements dès l'ouverture.
   if (ent.pointsDeVente !== undefined && ent.pointsDeVente.length > 0) {
@@ -232,10 +251,15 @@ export function cloturerMois(
   }
 
   // Fin de bail : dernier mois payé, le dépôt de garantie revient, le local est libéré.
-  if (ent.atelier?.bail && bailTermineAu(ent.atelier.bail, mois)) {
-    const restitution = ecritureRestitutionDepot(ent.id, mois, ent.atelier.bail);
-    if (restitution) enr(restitution);
-    ent = { ...ent, atelier: null };
+  // 3D-7 : local par local ; les autres locaux de la société ne bougent pas.
+  if (ent.ateliers.some((a) => a.bail && bailTermineAu(a.bail, mois))) {
+    const restants = ent.ateliers.filter((a) => {
+      if (!a.bail || !bailTermineAu(a.bail, mois)) return true;
+      const restitution = ecritureRestitutionDepot(ent.id, mois, a.bail, a.id);
+      if (restitution) enr(restitution);
+      return false;
+    });
+    ent = { ...ent, ateliers: restants };
   }
 
   // Prêts : échéances
@@ -360,10 +384,13 @@ export function cloturerMois(
     });
   }
 
-  if (atelierDuMois !== null && atelierDuMois.loyerMensuel > 0) {
+  if (loyerAteliersDuMois > 0) {
     explications.push({
       cle: "loyer",
-      message: `Loyer atelier : ${eurosTexte(atelierDuMois.loyerMensuel)}`,
+      message:
+        nbAteliersLoues > 1
+          ? `Loyers des ateliers (${nbAteliersLoues} locaux) : ${eurosTexte(centimes(loyerAteliersDuMois))}`
+          : `Loyer atelier : ${eurosTexte(centimes(loyerAteliersDuMois))}`,
     });
   }
 

@@ -58,11 +58,11 @@ describe("types du moteur", () => {
           experienceMois: 0,
         },
       ],
-      atelier: {
+      ateliers: [{
         surfaceM2: 50,
         loyerMensuel: centimes(100_000),
         modules: postesALaSignature(2, MODULES_CATALOGUE),
-      },
+      }],
       marque: { notoriete: 0, desirabilite: 0 },
       prets: [],
       catalogue: [],
@@ -86,7 +86,7 @@ describe("types du moteur", () => {
           stocksMatiere: [],
           stocksFinis: [],
           salaries: [],
-          atelier: null,
+          ateliers: [],
           marque: { notoriete: 10, desirabilite: 5 },
           prets: [],
           catalogue: [],

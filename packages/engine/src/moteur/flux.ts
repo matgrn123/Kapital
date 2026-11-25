@@ -2,7 +2,7 @@ import type { Parametres } from "@kapital/content";
 import { enregistrer, planComptableV1 } from "../comptabilite/index.js";
 import type { EcritureComptable, GrandLivre } from "../comptabilite/types.js";
 import { capaciteMinutes, rendement } from "../atelier/calculs.js";
-import { postesEquipesAtelier } from "../atelier/effetsPlan.js";
+import { postesEquipesAteliers } from "../atelier/effetsPlan.js";
 import { artisansAuPoste } from "../personnel/postes.js";
 import { calculerVentesMois } from "../marche/ventesMois.js";
 import {
@@ -186,11 +186,12 @@ type LignePlanProduction = { readonly produit: IdProduit; readonly pieces: numbe
  * Un pas n'en fait qu'une part (voir `avancerFlux`).
  */
 export function planProductionDuMois(ent: Entreprise, params: Parametres): readonly LignePlanProduction[] {
-  if (ent.atelier === null) return [];
+  if (ent.ateliers.length === 0) return [];
   // AE-7 : seuls les artisans qui occupent un poste équipé produisent et comptent dans le
   // rendement (les plus expérimentés d'abord) ; embaucher sans poste libre ne change rien.
   // 3D-3 : les postes sont les modules réellement posés dans le plan d'aménagement.
-  const postesEquipes = postesEquipesAtelier(ent.atelier);
+  // 3D-7 : la capacité est la somme des postes posés de tous les locaux de la société.
+  const postesEquipes = postesEquipesAteliers(ent.ateliers);
   const artisans = artisansAuPoste(ent.salaries, postesEquipes);
   const nbArtisans = artisans.length;
   if (nbArtisans === 0) return [];

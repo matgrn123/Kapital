@@ -224,7 +224,7 @@ function echeanceDuMois(pret: Pret, mois: MoisJeu): EcheancePret | null {
 export type ChargesFixesMensuelles = {
   /** Salaires bruts et cotisations patronales. */
   readonly salaires: Centimes;
-  /** Loyer de l'atelier, plus loyer et charges des boutiques (AE-10). */
+  /** Loyers des ateliers (3D-7 : tous les locaux), plus loyer et charges des boutiques (AE-10). */
   readonly loyer: Centimes;
   /** Intérêts de l'échéance du mois (le capital remboursé n'est pas une charge). */
   readonly interetsPrets: Centimes;
@@ -255,7 +255,8 @@ export function chargesFixesMensuelles(
     });
   }
   // AE-10 : le loyer compte aussi le loyer et les charges des boutiques (payés dès la signature).
-  let loyer: number = e.atelier?.loyerMensuel ?? 0;
+  // 3D-7 : loyers de tous les locaux de la société.
+  let loyer: number = e.ateliers.reduce((s, a) => s + a.loyerMensuel, 0);
   for (const pdv of e.pointsDeVente ?? []) {
     if (mois >= pdv.moisSignature) loyer += pdv.loyerMensuel + pdv.chargesMensuelles;
   }

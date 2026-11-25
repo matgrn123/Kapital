@@ -25,12 +25,12 @@ function entreprise(o: Partial<Entreprise> = {}): Entreprise {
     stocksMatiere: [],
     stocksFinis: [],
     salaries: [],
-    atelier: {
+    ateliers: [{
       surfaceM2: 150,
       loyerMensuel: centimes(250_000),
       modules: postesALaSignature(0, MODULES_CATALOGUE),
       bail: { depotGarantie: centimes(250_000), chargesMensuelles: centimes(105_000), moisSignature: moisJeu(1), moisFin: null },
-    },
+    }],
     marque: { notoriete: 50, desirabilite: 50 },
     prets: [],
     catalogue: [],
@@ -55,12 +55,12 @@ describe("clôture : loyer, charges et fin de bail", () => {
     expect(soldeCompte(gl, "512")).toBe(-355_000);
     expect(enEquilibre(gl)).toBe(true);
     expect(r.entrepriseApres.tresorerie).toBe(2_000_000 - 355_000);
-    expect(r.entrepriseApres.atelier).not.toBeNull();
+    expect(r.entrepriseApres.ateliers).toHaveLength(1);
   });
 
   it("un atelier sans bail détaillé (ancien) ne paie que son loyer", () => {
     const e = entreprise();
-    const r = cloturer({ ...e, atelier: { ...e.atelier!, bail: undefined } }, 5);
+    const r = cloturer({ ...e, ateliers: [{ ...e.ateliers[0]!, bail: undefined }] }, 5);
     const gl = grandLivreDe(r.ecritures);
     expect(soldeCompte(gl, "613")).toBe(250_000);
     expect(soldeCompte(gl, "614")).toBe(0);
@@ -68,13 +68,13 @@ describe("clôture : loyer, charges et fin de bail", () => {
 
   it("au mois de fin de bail : dernier loyer payé, dépôt restitué, atelier libéré", () => {
     const e = entreprise();
-    const fin = { ...e, atelier: { ...e.atelier!, bail: { ...e.atelier!.bail!, moisFin: moisJeu(16) } } };
+    const fin = { ...e, ateliers: [{ ...e.ateliers[0]!, bail: { ...e.ateliers[0]!.bail!, moisFin: moisJeu(16) } }] };
     const avant = cloturer(fin, 15);
-    expect(avant.entrepriseApres.atelier).not.toBeNull();
+    expect(avant.entrepriseApres.ateliers).toHaveLength(1);
     expect(avant.ecritures.some((x) => x.id.startsWith("bail_restitution_"))).toBe(false);
 
     const r = cloturer(fin, 16);
-    expect(r.entrepriseApres.atelier).toBeNull();
+    expect(r.entrepriseApres.ateliers).toEqual([]);
     const rest = r.ecritures.find((x) => x.id.startsWith("bail_restitution_"));
     expect(rest?.lignes).toEqual([
       { compte: "512", sens: "debit", montant: 250_000 },
@@ -86,7 +86,7 @@ describe("clôture : loyer, charges et fin de bail", () => {
 
   it("cycle complet : dépôt versé à la signature puis restitué, actif = passif à chaque étape", () => {
     const e = entreprise();
-    const bail = e.atelier!.bail!;
+    const bail = e.ateliers[0]!.bail!;
     let gl = planComptableV1();
     gl = enregistrer(gl, {
       id: "capital",
@@ -107,7 +107,7 @@ describe("clôture : loyer, charges et fin de bail", () => {
       ],
     });
     expect(enEquilibre(gl)).toBe(true);
-    const fin = { ...e, atelier: { ...e.atelier!, bail: { ...bail, moisFin: moisJeu(2) } } };
+    const fin = { ...e, ateliers: [{ ...e.ateliers[0]!, bail: { ...bail, moisFin: moisJeu(2) } }] };
     for (const x of [...cloturer(fin, 1).ecritures, ...cloturer(fin, 2).ecritures]) gl = enregistrer(gl, x);
     expect(enEquilibre(gl)).toBe(true);
     expect(soldeCompte(gl, "275")).toBe(0);
@@ -117,7 +117,7 @@ describe("clôture : loyer, charges et fin de bail", () => {
 describe("3D-3 : amortissement du matériel posé (681 / 2815)", () => {
   it("les 2 postes fournis avec le local ne sont ni à l'actif ni amortis", () => {
     const e = entreprise();
-    const r = cloturer({ ...e, atelier: { ...e.atelier!, modules: postesALaSignature(2, MODULES_CATALOGUE) } }, 5);
+    const r = cloturer({ ...e, ateliers: [{ ...e.ateliers[0]!, modules: postesALaSignature(2, MODULES_CATALOGUE) }] }, 5);
     expect(r.ecritures.find((x) => x.id.startsWith("amort_"))).toBeUndefined();
   });
 
@@ -133,7 +133,7 @@ describe("3D-3 : amortissement du matériel posé (681 / 2815)", () => {
         { compte: "512", sens: "credit", montant: centimes(poste.prix_centimes) },
       ],
     });
-    let ent: Entreprise = { ...e, atelier: { ...e.atelier!, modules: postesALaSignature(3, MODULES_CATALOGUE) } };
+    let ent: Entreprise = { ...e, ateliers: [{ ...e.ateliers[0]!, modules: postesALaSignature(3, MODULES_CATALOGUE) }] };
     const dotation = Math.round(poste.prix_centimes / poste.amortissement_mois);
     for (const mois of [5, 6, 7]) {
       const r = cloturer(ent, mois);
@@ -143,7 +143,7 @@ describe("3D-3 : amortissement du matériel posé (681 / 2815)", () => {
     }
     expect(soldeCompte(gl, "681")).toBe(3 * dotation);
     expect(soldeCompte(gl, "2815")).toBe(3 * dotation);
-    expect(ent.atelier?.materiel).toEqual({
+    expect(ent.ateliers[0]?.materiel).toEqual({
       valeurBrute: poste.prix_centimes,
       amortissementsCumules: 3 * dotation,
     });
@@ -155,11 +155,11 @@ describe("3D-3 : amortissement du matériel posé (681 / 2815)", () => {
     const r = cloturer(
       {
         ...e,
-        atelier: {
-          ...e.atelier!,
+        ateliers: [{
+          ...e.ateliers[0]!,
           modules: postesALaSignature(3, MODULES_CATALOGUE),
           materiel: { valeurBrute: centimes(poste.prix_centimes), amortissementsCumules: centimes(poste.prix_centimes) },
-        },
+        }],
       },
       5,
     );

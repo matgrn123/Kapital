@@ -69,7 +69,7 @@ function entreprisePnjBase(): Entreprise {
     stocksMatiere: [],
     stocksFinis: [],
     salaries: [],
-    atelier: null,
+    ateliers: [],
     marque: { notoriete: 50, desirabilite: 50 },
     prets: [],
     catalogue: [],
@@ -478,7 +478,7 @@ describe("simulerMoisEntreprise — charges fixes", () => {
     const ent: Entreprise = {
       ...entreprisePnjBase(),
       tresorerie: centimes(10_000_000),
-      atelier,
+      ateliers: [atelier],
     };
     const result = simulerMoisEntreprise(
       ent,
@@ -503,7 +503,7 @@ describe("simulerMoisEntreprise — charges fixes", () => {
     const ent: Entreprise = {
       ...entreprisePnjBase(),
       tresorerie: centimes(10_000_000),
-      atelier,
+      ateliers: [atelier],
     };
     const result = simulerMoisEntreprise(
       ent,
@@ -532,7 +532,7 @@ describe("simulerMoisEntreprise — charges fixes", () => {
     const ent: Entreprise = {
       ...entreprisePnjBase(),
       tresorerie: centimes(10_000_000),
-      atelier,
+      ateliers: [atelier],
     };
     const result = simulerMoisEntreprise(
       ent,

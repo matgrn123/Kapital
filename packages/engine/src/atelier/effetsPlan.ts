@@ -69,6 +69,11 @@ export function postesEquipesAtelier(atelier: { readonly modules: readonly Modul
   return atelier === null ? 0 : effetsPlan(atelier.modules).postesEquipes;
 }
 
+/** 3D-7 : postes équipés de tous les locaux de la société (somme ; 0 sans local). */
+export function postesEquipesAteliers(ateliers: readonly { readonly modules: readonly ModulePose[] }[]): number {
+  return ateliers.reduce((s, a) => s + postesEquipesAtelier(a), 0);
+}
+
 /**
  * Complète un plan (positions) avec les données du catalogue. Un module absent du catalogue
  * n'a aucun effet : il est ignoré.

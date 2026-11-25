@@ -253,7 +253,7 @@ async function main(): Promise<void> {
       stocksMatiere: [{ matiere: idMatiere(matiere), quantite: 4.25, valeurTotale: centimes(1_700) }],
       stocksFinis: [{ produit: idProduit(produit), quantite: 3, valeurTotale: centimes(250) }],
       salaries: [],
-      atelier: null,
+      ateliers: [],
       marque: { notoriete: 33, desirabilite: 44 },
       prets: [
         {
