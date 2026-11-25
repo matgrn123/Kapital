@@ -33,7 +33,8 @@ export function empriseModule(m: ModulePlace, catalogue: readonly TypeModule[]):
 export function validerPlan(atelier: DimensionsAtelier, plan: readonly ModulePlace[], catalogue: readonly TypeModule[]): ResultatValidation {
   return validerPlanEtage(
     { ...atelier, modules: plan.map((m) => ({ id_type: m.module_type_id, x: m.x, y: m.y, pivote: m.pivote })) },
-    catalogue,
+    // Le moteur attend une liste modifiable : on lui passe une copie, sans toucher au catalogue.
+    [...catalogue],
   );
 }
 
