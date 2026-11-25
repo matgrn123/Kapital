@@ -1,6 +1,9 @@
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDate } from "../../../lib/formatage";
+import { reglesPretV1 } from "@kapital/server";
 import { FormulairePret } from "./FormulairePret";
+import { lireEstrAnnuel } from "../_partage/estr";
+import { lireVerrou } from "../_partage/verrou";
 
 type Loan = {
   id: string;
@@ -55,6 +58,9 @@ export default async function PageBanque() {
   }
 
   const detteTotale = pretActifs.reduce((s, p) => s + p.capital_restant_centimes, 0);
+  const regles = reglesPretV1();
+  const estrAnnuel = await lireEstrAnnuel(supabase, regles.estrDeSecoursAnnuel);
+  const { verrou } = await lireVerrou(supabase, entreprise.id, "demande_pret");
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-10">
@@ -146,6 +152,9 @@ export default async function PageBanque() {
         <FormulairePret
           tresorerieActuelle={entreprise.tresorerie_centimes}
           detteActuelle={detteTotale}
+          regles={regles}
+          estrAnnuel={estrAnnuel}
+          verrou={verrou}
         />
       </section>
     </div>

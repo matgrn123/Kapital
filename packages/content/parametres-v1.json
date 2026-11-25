@@ -286,5 +286,227 @@
     "unite": "centimes_par_piece",
     "source": "docs/referentiel-couts.md - faconnier Portugal : 300 a 900 centimes selon produit, moyenne pour MVP - sera remplace par le vrai cout minute atelier / prix facon reel avec T27",
     "date": "2026-11-22"
+  },
+  "temps_minutes_reelles_par_pas": {
+    "valeur": 1,
+    "unite": "minutes_reelles",
+    "source": "docs/cahier-des-charges-v1.md section 4 (pas d'avance du monde : 1 minute réelle, décision du 24 novembre 2026 ; 10 minutes au premier jet)",
+    "date": "2026-11-24"
+  },
+  "temps_minutes_reelles_par_mois_jeu": {
+    "valeur": 1440,
+    "unite": "minutes_reelles",
+    "source": "docs/cahier-des-charges-v1.md section 2 (1 jour réel = 1 mois de jeu)",
+    "date": "2026-11-24"
+  },
+  "temps_jours_par_mois_jeu": {
+    "valeur": 30,
+    "unite": "jours",
+    "source": "docs/cahier-des-charges-v1.md section 4 (échéance de prêt tous les 30 jours = toutes les 24 h réelles)",
+    "date": "2026-11-24"
+  },
+  "serie_lancement_pieces": {
+    "valeur": 100,
+    "unite": "pieces",
+    "source": "docs/cahier-des-charges-v1.md section 4 (démarrage sans attente) ; docs/plan-architecture-entreprise.md section 5 (une marque nouvelle vend 50 à 300 pièces par mois) : valeur de départ à calibrer au banc d'essai",
+    "date": "2026-11-24"
+  },
+  "grossiste_majoration_sur_cout_usine": {
+    "valeur": 0.4,
+    "unite": "ratio",
+    "source": "docs/cahier-des-charges-v1.md section 4 (le grossiste local est plus cher que l'usine : aller vite coûte de la marge) : valeur de départ à calibrer au banc d'essai",
+    "date": "2026-11-24"
+  },
+  "capital_depart_centimes": {
+    "valeur": 2000000,
+    "unite": "centimes",
+    "source": "docs/cahier-des-charges-v1.md section 3 (capital de départ fixe, 20 000 € d'apport) ; docs/plan-architecture-entreprise.md section 0 (SAS, capital de 20 000 €)",
+    "date": "2026-11-24"
+  },
+  "seuil_etape_1_pieces_vendues": {
+    "valeur": 50,
+    "unite": "pieces",
+    "source": "docs/plan-architecture-entreprise.md section 7 (décision de Mathieu, 24 novembre 2026 : l'étape 1 s'ouvre à 50 pièces vendues au total) ; 50 pièces = bas de la fourchette d'une marque nouvelle (section 5) : valeur de départ à calibrer au banc d'essai",
+    "date": "2026-11-24"
+  },
+  "seuil_etape_2_chiffre_affaires_ht_cumule_centimes": {
+    "valeur": 3000000,
+    "unite": "centimes",
+    "source": "docs/plan-architecture-entreprise.md section 7 (décision de Mathieu, 24 novembre 2026 : l'étape 2 s'ouvre à 30 000 € de chiffre d'affaires cumulé hors taxes, avec une trésorerie positive à la clôture) : valeur de départ à calibrer au banc d'essai",
+    "date": "2026-11-24"
+  },
+  "indicateurs_horizon_previsionnel_mois": {
+    "valeur": 3,
+    "unite": "mois",
+    "source": "docs/cahier-des-charges-v1.md section 13 (AE-3 : prévisionnel de trésorerie à 3 mois) ; docs/chantier-v1-1.md section tableau de bord (prévisionnel à 3 mois avec alerte si découvert prévu)",
+    "date": "2026-11-24"
+  },
+  "indicateurs_delai_encaissement_revendeur_mois": {
+    "valeur": 2,
+    "unite": "mois",
+    "source": "docs/plan-architecture-entreprise.md section 1 (revendeurs payant à 60 jours) ; aligné sur le moteur, qui encaisse la créance revendeur deux mois après la vente (stockageSupabase.chargerCreances)",
+    "date": "2026-11-24"
+  },
+  "pret_marge_estr_tresorerie": {
+    "valeur": 0.035,
+    "unite": "ratio_annuel",
+    "source": "docs/cahier-des-charges-v1.md section 6 (taux du prêt = €STR du mois + marge) ; valeur provisoire à calibrer : aucune source documentaire du projet ; marge sur l'€STR, prêt de trésorerie, non garanti donc le plus cher",
+    "date": "2026-11-24"
+  },
+  "pret_marge_estr_equipement": {
+    "valeur": 0.025,
+    "unite": "ratio_annuel",
+    "source": "docs/cahier-des-charges-v1.md section 6 (taux du prêt = €STR du mois + marge) ; valeur provisoire à calibrer : aucune source documentaire du projet ; marge sur l'€STR, prêt d'équipement, garanti par la machine",
+    "date": "2026-11-24"
+  },
+  "pret_marge_estr_immobilier": {
+    "valeur": 0.015,
+    "unite": "ratio_annuel",
+    "source": "docs/cahier-des-charges-v1.md section 6 (taux du prêt = €STR du mois + marge) ; valeur provisoire à calibrer : aucune source documentaire du projet ; marge sur l'€STR, prêt immobilier, garanti par le local donc le moins cher",
+    "date": "2026-11-24"
+  },
+  "pret_duree_min_mois_tresorerie": {
+    "valeur": 12,
+    "unite": "mois",
+    "source": "valeur provisoire à calibrer : aucune source documentaire du projet ; durée minimale d'un prêt de trésorerie ; le plancher de 12 mois reprend l'ancienne règle du serveur (validations/demandePret.ts)",
+    "date": "2026-11-24"
+  },
+  "pret_duree_max_mois_tresorerie": {
+    "valeur": 36,
+    "unite": "mois",
+    "source": "valeur provisoire à calibrer : aucune source documentaire du projet ; durée maximale d'un prêt de trésorerie ; le plafond de 240 mois de l'immobilier reprend l'ancienne règle du serveur",
+    "date": "2026-11-24"
+  },
+  "pret_duree_min_mois_equipement": {
+    "valeur": 12,
+    "unite": "mois",
+    "source": "valeur provisoire à calibrer : aucune source documentaire du projet ; durée minimale d'un prêt d'équipement ; le plancher de 12 mois reprend l'ancienne règle du serveur (validations/demandePret.ts)",
+    "date": "2026-11-24"
+  },
+  "pret_duree_max_mois_equipement": {
+    "valeur": 84,
+    "unite": "mois",
+    "source": "valeur provisoire à calibrer : aucune source documentaire du projet ; durée maximale d'un prêt d'équipement ; le plafond de 240 mois de l'immobilier reprend l'ancienne règle du serveur",
+    "date": "2026-11-24"
+  },
+  "pret_duree_min_mois_immobilier": {
+    "valeur": 60,
+    "unite": "mois",
+    "source": "valeur provisoire à calibrer : aucune source documentaire du projet ; durée minimale d'un prêt immobilier ; le plancher de 12 mois reprend l'ancienne règle du serveur (validations/demandePret.ts)",
+    "date": "2026-11-24"
+  },
+  "pret_duree_max_mois_immobilier": {
+    "valeur": 240,
+    "unite": "mois",
+    "source": "valeur provisoire à calibrer : aucune source documentaire du projet ; durée maximale d'un prêt immobilier ; le plafond de 240 mois de l'immobilier reprend l'ancienne règle du serveur",
+    "date": "2026-11-24"
+  },
+  "pret_plafond_montant_centimes_tresorerie": {
+    "valeur": 3000000,
+    "unite": "centimes",
+    "source": "valeur provisoire à calibrer : aucune source documentaire du projet ; montant maximal d'un prêt de trésorerie (en centimes)",
+    "date": "2026-11-24"
+  },
+  "pret_plafond_montant_centimes_equipement": {
+    "valeur": 10000000,
+    "unite": "centimes",
+    "source": "valeur provisoire à calibrer : aucune source documentaire du projet ; montant maximal d'un prêt d'équipement (en centimes)",
+    "date": "2026-11-24"
+  },
+  "pret_plafond_montant_centimes_immobilier": {
+    "valeur": 50000000,
+    "unite": "centimes",
+    "source": "valeur provisoire à calibrer : aucune source documentaire du projet ; montant maximal d'un prêt immobilier (en centimes)",
+    "date": "2026-11-24"
+  },
+  "pret_plafond_endettement_multiple_tresorerie_tresorerie": {
+    "valeur": 3,
+    "unite": "multiplicateur_tresorerie",
+    "source": "docs/plan-architecture-entreprise.md section 3 (emprunt) ; valeur provisoire à calibrer : aucune source documentaire du projet ; dette totale après prêt au plus égale à ce multiple de la trésorerie (l'ancienne règle du serveur était 5 pour tous les prêts)",
+    "date": "2026-11-24"
+  },
+  "pret_plafond_endettement_multiple_tresorerie_equipement": {
+    "valeur": 5,
+    "unite": "multiplicateur_tresorerie",
+    "source": "docs/plan-architecture-entreprise.md section 3 (emprunt) ; valeur provisoire à calibrer : aucune source documentaire du projet ; dette totale après prêt au plus égale à ce multiple de la trésorerie (l'ancienne règle du serveur était 5 pour tous les prêts)",
+    "date": "2026-11-24"
+  },
+  "pret_plafond_endettement_multiple_tresorerie_immobilier": {
+    "valeur": 10,
+    "unite": "multiplicateur_tresorerie",
+    "source": "docs/plan-architecture-entreprise.md section 3 (emprunt) ; valeur provisoire à calibrer : aucune source documentaire du projet ; dette totale après prêt au plus égale à ce multiple de la trésorerie (l'ancienne règle du serveur était 5 pour tous les prêts)",
+    "date": "2026-11-24"
+  },
+  "pret_estr_secours_annuel": {
+    "valeur": 0.0265,
+    "unite": "ratio_annuel",
+    "source": "valeur provisoire à calibrer : €STR utilisé seulement si la table market_data n'en contient aucun ; reprend la valeur d'attente de l'orchestrateur (packages/server/src/avance/orchestrateur.ts)",
+    "date": "2026-11-24"
+  },
+  "bail_depot_garantie_mois_de_loyer": {
+    "valeur": 1,
+    "unite": "mois_de_loyer",
+    "source": "docs/plan-architecture-entreprise.md section 3 (petit atelier : dépôt de 2 500 € pour un loyer de 2 500 €, soit un mois) ; valeur provisoire à calibrer : un bail commercial réel demande souvent 2 à 3 mois, le montant est libre entre les parties",
+    "date": "2026-11-24"
+  },
+  "bail_preavis_mois": {
+    "valeur": 6,
+    "unite": "mois_de_jeu",
+    "source": "Code de commerce, article L145-4 (congé donné au moins six mois à l'avance, par acte d'huissier ou lettre recommandée) ; simplification du jeu : le locataire peut donner congé à tout moment, et non à l'échéance triennale ; valeur à confirmer",
+    "date": "2026-11-24"
+  },
+  "bail_machines_a_la_signature": {
+    "valeur": 2,
+    "unite": "machines",
+    "source": "valeur provisoire à calibrer : reprend la valeur écrite en dur dans l'ancienne route louer-atelier ; l'achat de machines est un ticket à part",
+    "date": "2026-11-24"
+  },
+  "achat_apport_minimal_ratio": {
+    "valeur": 0.2,
+    "unite": "ratio_du_prix",
+    "source": "docs/plan-architecture-entreprise.md section 7 (décision du 24 novembre 2026 : achat des murs à crédit dès l'étape 2 avec 20 % d'apport) ; ordre de grandeur courant pour un crédit immobilier professionnel, à confirmer",
+    "date": "2026-11-24"
+  },
+  "achat_duree_amortissement_construction_mois": {
+    "valeur": 300,
+    "unite": "mois_de_jeu",
+    "source": "valeur provisoire à calibrer : 25 ans, dans la fourchette usuelle de 20 à 40 ans des constructions industrielles (plan comptable général, amortissement par composants) ; la V1 amortit tout le prix, sans distinguer le terrain",
+    "date": "2026-11-24"
+  },
+  "achat_duree_pret_immobilier_mois": {
+    "valeur": 180,
+    "unite": "mois_de_jeu",
+    "source": "valeur provisoire à calibrer : 15 ans, durée proposée par défaut pour le crédit d'achat du local ; elle reste dans les bornes du prêt immobilier (pret_duree_min_mois_immobilier à pret_duree_max_mois_immobilier)",
+    "date": "2026-11-24"
+  },
+  "licenciement_anciennete_minimale_mois": {
+    "valeur": 8,
+    "unite": "mois",
+    "source": "https://www.service-public.fr/particuliers/vosdroits/F987 (indemnité légale de licenciement : au moins 8 mois d'ancienneté ininterrompue ; Code du travail, article L1234-9 et R1234-2)",
+    "date": "2026-11-24"
+  },
+  "licenciement_indemnite_mois_de_salaire_par_an": {
+    "valeur": 0.25,
+    "unite": "mois_de_salaire_par_annee",
+    "source": "https://www.service-public.fr/particuliers/vosdroits/F987 (un quart de mois de salaire par année d'ancienneté jusqu'à 10 ans ; Code du travail, article R1234-2) ; simplification du jeu : salaire de référence = salaire brut mensuel actuel",
+    "date": "2026-11-24"
+  },
+  "licenciement_indemnite_mois_de_salaire_par_an_apres_seuil": {
+    "valeur": 0.3333333333,
+    "unite": "mois_de_salaire_par_annee",
+    "source": "https://www.service-public.fr/particuliers/vosdroits/F987 (un tiers de mois de salaire par année d'ancienneté à partir de la 11e année ; Code du travail, article R1234-2)",
+    "date": "2026-11-24"
+  },
+  "licenciement_indemnite_seuil_annees": {
+    "valeur": 10,
+    "unite": "annees",
+    "source": "https://www.service-public.fr/particuliers/vosdroits/F987 (le taux passe du quart au tiers au-delà de 10 ans d'ancienneté ; Code du travail, article R1234-2)",
+    "date": "2026-11-24"
+  },
+  "deblocage_total_developpement": {
+    "valeur": 1,
+    "unite": "booleen",
+    "source": "Décision de Mathieu, 25 novembre 2026 : tout débloquer tant que le jeu est en développement (1 = tout est débloqué, 0 = les étapes s'appliquent). À remettre à 0 avant l'ouverture publique, avec la fusion de la PR #60.",
+    "date": "2026-11-25"
   }
 }

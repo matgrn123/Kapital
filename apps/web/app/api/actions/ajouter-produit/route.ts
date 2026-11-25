@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { lancerSerieDeLancement } from "@kapital/server";
 import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
@@ -42,6 +43,12 @@ export async function POST(request: Request) {
     );
   }
 
+  // Premier produit de la société : elle naît avec une série de lancement prête à vendre (TP-3).
+  const { count: nbProduits } = await ctx.supabaseAdmin
+    .from("company_products")
+    .select("id", { count: "exact", head: true })
+    .eq("company_id", ctx.companyId);
+
   const defaut = PRIX_DEFAUT_PAR_GAMME[ctx.companyGamme]!;
   const { error } = await ctx.supabaseAdmin.from("company_products").insert({
     company_id: ctx.companyId,
@@ -54,6 +61,20 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if ((nbProduits ?? 0) === 0) {
+    try {
+      const serie = await lancerSerieDeLancement(ctx.supabaseAdmin, {
+        companyId: ctx.companyId,
+        productId: body.productId,
+        moisCourant: ctx.moisCourant,
+      });
+      return NextResponse.json({ ok: true, serieLancement: serie });
+    } catch (e) {
+      // Le produit est ajouté ; la série n'a pas pu être faite (trésorerie insuffisante...).
+      return NextResponse.json({ ok: true, serieLancement: null, avertissement: (e as Error).message });
+    }
   }
   return NextResponse.json({ ok: true });
 }

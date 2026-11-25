@@ -1,10 +1,15 @@
 import type { DecisionOrdreProduction } from "@kapital/engine";
 import { ok, refuse, type ContexteValidation, type Result } from "../types.js";
+import { verifierDeblocage } from "./verrouEtape.js";
 
 export function validerOrdreProduction(
   ctx: ContexteValidation,
   d: DecisionOrdreProduction,
 ): Result {
+  if (d.lieu.type === "atelier") {
+    const verrou = verifierDeblocage(ctx, "production_atelier");
+    if (!verrou.ok) return verrou;
+  }
   if (d.quantite <= 0 || !Number.isFinite(d.quantite)) {
     return refuse(
       "quantite_invalide",

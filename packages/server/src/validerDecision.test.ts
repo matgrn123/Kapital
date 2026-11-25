@@ -4,9 +4,11 @@ import {
   idFaconnier,
   idFournisseur,
   idMatiere,
+  idPret,
   idProduit,
   idSalarie,
   minutes,
+  moisJeu,
   type CatalogueFournisseur,
   type Decision,
   type Entreprise,
@@ -19,6 +21,7 @@ import {
   validerDecisions,
 } from "./validerDecision.js";
 import type { ContexteValidation } from "./types.js";
+import { reglesPretV1 } from "./validations/demandePret.js";
 
 const ENT = idEntreprise("ent_test");
 const PROD = idProduit("prod_tshirt");
@@ -32,7 +35,7 @@ function entreprise(overrides: Partial<Entreprise> = {}): Entreprise {
     id: ENT,
     nom: "Test",
     gamme: "milieu",
-    etape: 1,
+    etape: 2,
     proprietaire: { type: "joueur", idProfil: "profil_test" },
     statut: "active",
     tresorerie: centimes(2_000_000),
@@ -365,9 +368,12 @@ describe("licenciement", () => {
 });
 
 describe("demande_pret", () => {
+  const regles = reglesPretV1();
+
   it("accepte un prêt raisonnable", () => {
     const r = validerDecision(ctxDefault(), {
       type: "demande_pret",
+      objet: "equipement",
       montant: centimes(1_000_000),
       dureeMois: 60,
     });
@@ -377,6 +383,7 @@ describe("demande_pret", () => {
   it("refuse un montant nul ou négatif", () => {
     const r = validerDecision(ctxDefault(), {
       type: "demande_pret",
+      objet: "equipement",
       montant: centimes(0),
       dureeMois: 60,
     });
@@ -384,28 +391,71 @@ describe("demande_pret", () => {
     if (!r.ok) expect(r.code).toBe("montant_invalide");
   });
 
-  it("refuse une durée hors bornes", () => {
+  it("refuse une durée hors bornes de l'objet", () => {
     const r = validerDecision(ctxDefault(), {
       type: "demande_pret",
+      objet: "equipement",
       montant: centimes(500_000),
-      dureeMois: 6,
+      dureeMois: regles.parObjet.equipement.dureeMinMois - 1,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe("duree_hors_bornes");
   });
 
-  it("refuse un endettement supérieur à 5× la trésorerie", () => {
+  it("refuse hors du plafond d'endettement, avec le plafond, la demande et le manque chiffrés", () => {
+    const m = regles.parObjet.equipement.plafondEndettementMultipleTresorerie;
+    const plafond = m * 500_000;
     const ctx = ctxDefault(entreprise({ tresorerie: centimes(500_000) }));
     const r = validerDecision(ctx, {
       type: "demande_pret",
-      montant: centimes(10_000_000),
+      objet: "equipement",
+      montant: centimes(plafond + 1_000),
       dureeMois: 60,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.code).toBe("endettement_excessif");
       expect(r.message).toMatch(/dette/i);
+      expect(r.depassement).toEqual({ plafond, demande: plafond + 1_000, manque: 1_000 });
     }
+  });
+
+  it("refuse au-dessus du plafond par prêt de l'objet", () => {
+    const { plafondMontant } = regles.parObjet.tresorerie;
+    const ctx = ctxDefault(entreprise({ tresorerie: centimes(900_000_000) }));
+    const r = validerDecision(ctx, {
+      type: "demande_pret",
+      objet: "tresorerie",
+      montant: centimes(plafondMontant + 100),
+      dureeMois: 24,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe("plafond_pret_depasse");
+      expect(r.depassement).toEqual({ plafond: plafondMontant, demande: plafondMontant + 100, manque: 100 });
+    }
+  });
+
+  it("la dette des prêts en cours compte dans le plafond d'endettement", () => {
+    const m = regles.parObjet.equipement.plafondEndettementMultipleTresorerie;
+    const plafond = m * 2_000_000;
+    const pret = {
+      id: idPret("p1"),
+      objet: "equipement" as const,
+      capitalInitial: centimes(plafond),
+      capitalRestant: centimes(plafond),
+      tauxAnnuel: 0.05,
+      dureeTotaleMois: 60,
+      moisDebut: moisJeu(1),
+    };
+    const r = validerDecision(ctxDefault(entreprise({ prets: [pret] })), {
+      type: "demande_pret",
+      objet: "equipement",
+      montant: centimes(1),
+      dureeMois: 60,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("endettement_excessif");
   });
 });
 

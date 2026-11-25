@@ -1,19 +1,20 @@
 # Kapital — instructions pour Claude Code
 
 Kapital est un jeu de gestion d'entreprise multijoueur, éducatif, en français.
-Version en cours : V1, module Entrepreneur textile (étapes 0 à 2).
+Version en cours : V1, module Entrepreneur textile (étapes 0 à 2, puis une tranche boutique en fin de V1).
 
 ## Documents de référence (à lire avant tout ticket)
 
 - `docs/cahier-des-charges-v1.md` : ce qu'il faut construire, et la liste des tickets (section 13).
 - `docs/referentiel-couts.md` : les valeurs de départ du moteur (coûts, temps, salaires).
 - `docs/batiments-3d-groupe.md` : bâtiments, 3D, aménagement, groupe (holdings, LBO, procédures collectives), et les arbitrages faits.
+- `docs/plan-architecture-entreprise.md` : étapes de croissance du joueur, systèmes du moteur, types partagés, détail des tickets TP et AE.
 
 En cas de contradiction, le cahier des charges l'emporte.
 
 ## Méthode de travail
 
-- Un ticket à la fois, dans l'ordre de la section 13 du cahier des charges. Les tickets 3D portent le préfixe 3D (3D-1 à 3D-9).
+- Un ticket à la fois, dans l'ordre de la section 13 du cahier des charges. Les tickets 3D portent le préfixe 3D (3D-1 à 3D-9), ceux du temps le préfixe TP (TP-1 à TP-3), ceux de l'architecture de l'entreprise le préfixe AE (AE-1 à AE-11).
 - Avant de coder : résumer le ticket, proposer un plan court, attendre mon accord.
 - Écrire les tests d'abord (Vitest), puis le code qui les fait passer.
 - Un ticket est terminé quand son critère d'acceptation passe et que `npm test` est vert.
@@ -27,6 +28,7 @@ En cas de contradiction, le cahier des charges l'emporte.
 - Montants en centimes (entiers). Jamais de nombres à virgule pour l'argent.
 - Aucun chiffre métier en dur dans le code : tout vient de `packages/content/parametres-v1.json`, chaque paramètre avec valeur, unité, source et date.
 - Comptabilité en partie double : après chaque opération, actif = passif.
+- Temps : une seule horloge pour tous, sans pause ni accéléré. Le ratio (1 jour réel = 1 mois de jeu) et le pas d'avance du monde (1 minute réelle) sont des paramètres ; salaires et loyers sont payés en fin de mois de jeu.
 
 ## Règles 3D
 
