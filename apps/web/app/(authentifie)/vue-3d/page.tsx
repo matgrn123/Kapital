@@ -4,7 +4,7 @@ import { Puce } from "../../../components/ui";
 import { formaterEuros } from "../../../lib/formatage";
 import { libelleGamme } from "../../../lib/lisible";
 import { creerClientServeur } from "../../../lib/supabase/server";
-import { nomLisibleSociete, type ActeurVillage } from "../../../lib/vue3d";
+import { AUCUN_AUTRE_BATIMENT, idBoutique, idLocal, nomLisibleSociete, type ActeurVillage, type BatimentsDuJoueur } from "../../../lib/vue3d";
 import { lireEstrAnnuel } from "../_partage/estr";
 import { Village, type FicheActeur } from "./Village";
 
@@ -17,6 +17,16 @@ type Concurrent = { company_id: string; nom: string; gamme: string; pseudo: stri
 
 const pourcent = (x: number) => `${(x * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %`;
 const pluriel = (n: number, mot: string) => `${n.toLocaleString("fr-FR")} ${mot}${n > 1 ? "s" : ""}`;
+
+/**
+ * Bâtiments du joueur en plus de l'atelier principal (table workshops, une ligne au plus).
+ * Deuxième local et points de vente : leurs tables n'existent pas encore, on ne les requête
+ * donc pas. Quand la table `points_de_vente` existera, la lire ici (id, nom) ; le village
+ * dessinera alors la boutique à la place du terrain, sans autre changement.
+ */
+async function lireBatimentsDuJoueur(): Promise<BatimentsDuJoueur> {
+  return AUCUN_AUTRE_BATIMENT;
+}
 
 export default async function PageVillage() {
   const supabase = await creerClientServeur();
@@ -38,6 +48,8 @@ export default async function PageVillage() {
       lireEstrAnnuel(supabase, reglesPretV1().estrDeSecoursAnnuel),
     ]);
 
+  const batiments = await lireBatimentsDuJoueur();
+
   const stockFinis = ((stocks ?? []) as { quantite_pieces: number }[]).reduce((s, r) => s + Number(r.quantite_pieces), 0);
   const nbEmployes = employes?.length ?? 0;
   const mois = (monde as { mois_courant?: number } | null)?.mois_courant;
@@ -56,7 +68,7 @@ export default async function PageVillage() {
         ["Étape", String(entreprise.etape)],
       ],
       liens: [
-        { href: "/atelier", libelle: "Entrer dans l'atelier" },
+        { href: "/atelier-3d", libelle: "Entrer dans l'atelier" },
         { href: "/jeu", libelle: "Tableau de bord" },
       ],
     },
@@ -69,15 +81,41 @@ export default async function PageVillage() {
       faits: [["€STR du mois", pourcent(Math.max(estr, 0))]],
       liens: [{ href: "/banque", libelle: "Banque et prêt" }],
     },
-    {
-      id: "terrain",
-      genre: "terrain",
-      nom: "Terrain du futur magasin",
-      surTitre: "Terrain à débloquer",
-      description: "Ici pourra s'ouvrir ta boutique. Le magasin physique se débloque plus tard dans ta croissance.",
-      faits: [],
-      liens: [{ href: "/magasin", libelle: "Magasin physique" }],
-    },
+    ...batiments.locaux.map(
+      (l): FicheActeur => ({
+        id: idLocal(l),
+        genre: "local2",
+        nom: l.nom,
+        surTitre: "Ta société · autre local",
+        description: "Un autre local de ta société, en plus de l'atelier principal.",
+        faits: [],
+        liens: [{ href: "/locaux", libelle: "Locaux" }],
+      }),
+    ),
+    ...batiments.pointsDeVente.map(
+      (b): FicheActeur => ({
+        id: idBoutique(b),
+        genre: "boutique",
+        nom: b.nom,
+        surTitre: "Ta société · ton magasin",
+        description: "Ton point de vente physique, ouvert sur le terrain du village.",
+        faits: [],
+        liens: [{ href: "/magasin", libelle: "Gérer le magasin" }],
+      }),
+    ),
+    ...(batiments.pointsDeVente.length === 0
+      ? [
+          {
+            id: "terrain",
+            genre: "terrain",
+            nom: "Terrain du futur magasin",
+            surTitre: "Terrain à débloquer",
+            description: "Ici pourra s'ouvrir ta boutique. Le magasin physique se débloque plus tard dans ta croissance.",
+            faits: [],
+            liens: [{ href: "/magasin", libelle: "Magasin physique" }],
+          } satisfies FicheActeur,
+        ]
+      : []),
     ...((fournisseurs ?? []) as Partenaire[]).map(
       (f): FicheActeur => ({
         id: `fournisseur-${f.id}`,
@@ -141,7 +179,11 @@ export default async function PageVillage() {
           <>
             <Puce ton="accent">● Ta société</Puce>
             <Puce>Acteurs du monde</Puce>
-            <Puce ton="alerte">Terrain à débloquer</Puce>
+            {batiments.pointsDeVente.length === 0 ? (
+              <Puce ton="alerte">Terrain à débloquer</Puce>
+            ) : (
+              <Puce ton="accent">Ton magasin</Puce>
+            )}
           </>
         }
       >
