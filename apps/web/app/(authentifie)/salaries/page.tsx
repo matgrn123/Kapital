@@ -1,5 +1,16 @@
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDate } from "../../../lib/formatage";
+import { chargerParametresV1 } from "@kapital/content";
+import {
+  centimes,
+  coefficientsSalairesDepuisParametres,
+  coutEmployeur,
+  idSalarie,
+  indemniteLicenciement,
+  parametresLicenciementDepuis,
+} from "@kapital/engine";
+import { BandeauVerrou } from "../_partage/BandeauVerrou";
+import { lireVerrou } from "../_partage/verrou";
 import { FormulaireEmbauche, BoutonLicencier } from "./FormulaireEmbauche";
 
 type Employee = {
@@ -7,6 +18,9 @@ type Employee = {
   poste: "artisan" | "encadrement";
   salaire_brut_mensuel_centimes: number;
   cree_le: string;
+  anciennete_mois_debut: number;
+  experience_mois_debut: number;
+  mois_jeu_debut: number | null;
 };
 
 export default async function PageSalaries() {
@@ -14,21 +28,49 @@ export default async function PageSalaries() {
 
   const { data: entreprises } = await supabase
     .from("companies")
-    .select("id, etape")
+    .select("id")
     .limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
-  const { data: employes } = await supabase
-    .from("employees")
-    .select("id, poste, salaire_brut_mensuel_centimes, cree_le")
-    .eq("company_id", entreprise.id)
-    .eq("statut", "actif")
-    .order("cree_le");
+  const [{ data: employes }, { data: monde }, { verrou }] = await Promise.all([
+    supabase
+      .from("employees")
+      .select(
+        "id, poste, salaire_brut_mensuel_centimes, cree_le, anciennete_mois_debut, experience_mois_debut, mois_jeu_debut",
+      )
+      .eq("company_id", entreprise.id)
+      .eq("statut", "actif")
+      .order("cree_le"),
+    supabase.from("worlds").select("mois_courant").eq("etat", "actif").limit(1).maybeSingle(),
+    lireVerrou(supabase, entreprise.id, "embauche"),
+  ]);
+
+  const params = chargerParametresV1();
+  const coefficients = coefficientsSalairesDepuisParametres(params);
+  const paramsLicenciement = parametresLicenciementDepuis(params);
+  const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
 
   const employesTab = (employes ?? []) as Employee[];
   const totalBrut = employesTab.reduce((s, e) => s + e.salaire_brut_mensuel_centimes, 0);
-  const totalCharge = Math.round(totalBrut * 1.42);
+  const totalCharge = employesTab.reduce(
+    (s, e) => s + coutEmployeur({ ...coefficients, salaireBrutMensuel: centimes(e.salaire_brut_mensuel_centimes) }),
+    0,
+  );
+  // Même calcul que la route de licenciement : ancienneté de départ + mois passés dans l'entreprise.
+  const indemnite = (e: Employee): number => {
+    const service = Math.max(0, moisCourant - (e.mois_jeu_debut ?? 0));
+    return indemniteLicenciement(
+      {
+        id: idSalarie(e.id),
+        poste: e.poste,
+        salaireBrutMensuel: centimes(e.salaire_brut_mensuel_centimes),
+        ancienneteMois: e.anciennete_mois_debut + service,
+        experienceMois: e.experience_mois_debut + service,
+      },
+      paramsLicenciement,
+    );
+  };
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-10">
@@ -38,7 +80,7 @@ export default async function PageSalaries() {
         </p>
         <h1 className="text-3xl font-semibold tracking-tight">Salariés</h1>
         <p className="mt-1 text-sm text-[color:var(--color-g-500)]">
-          L'encadrement est débloqué à partir de l'étape 1.
+          L'embauche se débloque à l'étape 2 de votre entreprise.
         </p>
       </header>
 
@@ -50,9 +92,9 @@ export default async function PageSalaries() {
           <span className="chiffre">{formaterEuros(totalBrut)}</span> €
           <span className="block text-xs text-[color:var(--color-g-500)]">par mois</span>
         </Carte>
-        <Carte libelle="Coût employeur (approx.)">
+        <Carte libelle="Coût employeur">
           <span className="chiffre">{formaterEuros(totalCharge)}</span> €
-          <span className="block text-xs text-[color:var(--color-g-500)]">brut + 42 % charges</span>
+          <span className="block text-xs text-[color:var(--color-g-500)]">brut + cotisations patronales</span>
         </Carte>
       </section>
 
@@ -84,7 +126,7 @@ export default async function PageSalaries() {
                       {formaterDate(e.cree_le)}
                     </td>
                     <td className="px-4 py-2 text-right">
-                      <BoutonLicencier id={e.id} />
+                      <BoutonLicencier id={e.id} indemniteCentimes={indemnite(e)} />
                     </td>
                   </tr>
                 ))}
@@ -96,7 +138,8 @@ export default async function PageSalaries() {
 
       <section className="mt-10 space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider">Embaucher</h2>
-        <FormulaireEmbauche etape={entreprise.etape} />
+        {verrou && <BandeauVerrou verrou={verrou} action="L'embauche" />}
+        <FormulaireEmbauche smicMensuelBrut={coefficients.smicMensuelBrut} verrouille={verrou !== null} />
       </section>
     </div>
   );

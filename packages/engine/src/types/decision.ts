@@ -1,4 +1,4 @@
-import type { Canal, Poste } from "./entreprise.js";
+import type { Canal, ObjetPret, Poste } from "./entreprise.js";
 import type {
   Centimes,
   IdEntreprise,
@@ -59,6 +59,7 @@ export type DecisionLicenciement = {
 
 export type DecisionDemandePret = {
   readonly type: "demande_pret";
+  readonly objet: ObjetPret;
   readonly montant: Centimes;
   readonly dureeMois: number;
 };

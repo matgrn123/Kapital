@@ -254,6 +254,30 @@ describe("simulerMoisEntreprise — livraisons façonniers", () => {
     expect(lignes.find((l) => l.compte === "401" && l.sens === "credit")?.montant).toBe(totalFacon);
   });
 
+  it("livraison sans matière (produit fini acheté tel quel) : 35 débit / 401 crédit, sans ligne à zéro", () => {
+    const livraison: LivraisonFaconnier = {
+      id: "lg1",
+      produit: idProduit("prod_chemise"),
+      quantite: 30,
+      prixFaconParPiece: centimes(900),
+      coutMatiereParPiece: centimes(0),
+    };
+    const result = simulerMoisEntreprise(
+      entreprisePnjBase(),
+      { ...donneeesVides(), livraisonsFaconniers: [livraison] },
+      marketInputsTest(),
+      PARAMS,
+      GRAINE,
+      MOIS_1,
+    );
+    const ec = result.ecritures.find((e) => e.id === `livraison_fac_${MOIS_1}_lg1`);
+    expect(ec).toBeDefined();
+    expect(ec!.lignes).toHaveLength(2);
+    expect(ec!.lignes.find((l) => l.compte === "35" && l.sens === "debit")?.montant).toBe(30 * 900);
+    expect(ec!.lignes.find((l) => l.compte === "401" && l.sens === "credit")?.montant).toBe(30 * 900);
+    expect(ec!.lignes.some((l) => l.compte === "31")).toBe(false);
+  });
+
   it("stock fini augmente après livraison façonnier", () => {
     const livraison: LivraisonFaconnier = {
       id: "lf2",
@@ -503,6 +527,7 @@ describe("simulerMoisEntreprise — prêts", () => {
       capitalRestant: centimes(1_000_000),
       tauxAnnuel: 0.03,
       dureeTotaleMois: 24,
+      objet: "tresorerie",
       moisDebut: moisJeu(0),
     };
     const ent: Entreprise = {
@@ -542,6 +567,7 @@ describe("simulerMoisEntreprise — prêts", () => {
       capitalRestant: centimes(2_000_000),
       tauxAnnuel: 0.05,
       dureeTotaleMois: 12,
+      objet: "tresorerie",
       moisDebut: moisJeu(0),
     };
     const ent: Entreprise = {

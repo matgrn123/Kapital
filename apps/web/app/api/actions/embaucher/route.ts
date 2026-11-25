@@ -1,11 +1,24 @@
 import { NextResponse } from "next/server";
-import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
+import { centimes, postesLibres } from "@kapital/engine";
+import { validerDecision } from "@kapital/server";
+import {
+  chargerContexte,
+  chargerEntreprisePersonnel,
+  estErreurAction,
+  refuserSiVerrouille,
+} from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
+
+// AE-7 : la décision passe par validerDecision (étape, salaire, réserve de deux mois de paie).
+// Embaucher sans poste libre est accepté mais le salarié ne produit pas (le moteur ne compte
+// que les artisans qui occupent une machine) : la réponse le signale au joueur.
 
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
   if (estErreurAction(ctx)) return ctx;
+  const verrou = refuserSiVerrouille(ctx, "embauche");
+  if (verrou) return verrou;
 
   const body = (await request.json()) as {
     poste?: "artisan" | "encadrement";
@@ -16,17 +29,20 @@ export async function POST(request: Request) {
   if (poste !== "artisan" && poste !== "encadrement") {
     return NextResponse.json({ error: "Poste invalide." }, { status: 400 });
   }
-  if (!Number.isFinite(salaire) || salaire <= 0) {
+  if (!Number.isInteger(salaire) || salaire <= 0) {
     return NextResponse.json({ error: "Salaire invalide." }, { status: 400 });
   }
-  if (poste === "encadrement" && ctx.companyEtape < 1) {
-    return NextResponse.json(
-      {
-        error: `L'encadrement est débloqué à partir de l'étape 1 (vous êtes à l'étape ${ctx.companyEtape}).`,
-      },
-      { status: 400 },
-    );
+
+  const entreprise = await chargerEntreprisePersonnel(ctx);
+  const decision = validerDecision(
+    { entreprise },
+    { type: "embauche", poste, salaireBrutMensuel: centimes(salaire) },
+  );
+  if (!decision.ok) {
+    return NextResponse.json({ error: decision.message, code: decision.code }, { status: 400 });
   }
+  const posteLibre =
+    poste === "artisan" && postesLibres(entreprise.salaries, entreprise.atelier?.nombreMachines ?? 0) > 0;
 
   const { error } = await ctx.supabaseAdmin.from("employees").insert({
     company_id: ctx.companyId,
@@ -37,5 +53,14 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    ...(poste === "artisan" && !posteLibre
+      ? {
+          avertissement:
+            "Aucun poste de travail n'est libre : cet artisan est payé mais ne produit pas tant que vous n'avez pas une machine de plus.",
+          sansPosteLibre: true,
+        }
+      : {}),
+  });
 }

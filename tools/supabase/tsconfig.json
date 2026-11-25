@@ -8,5 +8,6 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext"
   },
-  "include": ["*.ts"]
+  "include": ["*.ts"],
+  "references": [{ "path": "../../packages/engine" }, { "path": "../../packages/content" }, { "path": "../../packages/server" }]
 }

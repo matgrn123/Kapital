@@ -3,6 +3,7 @@ import {
   chargerContexte,
   ecrireEcritures,
   estErreurAction,
+  refuserSiVerrouille,
 } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
@@ -21,6 +22,8 @@ function clamp(x: number): number {
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
   if (estErreurAction(ctx)) return ctx;
+  const verrou = refuserSiVerrouille(ctx, "action_marketing");
+  if (verrou) return verrou;
 
   const body = (await request.json()) as {
     type?: string;

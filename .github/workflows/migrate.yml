@@ -7,6 +7,11 @@ on:
     paths:
       - "supabase/migrations/**"
   workflow_dispatch:
+    inputs:
+      simulation:
+        description: "Simulation : liste les migrations en attente sans rien appliquer"
+        type: boolean
+        default: true
 
 jobs:
   migrate:
@@ -19,9 +24,17 @@ jobs:
         with:
           version: 3.2.0
 
+      # Depuis la version 3 de la CLI, `db push` vise la base locale par défaut :
+      # --remote est obligatoire pour viser le projet lié. Un lancement manuel est une
+      # simulation par défaut ; un push sur main applique pour de vrai.
+      # --yes : la CLI demande une confirmation et un job automatique ne peut pas la poser.
       - name: Apply migrations
         run: |
           supabase link --project-ref yuezuirmpmlxxyrzpdpf
-          supabase db push
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.simulation }}" = "true" ]; then
+            supabase db push --remote --dry-run
+          else
+            supabase db push --remote --yes
+          fi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

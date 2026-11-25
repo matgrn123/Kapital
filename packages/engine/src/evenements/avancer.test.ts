@@ -47,6 +47,7 @@ function entrepriseTest(): Entreprise {
         capitalRestant: centimes(1_000_000),
         tauxAnnuel: 0.05,
         dureeTotaleMois: 12,
+        objet: "tresorerie",
         moisDebut: moisJeu(0),
       },
     ],
