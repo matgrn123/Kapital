@@ -1,5 +1,9 @@
 import Link from "next/link";
+import { chargerParametresV1 } from "@kapital/content";
+import { capitalDeDepart } from "@kapital/engine";
 import { creerClientServeur } from "../../lib/supabase/server";
+import { formaterEuros } from "../../lib/formatage";
+import { FormulaireSociete } from "./FormulaireSociete";
 import { NavLaterale } from "./NavLaterale";
 
 export default async function LayoutAuthentifie({
@@ -12,18 +16,14 @@ export default async function LayoutAuthentifie({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Phase de développement : le middleware a déjà auto-connecté le visiteur
-  // sur le compte partagé. Si l'auto-connexion a échoué (env mal configuré),
-  // on affiche un message plutôt que de rediriger vers /connexion (supprimée).
+  // Le middleware connecte normalement le visiteur tout seul ; sinon, on l'explique sobrement.
   if (!user) {
     return (
       <div className="mx-auto max-w-2xl px-8 py-16">
-        <h1 className="text-xl font-semibold">Connexion automatique indisponible</h1>
+        <h1 className="text-xl font-semibold">Connexion impossible pour le moment</h1>
         <p className="mt-2 text-sm text-[color:var(--color-g-500)]">
-          Les variables KAPITAL_DEV_EMAIL et KAPITAL_DEV_PASSWORD ne sont pas
-          configurées côté serveur. Lance{" "}
-          <code>npm run configurer-compte-dev -w tools/supabase</code> et copie
-          les valeurs affichées dans Vercel.
+          Nous n'avons pas pu ouvrir votre session. Rechargez la page dans un instant ; si le
+          problème continue, signalez-le à l'équipe.
         </p>
       </div>
     );
@@ -41,12 +41,16 @@ export default async function LayoutAuthentifie({
     .eq("owner_profile_id", user.id)
     .limit(1);
   if (!entreprises || entreprises.length === 0) {
+    const capital = capitalDeDepart(chargerParametresV1());
     return (
-      <div className="mx-auto max-w-2xl px-8 py-16">
-        <h1 className="text-xl font-semibold">Compte sans entreprise</h1>
+      <div className="mx-auto max-w-3xl px-8 py-16">
+        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">Bienvenue</p>
+        <h1 className="text-3xl font-semibold tracking-tight">Créer ma société</h1>
         <p className="mt-2 text-sm text-[color:var(--color-g-500)]">
-          Le compte partagé n'a pas d'entreprise associée. Vérifie la base.
+          Vous allez lancer votre marque de textile. Choisissez son nom et sa gamme : c'est le point
+          de départ de votre entreprise.
         </p>
+        <FormulaireSociete capitalAffiche={formaterEuros(capital)} />
       </div>
     );
   }
