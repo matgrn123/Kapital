@@ -58,41 +58,36 @@ export default async function LayoutAuthentifie({
   const entreprise = entreprises[0]!;
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="flex w-56 shrink-0 flex-col bg-[color:var(--color-nav)] text-[color:var(--color-nav-texte)]">
-        <div className="border-b border-line px-5 py-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-[color:var(--color-accent-clair)]">
-            Kapital
-          </p>
-          <p className="truncate text-sm font-semibold text-ink">{entreprise.nom}</p>
-        </div>
-        <NavLaterale />
-        <div className="border-t border-line px-5 py-3 text-xs">
-          <p className="truncate">{profil?.pseudo ?? user.email}</p>
-          {profil?.role === "admin" && (
-            <Link href="/admin" className="mt-2 block underline hover:text-ink">
-              Administration
-            </Link>
-          )}
-          {process.env.NEXT_PUBLIC_RETOUR_URL && (
-            <a
-              href={process.env.NEXT_PUBLIC_RETOUR_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 block underline hover:text-ink"
-            >
-              Signaler un problème
-            </a>
-          )}
-        </div>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <BarreJeu
-          companyId={entreprise.id}
-          tresorerieInitiale={entreprise.tresorerie_centimes}
-          etapeInitiale={entreprise.etape}
-        />
-        <main className="flex flex-1 flex-col overflow-y-auto bg-[color:var(--color-fond)]">{children}</main>
+    <div className="flex h-screen flex-col overflow-hidden bg-bg">
+      <BarreJeu
+        companyId={entreprise.id}
+        nomEntreprise={entreprise.nom}
+        tresorerieInitiale={entreprise.tresorerie_centimes}
+        etapeInitiale={entreprise.etape}
+      />
+      <div className="flex min-h-0 flex-1">
+        <aside className="flex w-[216px] shrink-0 flex-col overflow-y-auto px-3 pt-5">
+          <NavLaterale />
+          <div className="mt-auto border-t border-line px-2.5 py-3 text-xs text-muted">
+            <p className="truncate">{profil?.pseudo ?? user.email}</p>
+            {profil?.role === "admin" && (
+              <Link href="/admin" className="mt-2 block underline hover:text-ink">
+                Administration
+              </Link>
+            )}
+            {process.env.NEXT_PUBLIC_RETOUR_URL && (
+              <a
+                href={process.env.NEXT_PUBLIC_RETOUR_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 block underline hover:text-ink"
+              >
+                Signaler un problème
+              </a>
+            )}
+          </div>
+        </aside>
+        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">{children}</main>
       </div>
     </div>
   );
