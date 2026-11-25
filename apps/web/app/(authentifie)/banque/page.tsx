@@ -41,7 +41,7 @@ const pourcent = (x: number) => `${(x * 100).toLocaleString("fr-FR", { maximumFr
 export default async function PageBanque() {
   const supabase = await creerClientServeur();
 
-  const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes").limit(1);
+  const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes, mois_decouvert_consecutifs").limit(1);
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
   const tresorerie = Number(entreprise.tresorerie_centimes);
@@ -91,6 +91,7 @@ export default async function PageBanque() {
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <FormulairePret
           tresorerieActuelle={tresorerie}
+          moisDecouvert={Number(entreprise.mois_decouvert_consecutifs ?? 0)}
           detteActuelle={detteTotale}
           regles={regles}
           estrAnnuel={estrAnnuel}

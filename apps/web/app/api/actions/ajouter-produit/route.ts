@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
+import { chargerParametresV1 } from "@kapital/content";
 import { lancerSerieDeLancement } from "@kapital/server";
+import { reglagesProduitDefaut } from "../../../../lib/produit-defaut";
 import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
-
-const PRIX_DEFAUT_PAR_GAMME: Record<string, { tt: number; gros: number }> = {
-  entree: { tt: 2000, gros: 1000 },
-  milieu: { tt: 6000, gros: 3000 },
-  haut: { tt: 15000, gros: 7500 },
-};
 
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
@@ -49,14 +45,11 @@ export async function POST(request: Request) {
     .select("id", { count: "exact", head: true })
     .eq("company_id", ctx.companyId);
 
-  const defaut = PRIX_DEFAUT_PAR_GAMME[ctx.companyGamme]!;
+  // Réglages de départ lus dans les paramètres (produit_defaut_*) ; le joueur les change ensuite.
   const { error } = await ctx.supabaseAdmin.from("company_products").insert({
     company_id: ctx.companyId,
     product_id: body.productId,
-    qualite_visee: 60,
-    prix_vente_directe_centimes: defaut.tt,
-    prix_revendeur_centimes: defaut.gros,
-    production_mensuelle_cible: 100,
+    ...reglagesProduitDefaut(ctx.companyGamme, chargerParametresV1()),
   });
 
   if (error) {

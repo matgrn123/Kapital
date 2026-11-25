@@ -13,6 +13,8 @@ export const PLAN_COMPTABLE_V1: readonly Compte[] = [
   // reste exacte (681 au débit, 2815 au crédit), seule la présentation du bilan est simplifiée.
   { numero: "2815", libelle: "Amortissement du matériel industriel", type: "passif" },
   { numero: "213", libelle: "Constructions", type: "actif" },
+  // Achat des modules posés dans l'atelier (route sauvegarder-amenagement, fonction SQL 0031).
+  { numero: "2154", libelle: "Matériel industriel", type: "actif" },
   // Comme 2815 : l'amortissement est typé passif (voir ci-dessus), l'équation reste exacte.
   { numero: "2813", libelle: "Amortissement des constructions", type: "passif" },
   { numero: "275", libelle: "Dépôts et cautionnements versés", type: "actif" },

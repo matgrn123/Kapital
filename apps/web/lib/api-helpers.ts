@@ -29,6 +29,8 @@ export type ContexteAction = {
   readonly companyPiecesVendues: number;
   readonly companyChiffreAffairesHt: number;
   readonly companyTresorerie: number;
+  /** Mois de découvert consécutifs (prime de risque des prêts). */
+  readonly companyMoisDecouvert: number;
   readonly supabaseAdmin: SupabaseClient;
   readonly moisCourant: number;
 };
@@ -48,7 +50,7 @@ export async function chargerContexte(): Promise<ContexteAction | ErreurAction> 
 
   const { data: companies } = await supabase
     .from("companies")
-    .select("id, gamme, etape, tresorerie_centimes, pieces_vendues_total, chiffre_affaires_cumule_ht_centimes")
+    .select("id, gamme, etape, tresorerie_centimes, pieces_vendues_total, chiffre_affaires_cumule_ht_centimes, mois_decouvert_consecutifs")
     .eq("owner_profile_id", user.id)
     .limit(1);
   const entreprise = companies?.[0];
@@ -78,6 +80,7 @@ export async function chargerContexte(): Promise<ContexteAction | ErreurAction> 
     companyPiecesVendues: Number(entreprise.pieces_vendues_total ?? 0),
     companyChiffreAffairesHt: Number(entreprise.chiffre_affaires_cumule_ht_centimes ?? 0),
     companyTresorerie: entreprise.tresorerie_centimes as number,
+    companyMoisDecouvert: Number(entreprise.mois_decouvert_consecutifs ?? 0),
     supabaseAdmin,
     moisCourant,
   };

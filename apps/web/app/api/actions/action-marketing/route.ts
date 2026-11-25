@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { chargerParametresV1 } from "@kapital/content";
+import { COMPTE_MARKETING, estActionMarketing, marqueApresAction } from "../../../../lib/marketing";
 import {
   chargerContexte,
   ecrireEcritures,
@@ -7,17 +9,6 @@ import {
 } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
-
-const K: Record<string, { n: number; d: number }> = {
-  publicite: { n: 2.0, d: 0 },
-  image_marque: { n: 0, d: 2.0 },
-  promotion: { n: 1.0, d: -1.5 },
-  relations_presse: { n: 1.5, d: 1.5 },
-};
-
-function clamp(x: number): number {
-  return Math.max(0, Math.min(100, x));
-}
 
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
@@ -31,10 +22,10 @@ export async function POST(request: Request) {
   };
   const type = body.type ?? "";
   const montant = body.montantCentimes ?? 0;
-  if (!K[type]) {
+  if (!estActionMarketing(type)) {
     return NextResponse.json({ error: "Type d'action inconnu." }, { status: 400 });
   }
-  if (!Number.isFinite(montant) || montant <= 0) {
+  if (!Number.isInteger(montant) || montant <= 0) {
     return NextResponse.json({ error: "Montant invalide." }, { status: 400 });
   }
   if (montant > ctx.companyTresorerie) {
@@ -55,11 +46,13 @@ export async function POST(request: Request) {
   const noto0 = (marque?.notoriete as number | undefined) ?? 0;
   const desi0 = (marque?.desirabilite as number | undefined) ?? 0;
 
-  const montantEuros = montant / 100;
-  const m = Math.log(1 + montantEuros);
-  const k = K[type]!;
-  const nouvelleNoto = clamp(noto0 + k.n * m);
-  const nouvelleDesi = clamp(desi0 + k.d * m);
+  // Effet calculé par le moteur (coefficients marketing_k_* des paramètres).
+  const { notoriete: nouvelleNoto, desirabilite: nouvelleDesi } = marqueApresAction(
+    { notoriete: noto0, desirabilite: desi0 },
+    type,
+    montant,
+    chargerParametresV1(),
+  );
 
   // Insertion de l'action
   const { error: errAction } = await ctx.supabaseAdmin.from("marketing_actions").insert({
@@ -86,7 +79,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errBrand.message }, { status: 500 });
   }
 
-  // Écriture comptable : 6228 (charges externes) débit, 512 (banque) crédit
+  // Écriture comptable : 623 (publicité, relations publiques) débit, 512 (banque) crédit
   try {
     await ecrireEcritures(ctx.supabaseAdmin, {
       companyId: ctx.companyId,
@@ -94,7 +87,7 @@ export async function POST(request: Request) {
       moisJeu: ctx.moisCourant,
       libelle: `Marketing : ${type}`,
       lignes: [
-        { compte: "6228", sens: "debit", montant_centimes: montant },
+        { compte: COMPTE_MARKETING, sens: "debit", montant_centimes: montant },
         { compte: "512", sens: "credit", montant_centimes: montant },
       ],
     });

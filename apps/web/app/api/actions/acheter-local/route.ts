@@ -99,6 +99,7 @@ export async function POST(request: Request) {
     tauxEstrAnnuel: estr,
     tresorerie: centimes(ctx.companyTresorerie),
     detteEnCours: centimes(detteEnCours),
+    moisDecouvertConsecutifs: ctx.companyMoisDecouvert,
     aDejaUnLocal: atelier !== null,
     params,
   });

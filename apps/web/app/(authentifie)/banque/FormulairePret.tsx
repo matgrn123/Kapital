@@ -29,6 +29,7 @@ const pourcent = (x: number) => `${(x * 100).toLocaleString("fr-FR", { maximumFr
 export function FormulairePret({
   tresorerieActuelle,
   detteActuelle,
+  moisDecouvert = 0,
   regles,
   estrAnnuel,
   moisCourant,
@@ -36,6 +37,7 @@ export function FormulairePret({
 }: {
   tresorerieActuelle: number;
   detteActuelle: number;
+  moisDecouvert?: number;
   regles: ReglesPret;
   estrAnnuel: number;
   moisCourant: number;
@@ -59,7 +61,7 @@ export function FormulairePret({
   const apercu = useMemo(
     () =>
       apercuPret({
-        situation: { tresorerie: tresorerieActuelle, detteEnCours: detteActuelle },
+        situation: { tresorerie: tresorerieActuelle, detteEnCours: detteActuelle, moisDecouvertConsecutifs: moisDecouvert },
         objet,
         capital: capitalCentimes ?? 0,
         dureeMois: Number.isFinite(dureeN) ? dureeN : 0,
@@ -67,7 +69,7 @@ export function FormulairePret({
         mois: moisCourant,
         regles,
       }),
-    [tresorerieActuelle, detteActuelle, objet, capitalCentimes, dureeN, estrAnnuel, moisCourant, regles],
+    [tresorerieActuelle, detteActuelle, moisDecouvert, objet, capitalCentimes, dureeN, estrAnnuel, moisCourant, regles],
   );
   const sim = apercu.simulation;
   const refus = capitalCentimes === null ? "Indique un montant en euros, supérieur à zéro." : apercu.evaluation.ok ? null : apercu.evaluation.message;
@@ -114,7 +116,7 @@ export function FormulairePret({
             onChange={choisirObjet}
             options={OBJETS.map((o) => ({
               id: o.id,
-              titre: `${o.libelle} · ${pourcent(tauxPret(o.id, estrAnnuel, regles))}`,
+              titre: `${o.libelle} · dès ${pourcent(tauxPret(o.id, estrAnnuel, regles))}`,
               detail: o.aide,
             }))}
           />
@@ -136,8 +138,8 @@ export function FormulairePret({
         <div className="grid gap-3 sm:grid-cols-3">
           <Resultat
             libelle="Taux"
-            valeur={pourcent(tauxPret(objet, estrAnnuel, regles))}
-            detail={`€STR ${pourcent(Math.max(estrAnnuel, 0))} + marge ${pourcent(regle.margeSurEstr)}`}
+            valeur={pourcent(sim?.taux ?? tauxPret(objet, estrAnnuel, regles))}
+            detail={`€STR ${pourcent(Math.max(estrAnnuel, 0))} + marge ${pourcent(regle.margeSurEstr)}${sim ? ` + prime de risque ${pourcent(Math.max(sim.taux - Math.max(estrAnnuel, 0) - regle.margeSurEstr, 0))}` : ""}`}
           />
           <Resultat libelle="Mensualité" valeur={sim ? `${formaterEuros(sim.mensualite)} €` : "—"} />
           <Resultat libelle="Coût total du crédit" valeur={sim ? `${formaterEuros(sim.coutTotal)} €` : "—"} detail="La somme des intérêts" />
