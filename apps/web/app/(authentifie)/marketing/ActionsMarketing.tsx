@@ -33,7 +33,7 @@ export function ActionsMarketing({
 }) {
   const router = useRouter();
   const [action, setAction] = useState<TypeActionMarketing>("publicite");
-  // Budget en euros entiers, du minimum d'un euro à toute la trésorerie disponible.
+  // Budget en euros (crans d'un euro sur le curseur), du minimum d'un euro à toute la trésorerie disponible.
   const bornes = bornesQuantite({ minimum: 1, plafonds: [tresorerie / 100] });
   const [euros, setEuros] = useState<number>(Math.min(bornes.max, Math.max(bornes.min, Math.floor(bornes.max / 10))));
   const [enCours, setEnCours] = useState(false);
@@ -42,7 +42,8 @@ export function ActionsMarketing({
   // Montant pour lequel le joueur a confirmé une grosse dépense (toute autre valeur redemande).
   const [confirmePour, setConfirmePour] = useState<number | null>(null);
 
-  const montantCentimes = Math.min(Math.max(euros, bornes.min), bornes.max) * 100;
+  // La saisie directe permet les centimes (12,50 €) : on arrondit au centime entier.
+  const montantCentimes = Math.round(Math.min(Math.max(euros, bornes.min), bornes.max) * 100);
   const effets = useMemo(
     () => effetsMarketing({ montant: montantCentimes, marque, coefficients }),
     [montantCentimes, marque, coefficients],
@@ -107,11 +108,12 @@ export function ActionsMarketing({
 
       <Curseur
         libelle="Budget"
-        valeur={montantCentimes / 100}
-        min={bornes.min}
-        max={bornes.max}
-        onChange={setEuros}
-        affichage={`${formaterEuros(montantCentimes)} €`}
+        valeur={montantCentimes}
+        min={bornes.min * 100}
+        max={bornes.max * 100}
+        pas={100}
+        onChange={(c) => setEuros(c / 100)}
+        saisie="euros"
         aide={`Trésorerie disponible : ${formaterEuros(tresorerie)} €. L'effet de chaque action au budget choisi s'affiche sur sa tuile.`}
       />
 
