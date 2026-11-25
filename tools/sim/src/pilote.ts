@@ -7,7 +7,11 @@ import {
   nouveauPointDeVente,
   passantsReferenceBoutiques,
   transfererStockVersBoutique,
+  debutExercice,
+  planComptableV1,
   postesEquipesAtelier,
+  resultatDepuisLignes,
+  tvaRestantDue,
   centimes,
   coefficientsSalairesDepuisParametres,
   commanderAuGrossiste,
@@ -587,8 +591,8 @@ function creancesAEncaisser(ecritures: readonly EcritureComptable[], mois: numbe
 
 /**
  * TVA à payer ce mois : la TVA déclarée à la clôture du mois précédent (crédits du 44551
- * de ce mois-là). Le serveur prend le solde net du 44551 du mois précédent, ce qui en
- * retire le paiement fait ce mois-là : voir le README (bug signalé).
+ * de ce mois-là). Le serveur, lui, paie le reste dû au 44551 (`tvaAPayerSelonServeur`) :
+ * les deux coïncident tant que toute la TVA a été payée.
  */
 function tvaAPayer(ecritures: readonly EcritureComptable[], mois: number): number {
   let total = 0;
@@ -600,16 +604,23 @@ function tvaAPayer(ecritures: readonly EcritureComptable[], mois: number): numbe
 }
 
 /**
- * Formule actuelle du serveur (StockageSupabase.chargerFinDeMois) : solde net du 44551 du
- * mois précédent, paiement de ce mois-là compris. Gardée pour montrer l'écart au banc.
+ * Formule du serveur (StockageSupabase.chargerFinDeMois) : ce qui reste dû au 44551 à la fin
+ * du mois précédent, via la fonction du moteur `tvaRestantDue`.
  */
 export function tvaAPayerSelonServeur(ecritures: readonly EcritureComptable[], mois: number): number {
-  let net = 0;
-  for (const e of ecritures) {
-    if (e.mois !== mois - 1) continue;
-    for (const l of e.lignes) if (l.compte === "44551") net += l.sens === "credit" ? l.montant : -l.montant;
-  }
-  return Math.max(0, net);
+  return tvaRestantDue(
+    ecritures.filter((e) => e.mois <= mois - 1).flatMap((e) => e.lignes.filter((l) => l.compte === "44551")),
+  );
+}
+
+/** Résultat des mois déjà clos de l'exercice, comme le serveur le lit avant la clôture du 12e mois. */
+function resultatExerciceAvant(ecritures: readonly EcritureComptable[], mois: number): number | undefined {
+  if ((mois + 1) % 12 !== 0) return undefined;
+  const debut = debutExercice(mois);
+  return resultatDepuisLignes(
+    ecritures.filter((e) => e.mois >= debut && e.mois <= mois - 1).flatMap((e) => e.lignes),
+    planComptableV1().comptes,
+  );
 }
 
 export type OptionsAvance = {
@@ -642,6 +653,10 @@ export function avancerMois(etat: EtatBanc, graine: number, options: OptionsAvan
       options.tva === "serveur" ? tvaAPayerSelonServeur(etat.ecritures, m) : tvaAPayer(etat.ecritures, m),
     ),
     moisDecouvertConsecutifs: etat.moisDecouvertConsecutifs,
+    ...((): { resultatExerciceAvantMois?: ReturnType<typeof centimes> } => {
+      const avant = resultatExerciceAvant(etat.ecritures, m);
+      return avant === undefined ? {} : { resultatExerciceAvantMois: centimes(avant) };
+    })(),
   };
 
   const r = simulerMoisEntreprise(

@@ -7,7 +7,11 @@ import {
   PREFIXE_AMORTISSEMENT_AGENCEMENT,
   type PointDeVente,
   type Poste,
+  debutExercice,
+  planComptableV1,
   resoudreModules,
+  resultatDepuisLignes,
+  tvaRestantDue,
   idEntreprise,
   idMatiere,
   idPret,
@@ -59,15 +63,20 @@ export type LigneModulePose = {
   x: number;
   y: number;
   pivote: boolean | null;
+  /** 3D-5 (migration 0037) : 'actif' (plan en service) ou 'prevu' (appliqué à la clôture). */
+  statut?: string | null;
 };
 
-/** Modules posés lus en base, complétés par le catalogue modules-v1 (effet, prix, durée). */
+/**
+ * Modules posés lus en base, complétés par le catalogue modules-v1 (effet, prix, durée).
+ * 3D-5 : seul le plan en service (statut 'actif') compte ; le plan prévu attend la clôture.
+ */
 export function modulesDepuisLignes(
   lignes: readonly LigneModulePose[] | null | undefined,
   catalogue: readonly TypeModule[],
 ): ModulePose[] {
   return resoudreModules(
-    (lignes ?? []).map((m) => ({ id_type: m.module_type_id, x: m.x, y: m.y, pivote: m.pivote ?? false })),
+    (lignes ?? []).filter((m) => (m.statut ?? "actif") === "actif").map((m) => ({ id_type: m.module_type_id, x: m.x, y: m.y, pivote: m.pivote ?? false })),
     catalogue,
   );
 }
@@ -407,7 +416,7 @@ export class StockageSupabase implements StockageMonde {
           .eq("statut", "actif"),
         this.supabase
           .from("workshops")
-          .select("surface_m2, loyer_mensuel_centimes, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin, mode_detention, prix_achat_centimes, apport_centimes, mois_achat, duree_amortissement_mois, placed_modules(module_type_id, x, y, pivote)")
+          .select("surface_m2, loyer_mensuel_centimes, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin, mode_detention, prix_achat_centimes, apport_centimes, mois_achat, duree_amortissement_mois, placed_modules(module_type_id, x, y, pivote, statut)")
           .eq("company_id", companyId)
           .maybeSingle(),
         this.supabase
@@ -717,32 +726,76 @@ export class StockageSupabase implements StockageMonde {
       .map(([ecritureId, solde]) => ({ ecritureId, montant: centimes(solde) }));
   }
 
+  /** Toutes les lignes d'une requête du grand livre, page par page (Supabase rend 1 000 lignes au plus). */
+  private async toutesLesLignes<T>(
+    nom: string,
+    requete: (de: number, a: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  ): Promise<T[]> {
+    const PAGE = 1000;
+    const lignes: T[] = [];
+    for (let de = 0; ; de += PAGE) {
+      const page = (verifier(nom, await requete(de, de + PAGE - 1)) ?? []) as T[];
+      lignes.push(...page);
+      if (page.length < PAGE) return lignes;
+    }
+  }
+
   async chargerFinDeMois(companyId: string, moisEnCours: number): Promise<DonneesFinMois> {
     const moisPrecedent = moisEnCours - 1;
-    const [tvaR, companyR] = await Promise.all([
+    // TVA : ce qui reste dû au 44551 à la fin du mois précédent (déclarations moins paiements).
+    const lignesTva =
       moisPrecedent >= 0
-        ? this.supabase
-            .from("ledger_entries")
-            .select("sens, montant_centimes")
-            .eq("company_id", companyId)
-            .eq("compte", "44551")
-            .eq("mois_jeu", moisPrecedent)
-        : Promise.resolve({ data: [], error: null }),
-      this.supabase
-        .from("companies")
-        .select("mois_decouvert_consecutifs")
-        .eq("id", companyId)
-        .maybeSingle(),
-    ]);
-    const tva = (verifier("ledger 44551", tvaR as { data: unknown; error: { message: string } | null }) ?? []) as Array<{
-      sens: string; montant_centimes: number;
-    }>;
-    let net = 0;
-    for (const l of tva) net += l.sens === "credit" ? l.montant_centimes : -l.montant_centimes;
+        ? await this.toutesLesLignes<{ sens: string; montant_centimes: number }>("ledger 44551", (de, a) =>
+            this.supabase
+              .from("ledger_entries")
+              .select("sens, montant_centimes")
+              .eq("company_id", companyId)
+              .eq("compte", "44551")
+              .lte("mois_jeu", moisPrecedent)
+              .order("id")
+              .range(de, a),
+          )
+        : [];
+    // IS : au dernier mois de l'exercice, résultat des mois déjà clos de cet exercice.
+    const dernierMoisExercice = (moisEnCours + 1) % 12 === 0;
+    const debut = debutExercice(moisEnCours);
+    const lignesResultat =
+      dernierMoisExercice && moisPrecedent >= debut
+        ? await this.toutesLesLignes<{ compte: string; sens: string; montant_centimes: number }>(
+            "ledger exercice",
+            (de, a) =>
+              this.supabase
+                .from("ledger_entries")
+                .select("compte, sens, montant_centimes")
+                .eq("company_id", companyId)
+                .gte("mois_jeu", debut)
+                .lte("mois_jeu", moisPrecedent)
+                .or("compte.like.6%,compte.like.7%")
+                .order("id")
+                .range(de, a),
+          )
+        : [];
+    const companyR = await this.supabase
+      .from("companies")
+      .select("mois_decouvert_consecutifs")
+      .eq("id", companyId)
+      .maybeSingle();
     const company = verifier("companies", companyR) as { mois_decouvert_consecutifs: number } | null;
     return {
-      tvaAPayerCeMois: centimes(Math.max(0, net)),
+      tvaAPayerCeMois: centimes(
+        tvaRestantDue(lignesTva.map((l) => ({ sens: l.sens, montant: Number(l.montant_centimes) }))),
+      ),
       moisDecouvertConsecutifs: company?.mois_decouvert_consecutifs ?? 0,
+      ...(dernierMoisExercice
+        ? {
+            resultatExerciceAvantMois: centimes(
+              resultatDepuisLignes(
+                lignesResultat.map((l) => ({ compte: l.compte, sens: l.sens, montant: Number(l.montant_centimes) })),
+                planComptableV1().comptes,
+              ),
+            ),
+          }
+        : {}),
     };
   }
 

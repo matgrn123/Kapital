@@ -313,7 +313,9 @@ export function cloturerMois(
   // Mois comptés depuis 0 (comme worlds.mois_courant) : l'exercice se clôt au 12e mois (11, 23…).
   if ((mois + 1) % 12 === 0) {
     const totaux = sommeAgregats(cumul.agregats, agregatsDe(ecrituresCloture, gl.comptes));
-    const resultatImposable = centimes(Math.max(0, totaux.produits - totaux.charges));
+    // L'exercice entier : les mois déjà clos (lus dans le grand livre) plus ce dernier mois.
+    const resultatExercice = (donnees.resultatExerciceAvantMois ?? 0) + totaux.produits - totaux.charges;
+    const resultatImposable = centimes(Math.max(0, resultatExercice));
     const is = calculImpotSocietes(resultatImposable, parametresIsDepuis(params));
 
     if (is > 0) {

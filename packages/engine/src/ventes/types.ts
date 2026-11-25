@@ -21,6 +21,11 @@ export type EntreesEcritureVenteDirecte = {
   readonly quantite: number;
   readonly prixTtcUnitaire: Centimes;
   readonly coutRevientUnitaire: Centimes;
+  /**
+   * Coût total sorti du stock pour cette vente (35 / 7135). Absent = coût unitaire × quantité.
+   * Le moteur le fournit pour que le compte 35 suive exactement la valeur de son stock.
+   */
+  readonly coutRevientTotal?: Centimes;
   readonly tauxTva: number;
 };
 
@@ -31,6 +36,11 @@ export type EntreesEcritureVenteRevendeur = {
   readonly quantite: number;
   readonly prixGrosHtUnitaire: Centimes;
   readonly coutRevientUnitaire: Centimes;
+  /**
+   * Coût total sorti du stock pour cette vente (35 / 7135). Absent = coût unitaire × quantité.
+   * Le moteur le fournit pour que le compte 35 suive exactement la valeur de son stock.
+   */
+  readonly coutRevientTotal?: Centimes;
 };
 
 export type EntreesEcritureRetour = {

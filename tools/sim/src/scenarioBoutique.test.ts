@@ -8,8 +8,8 @@ import { jouerScenarioBoutique } from "./scenarioBoutique.js";
 
 const { etat, journal } = jouerScenarioBoutique({ moisAvant: 24, moisBoutique: 12, graine: 7 });
 
-/** Même tolérance que le scénario solo : arrondi du coût moyen des ventes directes (bug signalé, PR #111). */
-const ANOMALIES_CONNUES = new Set(["stock_fini_sans_ecriture"]);
+/** Aucune anomalie tolérée : l'arrondi du coût moyen des ventes est corrigé (PR #111). */
+const ANOMALIES_CONNUES = new Set<string>();
 
 const ventesBoutique = (mois: number) =>
   etat.ecritures.filter((e) => e.mois === mois && e.id.startsWith("vente_") && e.id.endsWith("_boutique"));

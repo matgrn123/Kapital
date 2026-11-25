@@ -180,16 +180,19 @@ type LigneSalarie = {
 // ---------------------------------------------------------------------------
 
 /** Jointure PostgREST à ajouter au select de workshops pour lire les modules posés. */
-export const COLONNES_MODULES_POSES = "placed_modules(module_type_id, x, y, pivote)";
+export const COLONNES_MODULES_POSES = "placed_modules(module_type_id, x, y, pivote, statut)";
 
 export type AvecModulesPoses = {
-  placed_modules?: { module_type_id: string; x: number; y: number; pivote: boolean | null }[] | null;
+  placed_modules?: { module_type_id: string; x: number; y: number; pivote: boolean | null; statut?: string | null }[] | null;
 };
 
-/** Modules posés d'un atelier lu avec COLONNES_MODULES_POSES, complétés par le catalogue. */
+/**
+ * Modules posés d'un atelier lu avec COLONNES_MODULES_POSES, complétés par le catalogue.
+ * 3D-5 : seul le plan en service (statut 'actif') compte ; le plan prévu attend la clôture.
+ */
 export function modulesPoses(atelier: AvecModulesPoses | null | undefined): ModulePose[] {
   return resoudreModules(
-    (atelier?.placed_modules ?? []).map((m) => ({ id_type: m.module_type_id, x: m.x, y: m.y, pivote: m.pivote ?? false })),
+    (atelier?.placed_modules ?? []).filter((m) => (m.statut ?? "actif") === "actif").map((m) => ({ id_type: m.module_type_id, x: m.x, y: m.y, pivote: m.pivote ?? false })),
     chargerModulesV1(),
   );
 }

@@ -74,6 +74,12 @@ export type DonneesFlux = {
 export type DonneesFinMois = {
   readonly tvaAPayerCeMois: Centimes;
   readonly moisDecouvertConsecutifs: number;
+  /**
+   * Résultat (produits − charges) des mois de l'exercice déjà clos avant ce mois, lu dans le
+   * grand livre. Sert à l'impôt sur les sociétés, calculé au 12e mois sur l'exercice entier.
+   * Absent = 0.
+   */
+  readonly resultatExerciceAvantMois?: Centimes;
 };
 
 /** Toutes les données réelles pour la clôture d'un mois pris d'un seul bloc */

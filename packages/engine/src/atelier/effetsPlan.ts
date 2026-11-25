@@ -98,7 +98,7 @@ export function resoudreModules(
 /**
  * Cases où la signature pose ses postes : rangée du haut, un poste toutes les 3 colonnes
  * (x = 2, 5, 8…, y = 1), une colonne libre entre deux postes. Même formule que la migration
- * 0033 (signer_bail, acheter_local, reprise des ateliers existants) ; un test vérifie que ces
+ * 0036 (signer_bail, acheter_local, reprise des ateliers existants) ; un test vérifie que ces
  * positions passent validerPlanEtage sur la grille par défaut 10 × 5, entrée (0, 3).
  */
 export function positionsPostesALaSignature(nombre: number): PositionModule[] {
