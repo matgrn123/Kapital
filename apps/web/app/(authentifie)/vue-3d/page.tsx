@@ -21,26 +21,26 @@ const pourcent = (x: number) => `${(x * 100).toLocaleString("fr-FR", { maximumFr
 const pluriel = (n: number, mot: string) => `${n.toLocaleString("fr-FR")} ${mot}${n > 1 ? "s" : ""}`;
 
 /**
- * Bâtiments du joueur en plus de l'atelier principal (table workshops, une ligne au plus).
- * Points de vente (AE-11) : la table `points_de_vente` (0038), lue avec le client du joueur
- * (RLS : ses boutiques seulement) ; le nom vient du catalogue des bâtiments. Le village dessine
- * alors la boutique à la place du terrain. Deuxième local : pas encore de table (3D-7).
+ * Bâtiments du joueur en plus de l'atelier principal, lus avec le client du joueur (RLS : les
+ * siens seulement) ; le nom vient du catalogue des bâtiments.
+ * - Autres locaux (3D-7) : la table `workshops`, du plus ancien au plus récent ; le plus ancien est
+ *   l'atelier principal (la société), les suivants sont dessinés à l'emplacement `local2`.
+ * - Points de vente (AE-11) : la table `points_de_vente` (0038) ; le village dessine alors la
+ *   boutique à la place du terrain.
  */
 async function lireBatimentsDuJoueur(supabase: SupabaseClient, companyId: string): Promise<BatimentsDuJoueur> {
-  const { data, error } = await supabase
-    .from("points_de_vente")
-    .select("id, batiment_id")
-    .eq("company_id", companyId)
-    .eq("statut", "actif")
-    .order("cree_le");
-  if (error || !data || data.length === 0) return AUCUN_AUTRE_BATIMENT;
+  const [locauxR, boutiquesR] = await Promise.all([
+    supabase.from("workshops").select("id, batiment_id").eq("company_id", companyId).order("cree_le"),
+    supabase.from("points_de_vente").select("id, batiment_id").eq("company_id", companyId).eq("statut", "actif").order("cree_le"),
+  ]);
   const catalogue = chargerBatimentsV1();
+  const nom = (batimentId: string | null, defaut: string) => catalogue.find((b) => b.id === batimentId)?.nom ?? defaut;
+  const locaux = locauxR.error ? [] : ((locauxR.data ?? []) as { id: string; batiment_id: string | null }[]);
+  const boutiques = boutiquesR.error ? [] : ((boutiquesR.data ?? []) as { id: string; batiment_id: string }[]);
+  if (locaux.length <= 1 && boutiques.length === 0) return AUCUN_AUTRE_BATIMENT;
   return {
-    ...AUCUN_AUTRE_BATIMENT,
-    pointsDeVente: (data as { id: string; batiment_id: string }[]).map((p) => ({
-      id: p.id,
-      nom: catalogue.find((b) => b.id === p.batiment_id)?.nom ?? "Ta boutique",
-    })),
+    locaux: locaux.slice(1).map((l) => ({ id: l.id, nom: nom(l.batiment_id, "Autre local") })),
+    pointsDeVente: boutiques.map((p) => ({ id: p.id, nom: nom(p.batiment_id, "Ta boutique") })),
   };
 }
 
@@ -103,9 +103,12 @@ export default async function PageVillage() {
         genre: "local2",
         nom: l.nom,
         surTitre: "Ta société · autre local",
-        description: "Un autre local de ta société, en plus de l'atelier principal.",
+        description: "Un autre local de ta société, en plus de l'atelier principal. Ses postes s'ajoutent à ta capacité de production.",
         faits: [],
-        liens: [{ href: "/locaux", libelle: "Locaux" }],
+        liens: [
+          { href: `/atelier-3d?local=${l.id}`, libelle: "Entrer dans ce local" },
+          { href: "/locaux", libelle: "Locaux" },
+        ],
       }),
     ),
     ...batiments.pointsDeVente.map(

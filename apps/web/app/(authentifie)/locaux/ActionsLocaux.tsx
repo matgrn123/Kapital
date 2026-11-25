@@ -239,7 +239,7 @@ export function CarteOffre({
   );
 }
 
-export function BoutonConge({ preavisMois }: { preavisMois: number }) {
+export function BoutonConge({ preavisMois, workshopId }: { preavisMois: number; workshopId: string }) {
   const router = useRouter();
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -253,7 +253,8 @@ export function BoutonConge({ preavisMois }: { preavisMois: number }) {
       return;
     setErreur(null);
     setEnCours(true);
-    const r = await appelerAction("/api/actions/donner-conge-atelier");
+    // 3D-7 : le congé vise ce local, et lui seul.
+    const r = await appelerAction("/api/actions/donner-conge-atelier", { workshopId });
     setEnCours(false);
     if (!r.ok) return setErreur(r.message);
     router.refresh();

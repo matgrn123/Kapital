@@ -202,8 +202,13 @@ export function postesPoses(atelier: AvecModulesPoses | null | undefined): numbe
   return effetsPlan(modulesPoses(atelier)).postesEquipes;
 }
 
+/** 3D-7 : postes équipés de tous les locaux de la société (somme). */
+export function postesPosesTousLocaux(ateliers: readonly AvecModulesPoses[] | null | undefined): number {
+  return (ateliers ?? []).reduce((s, a) => s + postesPoses(a), 0);
+}
+
 export async function chargerEntreprisePersonnel(ctx: ContexteAction): Promise<Entreprise> {
-  const [{ data: lignes }, { data: atelier }] = await Promise.all([
+  const [{ data: lignes }, { data: locaux }] = await Promise.all([
     ctx.supabaseAdmin
       .from("employees")
       .select("id, poste, salaire_brut_mensuel_centimes, anciennete_mois_debut, experience_mois_debut, mois_jeu_debut")
@@ -211,9 +216,10 @@ export async function chargerEntreprisePersonnel(ctx: ContexteAction): Promise<E
       .eq("statut", "actif"),
     ctx.supabaseAdmin
       .from("workshops")
-      .select(`surface_m2, loyer_mensuel_centimes, ${COLONNES_MODULES_POSES}`)
+      .select(`id, surface_m2, loyer_mensuel_centimes, ${COLONNES_MODULES_POSES}`)
       .eq("company_id", ctx.companyId)
-      .maybeSingle(),
+      // 3D-7 : tous les locaux de la société ; les postes libres se comptent sur tous.
+      .order("cree_le"),
   ]);
   const salaries: Salarie[] = ((lignes ?? []) as LigneSalarie[]).map((e) => {
     const dureeService = Math.max(0, ctx.moisCourant - (e.mois_jeu_debut ?? 0));
@@ -225,7 +231,7 @@ export async function chargerEntreprisePersonnel(ctx: ContexteAction): Promise<E
       experienceMois: e.experience_mois_debut + dureeService,
     };
   });
-  const a = atelier as ({ surface_m2: number; loyer_mensuel_centimes: number } & AvecModulesPoses) | null;
+  const ateliers = (locaux ?? []) as ({ id: string; surface_m2: number; loyer_mensuel_centimes: number } & AvecModulesPoses)[];
   return {
     id: idEntreprise(ctx.companyId),
     nom: "",
@@ -241,13 +247,12 @@ export async function chargerEntreprisePersonnel(ctx: ContexteAction): Promise<E
     stocksMatiere: [],
     stocksFinis: [],
     salaries,
-    atelier: a
-      ? {
-          surfaceM2: a.surface_m2,
-          loyerMensuel: centimes(Number(a.loyer_mensuel_centimes)),
-          modules: modulesPoses(a),
-        }
-      : null,
+    ateliers: ateliers.map((a) => ({
+      id: a.id,
+      surfaceM2: a.surface_m2,
+      loyerMensuel: centimes(Number(a.loyer_mensuel_centimes)),
+      modules: modulesPoses(a),
+    })),
     marque: { notoriete: 0, desirabilite: 0 },
     prets: [],
     catalogue: [],

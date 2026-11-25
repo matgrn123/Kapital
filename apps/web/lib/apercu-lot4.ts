@@ -199,7 +199,6 @@ export function apercuAchat(a: {
     tresorerie: centimes(a.tresorerie),
     detteEnCours: centimes(a.detteEnCours),
     moisDecouvertConsecutifs: a.moisDecouvertConsecutifs ?? 0,
-    aDejaUnLocal: false,
     params: a.params,
   });
   if (!r.ok) return { ok: false, message: r.message };

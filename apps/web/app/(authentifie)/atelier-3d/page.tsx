@@ -1,6 +1,8 @@
 import { chargerBatimentsV1, chargerModulesV1, chargerParametresV1 } from "@kapital/content";
 import { BoutonLien, Carte, EnTete, Etapes } from "../../../components/ui";
 import { postesFournisDepuisParametres, valeurNetteMaterielEnService } from "../../../lib/amenagement";
+import { postesPoses } from "../../../lib/api-helpers";
+import { localAffiche, salariesDuLocal } from "../../../lib/locaux";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { EcranAtelier } from "./EcranAtelier";
 import type { ModulePlace } from "./plan";
@@ -10,6 +12,8 @@ import type { SalarieFiche } from "./salaries";
 // placed_modules.x / y comptent les cases à partir de 1 (convention de validerPlanEtage).
 // 3D-5 : placed_modules.statut sépare le plan en service ('actif') du plan prévu ('prevu'),
 // appliqué à la clôture du mois de jeu (migration 0037).
+// 3D-7 : une société peut avoir plusieurs locaux ; ?local=<id> choisit celui qu'on aménage
+// (par défaut le plus ancien), et un sélecteur passe de l'un à l'autre.
 
 type Employe = {
   id: string;
@@ -21,18 +25,25 @@ type Employe = {
   mois_jeu_debut: number | null;
 };
 
-export default async function PageAtelier() {
+type Workshop = {
+  id: string; batiment_id: string | null; surface_m2: number; largeur_grille: number; hauteur_grille: number;
+  entree_x: number; entree_y: number; plan_prevu_mois: number | null; plan_prevu_cout_centimes: number | null;
+  placed_modules: { module_type_id: string; x: number; y: number; pivote: boolean | null; statut: string | null }[] | null;
+};
+
+export default async function PageAtelier({ searchParams }: { searchParams: Promise<{ local?: string | string[] }> }) {
+  const { local: localDemande } = await searchParams;
   const supabase = await creerClientServeur();
   const { data: entreprises } = await supabase.from("companies").select("id, nom, tresorerie_centimes").limit(1);
   const entreprise = entreprises?.[0] as { id: string; nom: string; tresorerie_centimes: number } | undefined;
   if (!entreprise) return null;
 
-  const [{ data: workshop }, { data: employes }, { data: monde }] = await Promise.all([
+  const [{ data: workshops }, { data: employes }, { data: monde }] = await Promise.all([
     supabase
       .from("workshops")
-      .select("id, batiment_id, surface_m2, largeur_grille, hauteur_grille, entree_x, entree_y, plan_prevu_mois, plan_prevu_cout_centimes")
+      .select("id, batiment_id, surface_m2, largeur_grille, hauteur_grille, entree_x, entree_y, plan_prevu_mois, plan_prevu_cout_centimes, placed_modules(module_type_id, x, y, pivote, statut)")
       .eq("company_id", entreprise.id)
-      .maybeSingle(),
+      .order("cree_le"),
     supabase
       .from("employees")
       .select("id, poste, salaire_brut_mensuel_centimes, cree_le, anciennete_mois_debut, experience_mois_debut, mois_jeu_debut")
@@ -42,6 +53,8 @@ export default async function PageAtelier() {
     supabase.from("worlds").select("mois_courant").eq("etat", "actif").limit(1).maybeSingle(),
   ]);
 
+  const locaux = (workshops ?? []) as Workshop[];
+  const workshop = localAffiche(locaux, typeof localDemande === "string" ? localDemande : null);
   if (!workshop) {
     return (
       <div className="flex flex-col gap-4">
@@ -59,10 +72,10 @@ export default async function PageAtelier() {
     );
   }
 
-  const w = workshop as {
-    id: string; batiment_id: string | null; surface_m2: number; largeur_grille: number; hauteur_grille: number;
-    entree_x: number; entree_y: number; plan_prevu_mois: number | null; plan_prevu_cout_centimes: number | null;
-  };
+  const w = workshop;
+  const indexLocal = locaux.indexOf(w);
+  const catalogueBatiments = chargerBatimentsV1();
+  const nomLocal = (l: Workshop) => catalogueBatiments.find((b) => b.id === l.batiment_id)?.nom ?? "Local";
   const [{ data: places }, { data: materiel }] = await Promise.all([
     supabase
       .from("placed_modules")
@@ -86,7 +99,7 @@ export default async function PageAtelier() {
   const parametres = chargerParametresV1();
 
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
-  const salaries: SalarieFiche[] = ((employes ?? []) as Employe[]).map((e) => {
+  const tous: SalarieFiche[] = ((employes ?? []) as Employe[]).map((e) => {
     // Même calcul que la page des salariés : valeur de départ + mois passés dans l'entreprise.
     const service = Math.max(0, moisCourant - (e.mois_jeu_debut ?? 0));
     return {
@@ -98,11 +111,14 @@ export default async function PageAtelier() {
       salaireBrutCentimes: e.salaire_brut_mensuel_centimes,
     };
   });
+  // 3D-7 : chaque local montre les artisans de ses propres postes (le moteur, lui, additionne tout).
+  const salaries = salariesDuLocal(tous, locaux.map((l) => postesPoses(l)), indexLocal);
 
-  return (
+  const ecran = (
     <EcranAtelier
+      key={w.id}
       societe={entreprise.nom}
-      local={chargerBatimentsV1().find((b) => b.id === w.batiment_id)?.nom ?? "Local"}
+      local={locaux.length > 1 ? `${nomLocal(w)} (local ${indexLocal + 1} sur ${locaux.length})` : nomLocal(w)}
       surfaceM2={w.surface_m2}
       workshopId={w.id}
       atelier={{ largeur: w.largeur_grille, hauteur: w.hauteur_grille, entree_x: w.entree_x, entree_y: w.entree_y }}
@@ -119,5 +135,20 @@ export default async function PageAtelier() {
       catalogue={chargerModulesV1()}
       parametres={parametres}
     />
+  );
+  if (locaux.length <= 1) return ecran;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <nav aria-label="Choisir le local" className="flex flex-wrap items-center gap-2">
+        <span className="text-[0.84rem] text-muted">Tes locaux :</span>
+        {locaux.map((l, i) => (
+          <BoutonLien key={l.id} href={`/atelier-3d?local=${l.id}`} petit variante={l.id === w.id ? "principal" : "secondaire"}>
+            {`${i + 1}. ${nomLocal(l)} · ${postesPoses(l)} poste${postesPoses(l) > 1 ? "s" : ""}`}
+          </BoutonLien>
+        ))}
+      </nav>
+      {ecran}
+    </div>
   );
 }

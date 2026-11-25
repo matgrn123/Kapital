@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Carte, EncadreNotion, EnTete, FilRouge, Kpi, Puce, Tableau, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
-import { COLONNES_MODULES_POSES, postesPoses, type AvecModulesPoses } from "../../../lib/api-helpers";
+import { COLONNES_MODULES_POSES, postesPoses, postesPosesTousLocaux, type AvecModulesPoses } from "../../../lib/api-helpers";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
 import { chargerParametresV1 } from "@kapital/content";
 import { centimes, delaiGrossisteMinutes, prixGrossiste } from "@kapital/engine";
@@ -14,6 +14,7 @@ import {
 } from "./FormulaireProduction";
 
 type Workshop = AvecModulesPoses & {
+  id: string;
   surface_m2: number;
   loyer_mensuel_centimes: number;
 };
@@ -49,12 +50,12 @@ export default async function PageAtelier() {
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
-  const [{ data: workshop }, { data: faconniers }, { data: catalogueFac }, { data: ordres }, { data: produits }] = await Promise.all([
+  const [{ data: workshops }, { data: faconniers }, { data: catalogueFac }, { data: ordres }, { data: produits }] = await Promise.all([
     supabase
       .from("workshops")
-      .select(`surface_m2, loyer_mensuel_centimes, ${COLONNES_MODULES_POSES}`)
+      .select(`id, surface_m2, loyer_mensuel_centimes, ${COLONNES_MODULES_POSES}`)
       .eq("company_id", entreprise.id)
-      .maybeSingle(),
+      .order("cree_le"),
     supabase.from("faconniers").select("id, nom, pays, delai_mois, minimum_commande").order("nom"),
     supabase.from("faconnier_catalogue").select("faconnier_id, product_id, prix_par_piece_centimes"),
     supabase
@@ -66,7 +67,8 @@ export default async function PageAtelier() {
     supabase.from("products").select("id, nom, matiere_id, consommation_par_piece, fournitures_par_piece_centimes"),
   ]);
 
-  const atelier = workshop as Workshop | null;
+  // 3D-7 : tous les locaux de la société, du plus ancien au plus récent.
+  const ateliers = (workshops ?? []) as Workshop[];
   const faconniersTab = (faconniers ?? []) as Faconnier[];
   const catalogueFacTab = (catalogueFac ?? []) as LigneCatalogueFac[];
   const ordresTab = (ordres ?? []) as ProductionOrder[];
@@ -146,7 +148,7 @@ export default async function PageAtelier() {
         <div className="flex flex-col gap-4">
           <Carte titre="Lancer une production">
             <FormulaireProduction
-              aUnAtelier={!!atelier}
+              aUnAtelier={ateliers.length > 0}
               faconniers={faconniersTab}
               catalogueFaconnier={catalogueFacTab}
               produits={produitsCatalogue}
@@ -191,14 +193,36 @@ export default async function PageAtelier() {
             )}
           </Carte>
 
-          <Carte titre="Ton atelier">
-            {atelier ? (
+          <Carte titre={ateliers.length > 1 ? `Tes ateliers (${ateliers.length})` : "Ton atelier"}>
+            {ateliers.length > 0 ? (
               <div className="flex flex-col gap-3">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Kpi libelle="Surface" valeur={`${atelier.surface_m2} m²`} />
-                <Kpi libelle="Loyer mensuel" valeur={`${formaterEuros(atelier.loyer_mensuel_centimes)} €`} />
-                <Kpi libelle="Postes de travail" valeur={postesPoses(atelier)} />
-              </div>
+              {ateliers.length > 1 && (
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Kpi libelle="Surface totale" valeur={`${ateliers.reduce((s, a) => s + a.surface_m2, 0)} m²`} />
+                  <Kpi
+                    libelle="Loyers mensuels"
+                    valeur={`${formaterEuros(ateliers.reduce((s, a) => s + Number(a.loyer_mensuel_centimes), 0))} €`}
+                  />
+                  <Kpi libelle="Postes de travail" valeur={postesPosesTousLocaux(ateliers)} />
+                </div>
+              )}
+              {ateliers.map((atelier, i) => (
+                <div key={atelier.id} className="flex flex-col gap-2">
+                  {ateliers.length > 1 && (
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-[0.88rem] font-semibold">Local {i + 1}</span>
+                      <Link href={`/atelier-3d?local=${atelier.id}`} className="text-[0.84rem] text-accent underline">
+                        Aménager
+                      </Link>
+                    </div>
+                  )}
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Kpi libelle="Surface" valeur={`${atelier.surface_m2} m²`} />
+                    <Kpi libelle="Loyer mensuel" valeur={`${formaterEuros(atelier.loyer_mensuel_centimes)} €`} />
+                    <Kpi libelle="Postes de travail" valeur={postesPoses(atelier)} />
+                  </div>
+                </div>
+              ))}
               <p className="text-[0.84rem] text-muted">
                 Un poste, c&apos;est une machine posée dans ton plan : un artisan par poste, pas plus. Ajoute ou
                 retire des postes dans{" "}

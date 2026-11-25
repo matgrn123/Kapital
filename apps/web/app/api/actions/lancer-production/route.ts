@@ -36,12 +36,13 @@ export async function POST(request: Request) {
   if (body.lieuType === "atelier") {
     const verrou = refuserSiVerrouille(ctx, "production_atelier");
     if (verrou) return verrou;
-    const { data: atelier } = await ctx.supabaseAdmin
+    // 3D-7 : au moins un local (la société peut en avoir plusieurs).
+    const { data: locaux } = await ctx.supabaseAdmin
       .from("workshops")
       .select("id")
       .eq("company_id", ctx.companyId)
-      .maybeSingle();
-    if (!atelier) {
+      .limit(1);
+    if (!locaux || locaux.length === 0) {
       return NextResponse.json(
         { error: "Votre entreprise n'a pas d'atelier propre." },
         { status: 400 },

@@ -109,6 +109,8 @@ export function estIdentifiantSociete(id: string): boolean {
 
 /** Le local du joueur tel que lu dans workshops (ses propres données, protégées par RLS). */
 export type LocalDuJoueur = {
+  /** 3D-7 : workshops.id (lien vers l'intérieur de ce local) ; absent dans d'anciens tests. */
+  id?: string;
   batiment_id: string | null;
   surface_m2: number;
   loyer_mensuel_centimes: number;
@@ -131,19 +133,18 @@ export type BatimentEmpire = {
 };
 
 /**
- * Tous les bâtiments du joueur. Aujourd'hui son atelier s'il en a un ; demain la boutique et
- * les autres locaux s'ajoutent comme de nouvelles entrées de `locaux`.
+ * Tous les bâtiments du joueur : 3D-7, chacun de ses locaux (ateliers), du plus ancien au plus
+ * récent. La boutique s'ajoutera comme une nouvelle entrée de `locaux`.
  */
 export function batimentsDeLEmpire(
-  locaux: { atelier: LocalDuJoueur | null },
+  locaux: { ateliers: readonly LocalDuJoueur[] },
   catalogue: readonly TypeBatiment[],
 ): BatimentEmpire[] {
   const liste: BatimentEmpire[] = [];
-  if (locaux.atelier) {
-    const a = locaux.atelier;
+  locaux.ateliers.forEach((a, i) => {
     const type = a.batiment_id ? catalogue.find((b) => b.id === a.batiment_id) : undefined;
     liste.push({
-      cle: "atelier",
+      cle: a.id ? `atelier_${a.id}` : i === 0 ? "atelier" : `atelier_${i + 1}`,
       nom: type?.nom ?? "Atelier",
       categorie: type?.categorie ?? "atelier",
       surfaceM2: Number(a.surface_m2),
@@ -152,11 +153,11 @@ export function batimentsDeLEmpire(
       loyerMensuelCentimes: Number(a.loyer_mensuel_centimes),
       chargesMensuellesCentimes: Number(a.charges_mensuelles_centimes),
       liens: [
-        { href: "/atelier-3d", libelle: "Voir l'intérieur" },
+        { href: a.id ? `/atelier-3d?local=${a.id}` : "/atelier-3d", libelle: "Voir l'intérieur" },
         { href: "/locaux", libelle: "Gérer le local" },
       ],
     });
-  }
+  });
   return liste;
 }
 
