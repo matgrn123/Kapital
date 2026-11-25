@@ -1,3 +1,4 @@
+import { eurosTexte } from "../types/euros.js";
 import type { Parametres } from "@kapital/content";
 import { enregistrer, type EcritureComptable, type GrandLivre } from "../comptabilite/index.js";
 import { centimes, type Centimes, type MoisJeu } from "../types/primitifs.js";
@@ -126,9 +127,7 @@ export type RefusEmbauche =
       readonly manque: number;
     };
 
-function eurosFr(c: number): string {
-  return `${(c / 100).toFixed(2).replace(".", ",")} €`;
-}
+const eurosFr = eurosTexte;
 
 /**
  * Évalue une embauche : salaire entier strictement positif, au moins égal au SMIC mensuel

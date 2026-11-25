@@ -506,6 +506,8 @@ export function avancerFlux(
           tauxTva: tvaStandard,
         });
         derniereEcritureDuGl();
+        // Le retour annule la vente au compte 707 : le CA cumulé (seuil de l'étape 2) suit.
+        chiffreAffairesHt -= prixHtDepuisTtc(vente.prixUnitaireCentimes, tvaStandard) * quantiteRetournee;
         retourneParProduit[vente.produit as string] = dejaRetourne + quantiteRetournee;
         // Remettre en stock
         const valeurRetour = centimes(coutRevientUnitaire * quantiteRetournee);

@@ -449,6 +449,18 @@ describe("simulerPas — flux à chaque pas, échéances en fin de mois", () => 
     expect(fin).toEqual(bloc.entrepriseApres.cumulsEtape);
   });
 
+  it("le CA cumulé déduit les retours en ligne : il est égal au solde du compte 707 du mois", () => {
+    const pas = jouerUnMois(entrepriseDeTest({ cumulsEtape: { piecesVendues: 0, chiffreAffairesHt: centimes(0) } }));
+    const toutes = pas.ecrituresParPas.flat();
+    // Le test n'a de sens que s'il y a eu des retours.
+    expect(toutes.some((e) => e.id.startsWith("retour_"))).toBe(true);
+    const solde707 = toutes
+      .flatMap((e) => e.lignes)
+      .filter((l) => l.compte === "707")
+      .reduce((s, l) => s + (l.sens === "credit" ? l.montant : -l.montant), 0);
+    expect(pas.entreprisesParPas[NB_PAS - 1]!.cumulsEtape!.chiffreAffairesHt).toBe(solde707);
+  });
+
   it("la production et les ventes avancent pendant le mois", () => {
     const pas = jouerUnMois(entrepriseDeTest());
     const stockFini = (e: Entreprise) => e.stocksFinis.find((s) => s.produit === PRODUIT)!.quantite;
