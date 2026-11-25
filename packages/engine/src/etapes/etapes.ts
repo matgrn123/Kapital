@@ -154,3 +154,17 @@ export function verrouPour(
     conditions: conditionsManquantes(etapeRequise, etat, seuils),
   };
 }
+
+/**
+ * Réglage de développement : quand le paramètre `deblocage_total_developpement` vaut 1,
+ * toutes les actions sont débloquées, sans attendre les seuils. À remettre à 0 avant
+ * l'ouverture publique : c'est le seul endroit qui contourne les étapes.
+ */
+export function deblocageTotalActif(params: Parametres): boolean {
+  return params["deblocage_total_developpement"]?.valeur === 1;
+}
+
+/** L'étape à prendre en compte pour les verrous : la plus haute (2) si le déblocage total est actif. */
+export function etapeEffective(etapeReelle: EtapeEntreprise, params: Parametres): EtapeEntreprise {
+  return deblocageTotalActif(params) ? 2 : etapeReelle;
+}

@@ -502,5 +502,11 @@
     "unite": "annees",
     "source": "https://www.service-public.fr/particuliers/vosdroits/F987 (le taux passe du quart au tiers au-delà de 10 ans d'ancienneté ; Code du travail, article R1234-2)",
     "date": "2026-11-24"
+  },
+  "deblocage_total_developpement": {
+    "valeur": 1,
+    "unite": "booleen",
+    "source": "Décision de Mathieu, 25 novembre 2026 : tout débloquer tant que le jeu est en développement (1 = tout est débloqué, 0 = les étapes s'appliquent). À remettre à 0 avant l'ouverture publique, avec la fusion de la PR #60.",
+    "date": "2026-11-25"
   }
 }

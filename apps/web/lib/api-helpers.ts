@@ -1,8 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { chargerParametresV1 } from "@kapital/content";
 import { verifierDeblocageEtape } from "@kapital/server";
 import {
   centimes,
+  etapeEffective,
   idEntreprise,
   idSalarie,
   type ActionVerrouillable,
@@ -71,7 +73,8 @@ export async function chargerContexte(): Promise<ContexteAction | ErreurAction> 
     userId: user.id,
     companyId: entreprise.id as string,
     companyGamme: entreprise.gamme as "entree" | "milieu" | "haut",
-    companyEtape: entreprise.etape as number,
+    // Réglage de développement : peut compter la société comme étant à l'étape 2 (voir etapeEffective).
+    companyEtape: etapeEffective(entreprise.etape as EtapeEntreprise, chargerParametresV1()),
     companyPiecesVendues: Number(entreprise.pieces_vendues_total ?? 0),
     companyChiffreAffairesHt: Number(entreprise.chiffre_affaires_cumule_ht_centimes ?? 0),
     companyTresorerie: entreprise.tresorerie_centimes as number,
