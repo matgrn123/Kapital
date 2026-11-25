@@ -18,6 +18,9 @@ const PLAN: ModulePlace[] = [
 export default function PageDemoAtelier() {
   const catalogue = chargerModulesV1();
   const plan = PLAN.filter((m) => catalogue.some((c) => c.id === m.module_type_id));
+  const parametres = chargerParametresV1();
+  // Salaire d'exemple : le SMIC des paramètres (centimes).
+  const smic = parametres["smic_mensuel_brut"]?.valeur ?? 0;
   return (
     <div className="flex flex-col gap-3">
       <Alerte ton="alerte">Page de démonstration : données d&apos;exemple, pas celles de ta partie.</Alerte>
@@ -29,11 +32,13 @@ export default function PageDemoAtelier() {
         atelier={{ largeur: 10, hauteur: 5, entree_x: 0, entree_y: 3 }}
         planInitial={plan}
         salaries={[
-          { id: "ex-1", poste: "artisan", experienceMois: 8 },
-          { id: "ex-2", poste: "artisan", experienceMois: 1 },
+          { id: "ex-1", poste: "artisan", experienceMois: 8, ancienneteMois: 8, depuis: "2026-03-02", salaireBrutCentimes: smic },
+          { id: "ex-2", poste: "artisan", experienceMois: 1, ancienneteMois: 1, depuis: "2026-10-05", salaireBrutCentimes: smic },
+          { id: "ex-3", poste: "artisan", experienceMois: 0, ancienneteMois: 0, depuis: "2026-11-02", salaireBrutCentimes: smic },
+          { id: "ex-4", poste: "artisan", experienceMois: 0, ancienneteMois: 0, depuis: "2026-11-20", salaireBrutCentimes: smic },
         ]}
         catalogue={catalogue}
-        parametres={chargerParametresV1()}
+        parametres={parametres}
       />
     </div>
   );
