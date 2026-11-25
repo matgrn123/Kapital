@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { passerCommandeGrossiste } from "@kapital/server";
+import { CommandeRefusee, passerCommandeGrossiste } from "@kapital/server";
 import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
@@ -40,9 +40,13 @@ export async function POST(request: Request) {
       quantite,
       moisCourant: ctx.moisCourant,
       maintenant: new Date(),
+      tresorerieCentimes: ctx.companyTresorerie,
     });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
+    if (e instanceof CommandeRefusee) {
+      return NextResponse.json({ error: e.message, code: e.code }, { status: 400 });
+    }
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }

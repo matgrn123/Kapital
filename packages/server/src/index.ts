@@ -1,6 +1,7 @@
 export * from "./types.js";
 export * from "./validerDecision.js";
 export { validerChangerPrix } from "./validations/changerPrix.js";
+export { validerSaisiePrix, type ResultatSaisiePrix, type SaisiePrix } from "./validations/saisiePrix.js";
 export { validerCommanderMatiere } from "./validations/commanderMatiere.js";
 export { validerOrdreProduction } from "./validations/ordreProduction.js";
 export { validerActionMarketing } from "./validations/actionMarketing.js";
@@ -18,6 +19,7 @@ export {
   type ResultatApprovisionner,
 } from "./approvisionnerStock.js";
 export {
+  CommandeRefusee,
   coutUsineParPiece,
   ID_GROSSISTE_LOCAL,
   lancerSerieDeLancement,

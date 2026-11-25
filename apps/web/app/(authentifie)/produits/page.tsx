@@ -1,10 +1,11 @@
 import { chargerParametresV1 } from "@kapital/content";
+import { parametreObligatoire } from "@kapital/engine";
 import { ID_GROSSISTE_LOCAL } from "@kapital/server";
 import { Carte, EncadreNotion, EnTete, FilRouge, Ligne, Puce } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros } from "../../../lib/formatage";
 import { nomMatiere } from "../../../lib/lisible";
-import { besoinFondsRoulementDepuisLignes } from "../../../lib/vente";
+import { besoinFondsRoulementDepuisLignes, coutRevientEstimeSansStock } from "../../../lib/vente";
 import { AjouterProduit, FormulairePrix } from "./FormulairePrix";
 
 type Produit = {
@@ -42,6 +43,8 @@ export default async function PageProduits() {
     { data: prixFacon },
     { data: atelier },
     { data: ecritures },
+    { data: faconniers },
+    { data: prixMatieres },
   ] =
     await Promise.all([
       supabase
@@ -64,6 +67,8 @@ export default async function PageProduits() {
         .select("ecriture_id, mois_jeu, libelle, compte, sens, montant_centimes")
         .eq("company_id", entreprise.id)
         .in("compte", ["31", "35", "411", "401"]),
+      supabase.from("faconniers").select("id, fournit_matiere"),
+      supabase.from("supplier_catalogue").select("material_id, prix_centimes"),
     ]);
   const bfr = besoinFondsRoulementDepuisLignes(
     (ecritures ?? []) as Array<{
@@ -83,12 +88,24 @@ export default async function PageProduits() {
   const cataMap = new Map(((catalogue ?? []) as CompanyProduit[]).map((c) => [c.product_id, c]));
   const stockMap = new Map(((stocks ?? []) as Stock[]).map((s) => [s.product_id, s]));
 
-  // Prix de façon le plus bas par produit (hors grossiste express).
-  const faconMin = new Map<string, number>();
-  for (const l of (prixFacon ?? []) as Array<{ faconnier_id: string; product_id: string; prix_par_piece_centimes: number }>) {
-    if (l.faconnier_id === ID_GROSSISTE_LOCAL) continue;
-    const v = faconMin.get(l.product_id);
-    if (v === undefined || l.prix_par_piece_centimes < v) faconMin.set(l.product_id, l.prix_par_piece_centimes);
+  // Sans stock, coût complet estimé chez le façonnier le moins cher (hors grossiste express) :
+  // matière (chute comprise) + fournitures + façon, calculé par le moteur.
+  const fournitMatiere = new Map(
+    ((faconniers ?? []) as Array<{ id: string; fournit_matiere: boolean }>).map((f) => [f.id, f.fournit_matiere]),
+  );
+  const lignesFacon = ((prixFacon ?? []) as Array<{ faconnier_id: string; product_id: string; prix_par_piece_centimes: number }>)
+    .filter((l) => l.faconnier_id !== ID_GROSSISTE_LOCAL);
+  const lignesMatiere = (prixMatieres ?? []) as Array<{ material_id: string; prix_centimes: number }>;
+  const tauxChute = parametreObligatoire(params, "taux_chute_matiere_defaut");
+  function coutEstime(p: Produit): number | null {
+    return coutRevientEstimeSansStock({
+      produit: { consommationParPiece: Number(p.consommation_par_piece), fournituresCentimes: Number(p.fournitures_par_piece_centimes) },
+      prixMatiereCentimes: lignesMatiere.filter((m) => m.material_id === p.matiere_id).map((m) => m.prix_centimes),
+      tauxChute,
+      faconniers: lignesFacon
+        .filter((l) => l.product_id === p.id)
+        .map((l) => ({ prixFaconCentimes: l.prix_par_piece_centimes, fournitMatiere: fournitMatiere.get(l.faconnier_id) ?? false })),
+    });
   }
 
   /** Coût de revient utilisé pour la marge : celui du stock (coût moyen), sinon le façonnier le moins cher. */
@@ -100,11 +117,13 @@ export default async function PageProduits() {
         origine: `Coût moyen de tes ${s.quantite_pieces} pièces en stock : c'est celui que le moteur sort du stock à chaque vente.`,
       };
     }
-    const f = faconMin.get(productId);
-    if (f !== undefined) {
+    const produit = produitsRefTab.find((p) => p.id === productId);
+    const f = produit ? coutEstime(produit) : null;
+    if (f !== null) {
       return {
         cout: f,
-        origine: "Pas encore de stock : estimation au prix du façonnier le moins cher. Le vrai coût sera celui de ta production.",
+        origine:
+          "Pas encore de stock : estimation chez le façonnier le moins cher, matière (chutes comprises), fournitures et façon. Le vrai coût sera celui de ta production.",
       };
     }
     return { cout: null, origine: "" };
@@ -171,7 +190,7 @@ export default async function PageProduits() {
                   id: p.id,
                   nom: p.nom,
                   detail: `${p.consommation_par_piece.toLocaleString("fr-FR")} m de ${nomMatiere(p.matiere_id, nomsMatieres)} · ${p.temps_standard_minutes} min de couture`,
-                  prix: faconMin.has(p.id) ? `Façon dès ${formaterEuros(faconMin.get(p.id)!)} € la pièce` : null,
+                  prix: ((c) => (c === null ? null : `Coût de revient estimé ${formaterEuros(c)} € la pièce`))(coutEstime(p)),
                 }))}
               />
             </Carte>
