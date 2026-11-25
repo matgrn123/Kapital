@@ -411,3 +411,85 @@ describe("avancerMondeJusquA — une seule convention de mois", () => {
     expect(s.monde.moisCourant).toBe(1);
   });
 });
+
+describe("avancerMondeJusquA — journal d'événements (migration 0041)", () => {
+  const livraison = (id: string, instantMs: number) => ({
+    type: "matiere" as const,
+    statut: "en_cours" as const,
+    id,
+    matiere: MATIERE,
+    quantite: 500,
+    prixUnitaire: centimes(1500),
+    modePaiement: "credit" as const,
+    instantMs,
+  });
+  const cles = (s: StockageMemoire, id: string) => s.evenementsDe(id).map((e) => e.cle);
+
+  it("enregistre la livraison et la clôture du mois, avec les explications du moteur", async () => {
+    const s = monde();
+    s.ajouterLivraison("a", livraison("cmd1", DEBUT + 10.5 * MIN));
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 1 * JOUR + 5 * MIN);
+
+    const evs = s.evenementsDe("a");
+    const liv = evs.find((e) => e.cle === "livraison_matiere_cmd1");
+    expect(liv).toMatchObject({ type: "livraison_matiere", moisJeu: 0, pas: 10 });
+    const cloture = evs.find((e) => e.cle === "cloture_0");
+    expect(cloture?.type).toBe("cloture_mois");
+    const detail = cloture!.detail as { explications: { cle: string }[]; paiements: { paie: number; loyers: number } };
+    expect(detail.explications.map((x) => x.cle)).toContain("tresorerie");
+    expect(detail.paiements.paie).toBeGreaterThan(0);
+    expect(detail.paiements.loyers).toBe(250_000);
+  });
+
+  it("rejouer le même pas ne duplique aucun événement", async () => {
+    const s = monde();
+    s.ajouterLivraison("a", livraison("cmd1", DEBUT + 10.5 * MIN));
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 1 * JOUR + 5 * MIN);
+    const avant = cles(s, "a");
+
+    // Même instant : rien n'est retraité.
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 1 * JOUR + 5 * MIN);
+    expect(cles(s, "a")).toEqual(avant);
+
+    // Deux traitements simultanés du même pas : un seul passe, les clés restent uniques.
+    const double = monde();
+    double.ajouterLivraison("a", livraison("cmd1", DEBUT + 10.5 * MIN));
+    double.cederLaMain = true;
+    await Promise.all([
+      avancerMondeJusquA(double, PARAMS, DEBUT + 1 * JOUR + 5 * MIN),
+      avancerMondeJusquA(double, PARAMS, DEBUT + 1 * JOUR + 5 * MIN),
+    ]);
+    expect(cles(double, "a")).toEqual(avant);
+
+    // Réenregistrer les mêmes événements (reprise après panne) : la clé unique les ignore.
+    await s.enregistrerEvenements("a", s.evenementsDe("a"));
+    expect(cles(s, "a")).toEqual(avant);
+    expect(new Set(avant).size).toBe(avant.length);
+  });
+
+  it("avancer en une fois ou par morceaux donne le même journal", async () => {
+    const enUneFois = monde();
+    await avancerMondeJusquA(enUneFois, PARAMS, DEBUT + 2.5 * JOUR);
+    const parMorceaux = monde();
+    for (let t = 97; t < 2.5 * 1440; t += 97) await avancerMondeJusquA(parMorceaux, PARAMS, DEBUT + t * MIN);
+    await avancerMondeJusquA(parMorceaux, PARAMS, DEBUT + 2.5 * JOUR);
+    expect(parMorceaux.evenementsDe("a")).toEqual(enUneFois.evenementsDe("a"));
+  });
+
+  it("une panne du journal n'annule pas le pas déjà enregistré", async () => {
+    const s = monde();
+    s.pannesJournal = 1;
+    const r = await avancerMondeJusquA(s, PARAMS, DEBUT + 1 * JOUR + 5 * MIN);
+    expect(r.entreprises[0]!.etat).toBe("avancee");
+    expect(s.entreprises.get("a")!.pasTraites).toBe(N + 5);
+  });
+
+  it("chaque société n'a que ses propres événements", async () => {
+    const s = monde(["a", "b"]);
+    s.ajouterLivraison("a", livraison("cmd1", DEBUT + 10.5 * MIN));
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 1 * JOUR + 5 * MIN);
+    expect(cles(s, "a")).toContain("livraison_matiere_cmd1");
+    expect(cles(s, "b")).not.toContain("livraison_matiere_cmd1");
+    expect(cles(s, "b")).toContain("cloture_0");
+  });
+});

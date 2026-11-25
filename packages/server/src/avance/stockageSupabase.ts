@@ -41,6 +41,8 @@ import {
   type ResultatLotAEnregistrer,
   type StockageMonde,
 } from "./port.js";
+import { enregistrerEvenementsSupabase } from "../evenements/supabase.js";
+import type { EvenementJournal } from "../evenements/types.js";
 
 // ---------------------------------------------------------------------------
 // Nomenclature des produits (table products), jointe aux commandes et au catalogue
@@ -866,5 +868,9 @@ export class StockageSupabase implements StockageMonde {
       }
       throw new Error(`${fonction} ${companyId} : ${error.message}`);
     }
+  }
+
+  async enregistrerEvenements(companyId: string, evenements: readonly EvenementJournal[]): Promise<void> {
+    await enregistrerEvenementsSupabase(this.supabase, companyId, evenements);
   }
 }

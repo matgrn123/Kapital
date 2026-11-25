@@ -8,6 +8,7 @@ import type {
   LivraisonFaconnier,
   LivraisonMatiere,
 } from "@kapital/engine";
+import type { EvenementJournal } from "../evenements/types.js";
 
 /**
  * Ce dont l'orchestrateur a besoin pour lire et écrire le monde.
@@ -96,4 +97,9 @@ export interface StockageMonde {
     nbPas: number,
     lot: ResultatLotAEnregistrer,
   ): Promise<void>;
+  /**
+   * Journal (migration 0041) : enregistre les événements d'un lot déjà appliqué.
+   * Idempotent : un événement dont la clé existe déjà pour la société est ignoré.
+   */
+  enregistrerEvenements(companyId: string, evenements: readonly EvenementJournal[]): Promise<void>;
 }
