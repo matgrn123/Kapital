@@ -1,5 +1,8 @@
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
+import { libelleGamme, libelleLisible } from "../../../lib/lisible";
+import { Carte, Puce } from "../../../components/ui";
+import { EnTete, TableauRang, Vide } from "../../../components/ui/formulaire";
 
 type LigneMarche = {
   company_id: string;
@@ -24,24 +27,16 @@ type VenteRecente = {
   nom_entreprise: string;
 };
 
-const LIBELLE_GAMME: Record<string, string> = {
-  entree: "Entrée",
-  milieu: "Milieu",
-  haut: "Haut",
-};
-
-const LIBELLE_PRODUIT: Record<string, string> = {
-  prod_tshirt: "T-shirt",
-  prod_chemise: "Chemise",
-  prod_sac_toile: "Sac en toile",
-};
-
 export default async function PageMarche() {
   const supabase = await creerClientServeur();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { data: monEntreprise } = await supabase
     .from("companies")
     .select("id, gamme")
+    .eq("owner_profile_id", user?.id ?? "")
     .limit(1);
   const entreprise = monEntreprise?.[0];
   if (!entreprise) return null;
@@ -152,121 +147,72 @@ export default async function PageMarche() {
     arr.sort((a, b) => a.prix_vente_directe_centimes - b.prix_vente_directe_centimes);
   }
 
+  const nomsProduits = Object.fromEntries(nomProduit);
+
   return (
     <div className="flex flex-col gap-5">
-      <header className="border-b border-[color:var(--color-g-200)] pb-6">
-        <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-          Monde
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Marché</h1>
-        <p className="mt-2 text-sm text-[color:var(--color-g-500)]">
-          Les concurrents de votre gamme ({LIBELLE_GAMME[entreprise.gamme] ?? entreprise.gamme}) et leurs
-          prix, triés du moins cher au plus cher. Plus votre prix est bas pour une
-          notoriété donnée, plus vous captez de ventes.
-        </p>
-      </header>
+      <EnTete surTitre="Monde" titre="Marché">
+        Les concurrents de ta gamme ({libelleGamme(entreprise.gamme)}) et leurs prix, du moins cher au plus cher. Plus
+        ton prix est bas pour une notoriété donnée, plus tu captes de ventes.
+      </EnTete>
 
-      <section className="mt-8 space-y-8">
-        {[...parProduit.entries()].map(([productId, offres]) => (
-          <article
-            key={productId}
-            className="rounded-md border border-[color:var(--color-g-200)]"
-          >
-            <header className="border-b border-[color:var(--color-g-200)] px-5 py-3">
-              <h2 className="text-sm font-semibold">
-                {LIBELLE_PRODUIT[productId] ?? productId}
-              </h2>
-              <p className="text-xs text-[color:var(--color-g-500)]">
-                {offres.length} offres sur votre gamme
-              </p>
-            </header>
-            <table className="w-full text-sm">
-              <thead className="bg-[color:var(--color-g-100)] text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-                <tr>
-                  <th className="px-5 py-2 text-left font-medium">Marque</th>
-                  <th className="px-5 py-2 text-right font-medium">Prix direct TTC</th>
-                  <th className="px-5 py-2 text-right font-medium">Prix revendeur HT</th>
-                  <th className="px-5 py-2 text-right font-medium">Notoriété</th>
-                  <th className="px-5 py-2 text-right font-medium">Désirabilité</th>
-                  <th className="px-5 py-2 text-right font-medium">Stock</th>
-                </tr>
-              </thead>
-              <tbody>
-                {offres.map((o) => {
-                  const estMoi = o.company_id === entreprise.id;
-                  return (
-                    <tr
-                      key={`${o.company_id}-${o.product_id}`}
-                      className={`border-t border-[color:var(--color-g-200)] ${
-                        estMoi ? "bg-[color:var(--color-g-100)] font-medium" : ""
-                      }`}
-                    >
-                      <td className="px-5 py-2">
-                        {o.nom}
-                        {estMoi && <span className="ml-2 text-xs text-[color:var(--color-g-500)]">(vous)</span>}
-                      </td>
-                      <td className="chiffre px-5 py-2 text-right">
-                        {formaterEuros(o.prix_vente_directe_centimes)} €
-                      </td>
-                      <td className="chiffre px-5 py-2 text-right text-[color:var(--color-g-500)]">
-                        {formaterEuros(o.prix_revendeur_centimes)} €
-                      </td>
-                      <td className="chiffre px-5 py-2 text-right">
-                        {o.notoriete !== null ? Math.round(o.notoriete) : "—"}
-                      </td>
-                      <td className="chiffre px-5 py-2 text-right">
-                        {o.desirabilite !== null ? Math.round(o.desirabilite) : "—"}
-                      </td>
-                      <td className="chiffre px-5 py-2 text-right">
-                        {o.quantite_pieces}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </article>
-        ))}
-      </section>
+      {parProduit.size === 0 && <Vide>Aucune offre sur ta gamme pour l&apos;instant.</Vide>}
+      {[...parProduit.entries()].map(([productId, offres]) => (
+        <Carte
+          key={productId}
+          titre={nomProduit.get(productId) ?? productId}
+          action={<Puce>{offres.length} offres sur ta gamme</Puce>}
+        >
+          <TableauRang
+            entetes={[
+              { texte: "Marque" },
+              { texte: "Prix direct TTC", droite: true },
+              { texte: "Prix revendeur HT", droite: true },
+              { texte: "Notoriété", droite: true },
+              { texte: "Désirabilité", droite: true },
+              { texte: "Stock", droite: true },
+            ]}
+            lignes={offres.map((o) => {
+              const estMoi = o.company_id === entreprise.id;
+              return {
+                cle: `${o.company_id}-${o.product_id}`,
+                moi: estMoi,
+                cellules: [
+                  <>
+                    {o.nom}
+                    {estMoi && <span className="ml-2 text-[0.78rem] text-muted">(toi)</span>}
+                  </>,
+                  `${formaterEuros(o.prix_vente_directe_centimes)} €`,
+                  `${formaterEuros(o.prix_revendeur_centimes)} €`,
+                  o.notoriete !== null ? Math.round(o.notoriete) : "—",
+                  o.desirabilite !== null ? Math.round(o.desirabilite) : "—",
+                  o.quantite_pieces,
+                ],
+              };
+            })}
+          />
+        </Carte>
+      ))}
 
-      <section className="mt-10">
-        <header className="border-b border-[color:var(--color-g-200)] pb-3">
-          <h2 className="text-lg font-semibold">Ventes récentes (toutes gammes)</h2>
-          <p className="text-xs text-[color:var(--color-g-500)]">
-            Les 50 dernières ventes enregistrées dans le monde.
-          </p>
-        </header>
+      <Carte titre="Ventes récentes" surTitre="Les 50 dernières ventes enregistrées">
         {ventesRecentes.length === 0 ? (
-          <p className="mt-6 text-sm text-[color:var(--color-g-500)]">
-            Aucune vente encore. Avancez le monde pour en générer.
-          </p>
+          <Vide>Aucune vente encore : elles apparaissent ici au fil des minutes.</Vide>
         ) : (
-          <table className="mt-4 w-full text-sm">
-            <thead className="bg-[color:var(--color-g-100)] text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">
-              <tr>
-                <th className="px-5 py-2 text-left font-medium">Horodatage</th>
-                <th className="px-5 py-2 text-left font-medium">Entreprise</th>
-                <th className="px-5 py-2 text-left font-medium">Vente</th>
-                <th className="px-5 py-2 text-right font-medium">Montant HT</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ventesRecentes.map((v) => (
-                <tr key={v.id} className="border-t border-[color:var(--color-g-200)]">
-                  <td className="px-5 py-2 text-xs text-[color:var(--color-g-500)]">
-                    {formaterDateHeure(v.cree_le)}
-                  </td>
-                  <td className="px-5 py-2">{v.nom_entreprise}</td>
-                  <td className="px-5 py-2 text-[color:var(--color-g-700)]">{v.libelle}</td>
-                  <td className="chiffre px-5 py-2 text-right">
-                    {formaterEuros(v.montant_centimes)} €
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <TableauRang
+            entetes={[{ texte: "Quand" }, { texte: "Entreprise" }, { texte: "Vente" }, { texte: "Montant HT", droite: true }]}
+            lignes={ventesRecentes.map((v) => ({
+              cle: v.id,
+              moi: v.company_id === entreprise.id,
+              cellules: [
+                <span key="d" className="text-[0.78rem] text-muted">{formaterDateHeure(v.cree_le)}</span>,
+                v.nom_entreprise,
+                libelleLisible(v.libelle, nomsProduits),
+                `${formaterEuros(v.montant_centimes)} €`,
+              ],
+            }))}
+          />
         )}
-      </section>
+      </Carte>
     </div>
   );
 }
