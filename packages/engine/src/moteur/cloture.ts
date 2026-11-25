@@ -208,7 +208,8 @@ export function cloturerMois(
     if (numEcheance >= 1 && numEcheance <= pret.dureeTotaleMois) {
       const echeancier = genererEcheancier(pret.capitalInitial, pret.tauxAnnuel, pret.dureeTotaleMois);
       const echeance = echeancier[numEcheance - 1];
-      if (echeance) {
+      // Garde-fou : une échéance déjà payée (capital restant déjà à ce niveau) n'est jamais repayée.
+      if (echeance && pret.capitalRestant > echeance.capitalRestantApres) {
         gl = enregistrerEcheance(gl, {
           idEcriture: `echeance_${mois}_${pret.id}`,
           mois,
@@ -268,7 +269,8 @@ export function cloturerMois(
   }
 
   // IS de fin d'exercice (tous les 12 mois)
-  if (mois > 0 && mois % 12 === 0) {
+  // Mois comptés depuis 0 (comme worlds.mois_courant) : l'exercice se clôt au 12e mois (11, 23…).
+  if ((mois + 1) % 12 === 0) {
     const totaux = sommeAgregats(cumul.agregats, agregatsDe(ecrituresCloture, gl.comptes));
     const resultatImposable = centimes(Math.max(0, totaux.produits - totaux.charges));
     const is = calculImpotSocietes(resultatImposable, parametresIsDepuis(params));
@@ -344,11 +346,11 @@ export function cloturerMois(
   ent = incrementerAnciennete(ent);
   ent = { ...ent, tresorerie: tresorerieFin, statut: nouveauStatut };
 
-  // Constat d'étape : compteurs cumulés depuis la création, puis étape (jamais en arrière)
-  const piecesDuMois = Object.values(cumul.serviParLigne).reduce((s, q) => s + q, 0);
+  // Constat d'étape : les compteurs cumulés depuis la création sont déjà à jour (ils
+  // augmentent à chaque vente, voir cumulsEtape.ts) ; la clôture ne les rajoute pas.
   const cumulsEtape = {
-    piecesVendues: (ent.cumulsEtape?.piecesVendues ?? 0) + piecesDuMois,
-    chiffreAffairesHt: centimes((ent.cumulsEtape?.chiffreAffairesHt ?? 0) + cumul.chiffreAffairesHt),
+    piecesVendues: ent.cumulsEtape?.piecesVendues ?? 0,
+    chiffreAffairesHt: centimes(ent.cumulsEtape?.chiffreAffairesHt ?? 0),
   };
   const etapeApres = constaterEtape(
     { etape: ent.etape, cumuls: cumulsEtape, tresorerie: tresorerieFin },

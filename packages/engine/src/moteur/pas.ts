@@ -11,6 +11,7 @@ import {
   type DonneesFlux,
   type ResultatClotureEntreprise,
 } from "./donneesMois.js";
+import { ajouterVentesAuxCumulsEtape } from "./cumulsEtape.js";
 import { avancerFlux } from "./flux.js";
 import { configTempsDepuis } from "./temps.js";
 
@@ -92,17 +93,19 @@ export function simulerPas(
     suffixeId: `_p${indexDansMois}`,
   });
   const cumulApres: CumulMois = { ...flux.cumul, pasTraites: indexDansMois + 1 };
+  // Compteurs d'étape mis à jour à chaque vente (et non plus seulement à la clôture).
+  const entrepriseApresFlux = ajouterVentesAuxCumulsEtape(flux.entreprise, cumulAvant, cumulApres);
 
   if (!estDernierPas) {
     return {
-      entrepriseApres: flux.entreprise,
+      entrepriseApres: entrepriseApresFlux,
       cumul: cumulApres,
       ecrituresDuPas: flux.ecritures,
       cloture: null,
     };
   }
 
-  const cloture = cloturerMois(flux.entreprise, cumulApres, donneesFin!, params, mois);
+  const cloture = cloturerMois(entrepriseApresFlux, cumulApres, donneesFin!, params, mois);
   return {
     entrepriseApres: cloture.entrepriseApres,
     cumul: null,
