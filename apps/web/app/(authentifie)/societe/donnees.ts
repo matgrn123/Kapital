@@ -39,6 +39,7 @@ export const INTITULES_ETAPES: Record<EtapeEntreprise, string> = {
   0: "L'idée",
   1: "Le lancement",
   2: "L'atelier",
+  3: "La boutique",
 };
 
 const LIBELLES_ACTIONS: Record<ActionVerrouillable, string> = {
@@ -49,7 +50,13 @@ const LIBELLES_ACTIONS: Record<ActionVerrouillable, string> = {
   production_atelier: "la production à l'atelier",
   embauche: "l'embauche",
   vente_revendeur: "la vente aux revendeurs",
+  ouverture_boutique: "l'ouverture d'une boutique",
 };
+
+/** Libellés des actions verrouillables, pour la carte d'étape du tableau de bord. */
+export function libelleAction(a: ActionVerrouillable): string {
+  return LIBELLES_ACTIONS[a];
+}
 
 const euros = (c: number) => `${formaterEuros(c)} €`;
 
@@ -80,6 +87,12 @@ export function etapesDuJeu(seuils: SeuilsEtapes): EtapeDuJeu[] {
       condition: `${euros(seuils.chiffreAffairesHtEtape2)} de chiffre d'affaires hors taxes cumulé, et une trésorerie positive à la clôture du mois.`,
       debloque: debloque(2),
     },
+    {
+      etape: 3,
+      intitule: INTITULES_ETAPES[3],
+      condition: `${euros(seuils.chiffreAffairesHtEtape3)} de chiffre d'affaires hors taxes cumulé, au moins ${euros(seuils.tresorerieMinimaleEtape3)} de trésorerie à la clôture du mois et ${seuils.notorieteMinimaleEtape3} points de notoriété.`,
+      debloque: [...debloque(3), "l'embauche de vendeurs"],
+    },
   ];
 }
 
@@ -92,52 +105,61 @@ export type ConditionJauge = {
   remplie: boolean;
 };
 
+const points = (n: number) => String(Math.floor(n));
+
 /**
- * Conditions à remplir avant la boutique : celles de la dernière étape connue du
- * moteur (étape 2). Les conditions propres à la boutique arriveront avec AE-9.
+ * Conditions de l'étape 3 (la boutique), lues dans le moteur : chiffre d'affaires cumulé,
+ * trésorerie à la clôture et notoriété. Une fois l'étape 3 atteinte, elles sont acquises
+ * (l'étape ne redescend jamais), même si la trésorerie ou la notoriété baissent ensuite.
  */
 export function conditionsBoutique(
-  e: { etape: EtapeEntreprise; piecesVendues: number; chiffreAffairesHt: number; tresorerie: number },
+  e: {
+    etape: EtapeEntreprise;
+    piecesVendues: number;
+    chiffreAffairesHt: number;
+    tresorerie: number;
+    notoriete: number;
+  },
   seuils: SeuilsEtapes,
 ): ConditionJauge[] {
   const manquantes =
-    e.etape >= 2
+    e.etape >= 3
       ? []
       : conditionsManquantes(
-          2,
+          3,
           {
             etape: e.etape,
             cumuls: { piecesVendues: e.piecesVendues, chiffreAffairesHt: centimes(e.chiffreAffairesHt) },
             tresorerie: centimes(e.tresorerie),
+            notoriete: e.notoriete,
           },
           seuils,
         );
   const rempli = (cle: ConditionManquante["cle"]) => !manquantes.some((m) => m.cle === cle);
-  const tresoOk = rempli("tresorerie_positive");
   return [
-    {
-      cle: "pieces_vendues",
-      libelle: "Pièces vendues au total",
-      valeur: Math.min(e.piecesVendues, seuils.piecesEtape1),
-      max: seuils.piecesEtape1,
-      texte: `${e.piecesVendues} / ${seuils.piecesEtape1}`,
-      remplie: rempli("pieces_vendues"),
-    },
     {
       cle: "chiffre_affaires_ht_cumule",
       libelle: "Chiffre d'affaires hors taxes cumulé",
-      valeur: Math.min(e.chiffreAffairesHt, seuils.chiffreAffairesHtEtape2),
-      max: seuils.chiffreAffairesHtEtape2,
-      texte: `${euros(e.chiffreAffairesHt)} / ${euros(seuils.chiffreAffairesHtEtape2)}`,
+      valeur: Math.max(0, Math.min(e.chiffreAffairesHt, seuils.chiffreAffairesHtEtape3)),
+      max: seuils.chiffreAffairesHtEtape3,
+      texte: `${euros(e.chiffreAffairesHt)} / ${euros(seuils.chiffreAffairesHtEtape3)}`,
       remplie: rempli("chiffre_affaires_ht_cumule"),
     },
     {
-      cle: "tresorerie_positive",
-      libelle: "Trésorerie positive",
-      valeur: tresoOk ? 1 : 0,
-      max: 1,
-      texte: euros(e.tresorerie),
-      remplie: tresoOk,
+      cle: "tresorerie_minimale",
+      libelle: "Trésorerie à la clôture du mois",
+      valeur: Math.max(0, Math.min(e.tresorerie, seuils.tresorerieMinimaleEtape3)),
+      max: seuils.tresorerieMinimaleEtape3,
+      texte: `${euros(e.tresorerie)} / ${euros(seuils.tresorerieMinimaleEtape3)}`,
+      remplie: rempli("tresorerie_minimale"),
+    },
+    {
+      cle: "notoriete",
+      libelle: "Notoriété de la marque",
+      valeur: Math.max(0, Math.min(e.notoriete, seuils.notorieteMinimaleEtape3)),
+      max: seuils.notorieteMinimaleEtape3,
+      texte: `${points(e.notoriete)} / ${seuils.notorieteMinimaleEtape3} points`,
+      remplie: rempli("notoriete"),
     },
   ];
 }

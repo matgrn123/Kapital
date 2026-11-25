@@ -5,6 +5,7 @@ import {
   configTempsDepuis,
   evaluerMissions,
   horlogeDepuis,
+  type BoutiquePourMission,
   type MetriquesMissions,
   type ProgressionMission,
 } from "@kapital/engine";
@@ -17,6 +18,8 @@ function clientAdmin(): SupabaseClient | null {
 }
 
 type EcritureCompta = {
+  /** Identifiant de l'écriture (bail_signature_…, achat_local_…) ; absent dans les anciens tests. */
+  ecriture_id?: string;
   mois_jeu: number;
   libelle: string;
   compte: string;
@@ -36,6 +39,15 @@ const COMPTE_TRESORERIE = "512";
 const COMPTE_VENTES = "707";
 const COMPTE_COUT_VENTES = "7135";
 const PREFIXE_VENTE = "Vente directe ";
+/** Écritures qui prouvent qu'un local a été loué (signer_bail, 0027) ou acheté (acheter_local, 0028). */
+const PREFIXES_LOCAL_SIGNE = ["bail_signature_", "achat_local_"];
+
+/** Ce que le grand livre ne dit pas seul : les boutiques signées et les locaux occupés (AE-11). */
+export type ComplementsMissions = {
+  readonly boutiques?: readonly BoutiquePourMission[];
+  /** Au moins un local (atelier) enregistré pour la société, loué ou acheté. */
+  readonly localEnregistre?: boolean;
+};
 
 function piecesDepuisLibelle(libelle: string): number {
   if (!libelle.startsWith(PREFIXE_VENTE)) return 0;
@@ -49,6 +61,7 @@ export function calculerMetriques(
   ecritures: readonly EcritureCompta[],
   moisJeuCreation: number,
   moisJeuCourant: number,
+  complements: ComplementsMissions = {},
 ): MetriquesMissions {
   let pieces = 0;
   let caCumul = 0;
@@ -85,10 +98,15 @@ export function calculerMetriques(
   const moisTries = [...soldeTresorerie.keys()].sort((a, b) => a - b);
   let cumulTres = 0;
   let aEuDecouvert = false;
+  const tresorerieFinMois: { mois: number; solde_centimes: ReturnType<typeof centimes> }[] = [];
   for (const m of moisTries) {
     cumulTres += soldeTresorerie.get(m) ?? 0;
     if (cumulTres < 0) aEuDecouvert = true;
+    tresorerieFinMois.push({ mois: m, solde_centimes: centimes(cumulTres) });
   }
+  const localSigne =
+    complements.localEnregistre === true ||
+    ecritures.some((e) => PREFIXES_LOCAL_SIGNE.some((p) => e.ecriture_id?.startsWith(p)));
 
   const moisAvecVentes = [...caParMois.entries()]
     .filter(([, c]) => c > 0)
@@ -104,6 +122,9 @@ export function calculerMetriques(
     a_eu_decouvert: aEuDecouvert,
     ca_mois_initial_centimes: centimes(caMoisInitial),
     ca_mois_max_centimes: centimes(caMoisMax),
+    boutiques: [...(complements.boutiques ?? [])],
+    tresorerie_fin_mois: tresorerieFinMois,
+    local_signe: localSigne,
   };
 }
 
@@ -122,10 +143,10 @@ export async function chargerProgressionMissions(
   supabase: SupabaseClient,
   companyId: string,
 ): Promise<readonly ProgressionMission[] | null> {
-  const [compta, monde, lignesMiss, societe] = await Promise.all([
+  const [compta, monde, lignesMiss, societe, boutiques, locaux] = await Promise.all([
     supabase
       .from("ledger_entries")
-      .select("mois_jeu, libelle, compte, sens, montant_centimes")
+      .select("ecriture_id, mois_jeu, libelle, compte, sens, montant_centimes")
       .eq("company_id", companyId),
     supabase.from("worlds").select("mois_courant, debut_reel").limit(1).maybeSingle(),
     supabase
@@ -133,6 +154,8 @@ export async function chargerProgressionMissions(
       .select("mission_id, etat, actuel, cible, validee_le")
       .eq("company_id", companyId),
     supabase.from("companies").select("cree_le").eq("id", companyId).maybeSingle(),
+    supabase.from("points_de_vente").select("mois_signature, mois_ouverture").eq("company_id", companyId),
+    supabase.from("workshops").select("id").eq("company_id", companyId).limit(1),
   ]);
 
   const ecritures = (compta.data ?? []) as EcritureCompta[];
@@ -146,7 +169,13 @@ export async function chargerProgressionMissions(
     (monde.data?.debut_reel as string | null | undefined) ?? null,
     (societe.data?.cree_le as string | null | undefined) ?? null,
   );
-  const metriques = calculerMetriques(ecritures, moisCreation, moisCourant);
+  const metriques = calculerMetriques(ecritures, moisCreation, moisCourant, {
+    boutiques: ((boutiques.data ?? []) as { mois_signature: number; mois_ouverture: number }[]).map((b) => ({
+      mois_signature: Number(b.mois_signature),
+      mois_ouverture: Number(b.mois_ouverture),
+    })),
+    localEnregistre: (locaux.data ?? []).length > 0,
+  });
   const progressions = evaluerMissions(metriques);
 
   // Verrou "une fois validée, toujours validée"

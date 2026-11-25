@@ -181,6 +181,35 @@ describe("verifierDeblocage et verifierDeblocageEtape (aussi utilisée par les r
     }
   });
 
+  it("ouverture_boutique (AE-11) : refusée à l'étape 2 avec trésorerie et notoriété chiffrées, permise à l'étape 3", () => {
+    const etat = {
+      etape: 2 as const,
+      tresorerie: 1_000_000,
+      notoriete: 12.4,
+      cumuls: { piecesVendues: 4000, chiffreAffairesHt: centimes(15_000_000) },
+    };
+    const r = refus(verifierDeblocageEtape("ouverture_boutique", etat));
+    expect(r.code).toBe(CODE_ETAPE_VERROUILLEE);
+    expect(r.etapeRequise).toBe(3);
+    expect(r.conditions?.map((c) => c.cle)).toEqual(["tresorerie_minimale", "notoriete"]);
+    expect(r.message).toBe(
+      "L'ouverture d'une boutique se débloque à l'étape 3 (vous êtes à l'étape 2) : il vous manque 20000,00 € de trésorerie à la clôture du mois (10000,00 € sur 30000,00 €) ; il vous manque 17,6 points de notoriété (12,4 sur 30).",
+    );
+    expect(verifierDeblocageEtape("ouverture_boutique", { ...etat, etape: 3 }).ok).toBe(true);
+  });
+
+  it("verifierDeblocage lit la notoriété de la marque de l'entreprise", () => {
+    const e = entreprise({
+      etape: 2,
+      tresorerie: centimes(5_000_000),
+      marque: { notoriete: 31, desirabilite: 0 },
+      cumulsEtape: { piecesVendues: 4000, chiffreAffairesHt: centimes(15_000_000) },
+    });
+    const r = refus(verifierDeblocage(ctx(e), "ouverture_boutique"));
+    // L'étape 3 n'est constatée qu'à la clôture : les conditions sont remplies, il n'en manque aucune.
+    expect(r.conditions).toEqual([]);
+  });
+
   it("refusDepuisVerrou reprend les champs du verrou", () => {
     const r = refusDepuisVerrou({
       action: "demande_pret",

@@ -266,6 +266,7 @@ export default async function PageJeu() {
             piecesVendues={Number(entreprise.pieces_vendues_total)}
             chiffreAffairesHt={Number(entreprise.chiffre_affaires_cumule_ht_centimes)}
             tresorerie={Number(entreprise.tresorerie_centimes)}
+            notoriete={Number(notoriete ?? 0)}
           />
         </div>
 

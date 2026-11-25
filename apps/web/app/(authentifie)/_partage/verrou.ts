@@ -22,13 +22,16 @@ export async function lireVerrou(
   companyId: string,
   action: ActionVerrouillable,
 ): Promise<{ verrou: VerrouAffiche | null; tresorerie: number; etape: number }> {
-  const { data } = await supabase
-    .from("companies")
-    .select("etape, tresorerie_centimes, pieces_vendues_total, chiffre_affaires_cumule_ht_centimes")
-    .eq("id", companyId)
-    .maybeSingle();
+  const [{ data }, { data: marque }] = await Promise.all([
+    supabase
+      .from("companies")
+      .select("etape, tresorerie_centimes, pieces_vendues_total, chiffre_affaires_cumule_ht_centimes")
+      .eq("id", companyId)
+      .maybeSingle(),
+    supabase.from("brand_state").select("notoriete").eq("company_id", companyId).maybeSingle(),
+  ]);
   const params = chargerParametresV1();
-  // Réglage de développement : peut compter la société comme étant à l'étape 2.
+  // Réglage de développement : peut compter la société comme étant à la dernière étape.
   const etape = etapeEffective(Number(data?.etape ?? 0) as EtapeEntreprise, params);
   const tresorerie = Number(data?.tresorerie_centimes ?? 0);
   const v = verrouPour(
@@ -40,6 +43,7 @@ export async function lireVerrou(
         chiffreAffairesHt: centimes(Number(data?.chiffre_affaires_cumule_ht_centimes ?? 0)),
       },
       tresorerie: centimes(tresorerie),
+      notoriete: Number(marque?.notoriete ?? 0),
     },
     seuilsEtapesDepuis(params),
   );

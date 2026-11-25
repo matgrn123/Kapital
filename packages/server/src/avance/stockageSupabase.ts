@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { chargerBatimentsV1, chargerModulesV1, type TypeBatiment, type TypeModule } from "@kapital/content";
 import {
   centimes,
+  type EtapeEntreprise,
   estEmplacementBoutique,
   passantsReferenceBoutiques,
   PREFIXE_AMORTISSEMENT_AGENCEMENT,
@@ -296,7 +297,7 @@ type LigneCompany = {
   id: string;
   nom: string;
   gamme: "entree" | "milieu" | "haut";
-  etape: 0 | 1 | 2;
+  etape: EtapeEntreprise;
   statut: "active" | "en_difficulte" | "liquidee";
   tresorerie_centimes: number;
   owner_profile_id: string | null;

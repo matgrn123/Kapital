@@ -3,8 +3,8 @@ import { formaterEuros } from "../../../lib/formatage";
 // Lecture des réponses des routes /api/actions/* (côté navigateur).
 
 export type ConditionEtape = {
-  cle: "pieces_vendues" | "chiffre_affaires_ht_cumule" | "tresorerie_positive";
-  unite: "pieces" | "centimes";
+  cle: "pieces_vendues" | "chiffre_affaires_ht_cumule" | "tresorerie_positive" | "tresorerie_minimale" | "notoriete";
+  unite: "pieces" | "centimes" | "points";
   actuel: number;
   requis: number;
   manque: number;
@@ -27,6 +27,10 @@ export function phraseCondition(c: ConditionEtape): string {
       return `il manque ${formaterEuros(c.manque)} € de chiffre d'affaires hors taxes cumulé (${formaterEuros(c.actuel)} € sur ${formaterEuros(c.requis)} €)`;
     case "tresorerie_positive":
       return `la trésorerie doit être positive (actuellement ${formaterEuros(c.actuel)} €)`;
+    case "tresorerie_minimale":
+      return `il manque ${formaterEuros(c.manque)} € de trésorerie (${formaterEuros(c.actuel)} € sur ${formaterEuros(c.requis)} €)`;
+    case "notoriete":
+      return `il manque ${Math.ceil(c.manque)} points de notoriété (${Math.floor(c.actuel)} sur ${c.requis})`;
   }
 }
 

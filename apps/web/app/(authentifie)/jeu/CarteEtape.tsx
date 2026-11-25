@@ -1,5 +1,6 @@
 import {
   DEBLOCAGES_PAR_ACTION,
+  DERNIERE_ETAPE,
   centimes,
   conditionsManquantes,
   seuilsEtapesDepuis,
@@ -9,17 +10,7 @@ import {
 } from "@kapital/engine";
 import { chargerParametresV1 } from "@kapital/content";
 import { formaterEuros } from "../../../lib/formatage";
-import { INTITULES_ETAPES } from "../societe/donnees";
-
-const LIBELLES_ACTIONS: Record<ActionVerrouillable, string> = {
-  action_marketing: "la publicité",
-  demande_pret: "l'emprunt",
-  louer_atelier: "la location d'un local",
-  achat_local: "l'achat d'un local",
-  production_atelier: "la production à l'atelier",
-  embauche: "l'embauche",
-  vente_revendeur: "la vente aux revendeurs",
-};
+import { INTITULES_ETAPES, libelleAction } from "../societe/donnees";
 
 // Une seule source pour les noms d'étapes (ceux de plan-architecture-entreprise.md).
 const INTITULES = INTITULES_ETAPES;
@@ -27,7 +18,7 @@ const INTITULES = INTITULES_ETAPES;
 function debloquesPar(etape: EtapeEntreprise): string[] {
   return (Object.keys(DEBLOCAGES_PAR_ACTION) as ActionVerrouillable[])
     .filter((a) => DEBLOCAGES_PAR_ACTION[a] === etape)
-    .map((a) => LIBELLES_ACTIONS[a]);
+    .map(libelleAction);
 }
 
 function euros(c: number): string {
@@ -42,6 +33,10 @@ function phrase(c: ConditionManquante): string {
       return `Il manque ${euros(c.manque)} de chiffre d'affaires hors taxes cumulé (${euros(c.actuel)} sur ${euros(c.requis)}).`;
     case "tresorerie_positive":
       return `La trésorerie doit être positive (${euros(c.actuel)} aujourd'hui).`;
+    case "tresorerie_minimale":
+      return `Il manque ${euros(c.manque)} de trésorerie à la clôture (${euros(c.actuel)} sur ${euros(c.requis)}).`;
+    case "notoriete":
+      return `Il manque ${Math.ceil(c.manque)} points de notoriété (${Math.floor(c.actuel)} sur ${c.requis}).`;
   }
 }
 
@@ -50,14 +45,16 @@ export function CarteEtape({
   piecesVendues,
   chiffreAffairesHt,
   tresorerie,
+  notoriete,
 }: {
   etape: EtapeEntreprise;
   piecesVendues: number;
   chiffreAffairesHt: number;
   tresorerie: number;
+  notoriete: number;
 }) {
   const seuils = seuilsEtapesDepuis(chargerParametresV1());
-  const prochaine = etape < 2 ? ((etape + 1) as EtapeEntreprise) : null;
+  const prochaine = etape < DERNIERE_ETAPE ? ((etape + 1) as EtapeEntreprise) : null;
   const conditions =
     prochaine === null
       ? []
@@ -67,6 +64,7 @@ export function CarteEtape({
             etape,
             cumuls: { piecesVendues, chiffreAffairesHt: centimes(chiffreAffairesHt) },
             tresorerie: centimes(tresorerie),
+            notoriete,
           },
           seuils,
         );
@@ -77,6 +75,8 @@ export function CarteEtape({
     pourcent = Math.floor((piecesVendues / seuils.piecesEtape1) * 100);
   } else if (prochaine === 2) {
     pourcent = Math.floor((chiffreAffairesHt / seuils.chiffreAffairesHtEtape2) * 100);
+  } else if (prochaine === 3) {
+    pourcent = Math.floor((chiffreAffairesHt / seuils.chiffreAffairesHtEtape3) * 100);
   }
   pourcent = Math.max(0, Math.min(100, pourcent));
 

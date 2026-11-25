@@ -44,9 +44,12 @@ describe("ecritureOuverture", () => {
 
 describe("etapesDuJeu", () => {
   const seuils = seuilsEtapesDepuis(chargerParametresV1());
-  it("liste les étapes 0 à 2 avec leurs seuils lus dans les paramètres", () => {
+  it("liste les étapes 0 à 3 avec leurs seuils lus dans les paramètres", () => {
     const e = etapesDuJeu(seuils);
-    expect(e.map((x) => x.etape)).toEqual([0, 1, 2]);
+    expect(e.map((x) => x.etape)).toEqual([0, 1, 2, 3]);
+    expect(e[3]!.intitule).toBe("La boutique");
+    expect(e[3]!.debloque).toContain("l'ouverture d'une boutique");
+    expect(e[3]!.condition).toContain(`${seuils.notorieteMinimaleEtape3} points de notoriété`);
     expect(e[1]!.condition).toContain(String(seuils.piecesEtape1));
     expect(e[1]!.debloque).toContain("la publicité");
     expect(e[2]!.debloque).toContain("l'embauche");
@@ -55,17 +58,22 @@ describe("etapesDuJeu", () => {
 
 describe("conditionsBoutique", () => {
   const seuils = seuilsEtapesDepuis(chargerParametresV1());
-  it("à l'étape 0, deux jauges : pièces puis chiffre d'affaires, lues du moteur", () => {
-    const c = conditionsBoutique({ etape: 0, piecesVendues: 10, chiffreAffairesHt: 5_000, tresorerie: 100 }, seuils);
-    expect(c.map((x) => x.cle)).toEqual(["pieces_vendues", "chiffre_affaires_ht_cumule", "tresorerie_positive"]);
-    expect(c[0]).toMatchObject({ valeur: 10, max: seuils.piecesEtape1, remplie: false });
-    expect(c[2]).toMatchObject({ remplie: true });
-  });
-  it("à l'étape 2, tout est rempli", () => {
+  it("trois jauges de l'étape 3 : chiffre d'affaires, trésorerie, notoriété, lues du moteur", () => {
     const c = conditionsBoutique(
-      { etape: 2, piecesVendues: 0, chiffreAffairesHt: 0, tresorerie: -5 },
+      { etape: 2, piecesVendues: 900, chiffreAffairesHt: 5_000_000, tresorerie: 4_000_000, notoriete: 12.7 },
+      seuils,
+    );
+    expect(c.map((x) => x.cle)).toEqual(["chiffre_affaires_ht_cumule", "tresorerie_minimale", "notoriete"]);
+    expect(c[0]).toMatchObject({ valeur: 5_000_000, max: seuils.chiffreAffairesHtEtape3, remplie: false });
+    expect(c[1]).toMatchObject({ valeur: seuils.tresorerieMinimaleEtape3, remplie: true });
+    expect(c[2]).toMatchObject({ remplie: false, texte: "12 / 30 points" });
+  });
+  it("à l'étape 3, tout est acquis même si la trésorerie a baissé", () => {
+    const c = conditionsBoutique(
+      { etape: 3, piecesVendues: 0, chiffreAffairesHt: 0, tresorerie: -5, notoriete: 0 },
       seuils,
     );
     expect(c.every((x) => x.remplie)).toBe(true);
+    expect(c[1]!.valeur).toBe(0);
   });
 });
