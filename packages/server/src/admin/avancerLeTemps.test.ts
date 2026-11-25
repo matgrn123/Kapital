@@ -151,7 +151,7 @@ describe("avancerLeTemps — effet sur les entreprises", () => {
     atelier: { surfaceM2: 150, loyerMensuel: centimes(250_000), nombreMachines: 2 },
     marque: { notoriete: 50, desirabilite: 50 },
     prets: [{ id: idPret("p1"), capitalInitial: centimes(1_000_000), capitalRestant: centimes(1_000_000), tauxAnnuel: 0.04, dureeTotaleMois: 24, objet: "tresorerie", moisDebut: moisJeu(0) }],
-    catalogue: [{ produit: idProduit("prod_tshirt"), qualiteVisee: 60, prix: { vente_directe: centimes(3000), revendeur: centimes(1800) }, productionMensuelleCible: 60 }],
+    catalogue: [{ produit: idProduit("prod_tshirt"), qualiteVisee: 60, prix: { vente_directe: centimes(3000), revendeur: centimes(1800) }, productionMensuelleCible: 60, fabrication: { matiere: idMatiere("mat_coton"), consommationParPiece: 1, fournituresParPiece: centimes(0), tempsStandardMinutes: 30 } }],
   };
 
   it("après avoir avancé d'un mois, la mise à jour fait rattraper un mois aux entreprises", async () => {

@@ -8,10 +8,14 @@ import {
   idProduit,
   idSalarie,
   moisJeu,
+  montantFactureFaconnier,
+  montantLivraisonMatiere,
   type CreanceAEncaisser,
   type CumulMois,
+  type DetteFournisseurEchue,
   type DonneesFinMois,
   type Entreprise,
+  type FicheFabrication,
 } from "@kapital/engine";
 import {
   ErreurPasDejaTraite,
@@ -22,6 +26,35 @@ import {
   type ResultatLotAEnregistrer,
   type StockageMonde,
 } from "./port.js";
+
+// ---------------------------------------------------------------------------
+// Nomenclature des produits (table products), jointe aux commandes et au catalogue
+// ---------------------------------------------------------------------------
+
+type LigneProduitNomenclature = {
+  matiere_id: string;
+  consommation_par_piece: number;
+  fournitures_par_piece_centimes: number;
+  temps_standard_minutes: number;
+};
+
+const COLONNES_NOMENCLATURE =
+  "products(matiere_id, consommation_par_piece, fournitures_par_piece_centimes, temps_standard_minutes)";
+
+/** Une jointure PostgREST rend un objet, parfois une liste d'un élément. */
+function uneLigne<T>(v: T | T[] | null | undefined): T | null {
+  if (Array.isArray(v)) return v[0] ?? null;
+  return v ?? null;
+}
+
+export function ficheDepuisLigne(p: LigneProduitNomenclature): FicheFabrication {
+  return {
+    matiere: idMatiere(p.matiere_id),
+    consommationParPiece: Number(p.consommation_par_piece),
+    fournituresParPiece: centimes(Number(p.fournitures_par_piece_centimes)),
+    tempsStandardMinutes: Number(p.temps_standard_minutes),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Contrat avec la fonction Postgres appliquer_pas_entreprise (migration 0020, remplacée par 0025 puis 0027)
@@ -129,6 +162,18 @@ function verifier<T>(nom: string, r: { data: T | null; error: { message: string 
   return r.data as T;
 }
 
+/** Nomenclature à sortir du stock du joueur à la livraison d'un façonnier ; null s'il fournit tout. */
+function matiereDuJoueur(
+  faconnier: { fournit_matiere: boolean } | { fournit_matiere: boolean }[] | null,
+  produit: LigneProduitNomenclature | LigneProduitNomenclature[] | null,
+  productId: string,
+): FicheFabrication | null {
+  if (uneLigne(faconnier)?.fournit_matiere === true) return null;
+  const p = uneLigne(produit);
+  if (!p) throw new Error(`Nomenclature introuvable pour le produit ${productId}.`);
+  return ficheDepuisLigne(p);
+}
+
 export class StockageSupabase implements StockageMonde {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -233,7 +278,7 @@ export class StockageSupabase implements StockageMonde {
           .eq("statut", "actif"),
         this.supabase
           .from("company_products")
-          .select("product_id, qualite_visee, prix_vente_directe_centimes, prix_revendeur_centimes, production_mensuelle_cible")
+          .select(`product_id, qualite_visee, prix_vente_directe_centimes, prix_revendeur_centimes, production_mensuelle_cible, ${COLONNES_NOMENCLATURE}`)
           .eq("company_id", companyId),
         this.supabase
           .from("brand_state")
@@ -273,6 +318,7 @@ export class StockageSupabase implements StockageMonde {
     const produits = (verifier("company_products", produitsR) ?? []) as Array<{
       product_id: string; qualite_visee: number; prix_vente_directe_centimes: number;
       prix_revendeur_centimes: number; production_mensuelle_cible: number;
+      products: LigneProduitNomenclature | LigneProduitNomenclature[] | null;
     }>;
     const marque = verifier("brand_state", marqueR) as { notoriete: number; desirabilite: number } | null;
     const etat = verifier("etat_mois_entreprise", etatR) as { cumul: CumulMois } | null;
@@ -356,6 +402,7 @@ export class StockageSupabase implements StockageMonde {
           revendeur: centimes(p.prix_revendeur_centimes),
         },
         productionMensuelleCible: p.production_mensuelle_cible,
+        ...(uneLigne(p.products) ? { fabrication: ficheDepuisLigne(uneLigne(p.products)!) } : {}),
       })),
     };
     return { entreprise, cumul: etat?.cumul ?? null };
@@ -372,7 +419,7 @@ export class StockageSupabase implements StockageMonde {
         .lt("instant_livraison_prevue", avant),
       this.supabase
         .from("production_orders")
-        .select("id, product_id, quantite, prix_facon_par_piece_centimes, instant_livraison_prevue")
+        .select(`id, product_id, quantite, prix_facon_par_piece_centimes, instant_livraison_prevue, faconniers(fournit_matiere), ${COLONNES_NOMENCLATURE}`)
         .eq("company_id", companyId)
         .eq("lieu_type", "faconnier")
         .eq("statut", "en_cours")
@@ -385,6 +432,8 @@ export class StockageSupabase implements StockageMonde {
     const prod = (verifier("production_orders", prodR) ?? []) as Array<{
       id: string; product_id: string; quantite: number; prix_facon_par_piece_centimes: number | null;
       instant_livraison_prevue: string;
+      faconniers: { fournit_matiere: boolean } | { fournit_matiere: boolean }[] | null;
+      products: LigneProduitNomenclature | LigneProduitNomenclature[] | null;
     }>;
     return {
       matiere: po.map((c) => ({
@@ -402,10 +451,71 @@ export class StockageSupabase implements StockageMonde {
           produit: idProduit(o.product_id),
           quantite: o.quantite,
           prixFaconParPiece: centimes(o.prix_facon_par_piece_centimes!),
-          coutMatiereParPiece: centimes(0),
+          // Le façonnier travaille la matière du joueur, sauf s'il fournit tout (grossiste).
+          matiereDuJoueur: matiereDuJoueur(o.faconniers, o.products, o.product_id),
           instantMs: Date.parse(o.instant_livraison_prevue),
         })),
     };
+  }
+
+  async chargerDettesEchues(
+    companyId: string,
+    moisEnCours: number,
+  ): Promise<readonly DetteFournisseurEchue[]> {
+    const [poR, prodR] = await Promise.all([
+      this.supabase
+        .from("purchase_orders")
+        .select("id, quantite, prix_unitaire_centimes, mois_jeu_livraison, suppliers(delai_paiement_mois)")
+        .eq("company_id", companyId)
+        .eq("statut", "livree")
+        .is("mois_jeu_reglement", null),
+      this.supabase
+        .from("production_orders")
+        .select(`id, product_id, quantite, prix_facon_par_piece_centimes, mois_jeu_livraison, fournitures_facturees, faconniers(delai_paiement_mois, fournit_matiere), ${COLONNES_NOMENCLATURE}`)
+        .eq("company_id", companyId)
+        .eq("lieu_type", "faconnier")
+        .eq("statut", "livree")
+        .is("mois_jeu_reglement", null),
+    ]);
+    type Delai = { delai_paiement_mois: number };
+    const po = (verifier("purchase_orders (dettes)", poR) ?? []) as Array<{
+      id: string; quantite: number; prix_unitaire_centimes: number; mois_jeu_livraison: number | null;
+      suppliers: Delai | Delai[] | null;
+    }>;
+    type Fac = { delai_paiement_mois: number; fournit_matiere: boolean };
+    const prod = (verifier("production_orders (dettes)", prodR) ?? []) as Array<{
+      id: string; product_id: string; quantite: number; prix_facon_par_piece_centimes: number | null;
+      mois_jeu_livraison: number | null; fournitures_facturees: boolean;
+      faconniers: Fac | Fac[] | null;
+      products: LigneProduitNomenclature | LigneProduitNomenclature[] | null;
+    }>;
+    // Échéance = mois de livraison + délai de paiement. Une commande ancienne sans mois de
+    // livraison connu est considérée comme due tout de suite.
+    const echue = (moisLivraison: number | null, delai: number | undefined): boolean =>
+      (moisLivraison ?? 0) + (delai ?? 0) <= moisEnCours;
+    const dettes: DetteFournisseurEchue[] = [];
+    for (const c of po) {
+      if (!echue(c.mois_jeu_livraison, uneLigne(c.suppliers)?.delai_paiement_mois)) continue;
+      dettes.push({
+        ordreId: c.id,
+        nature: "matiere",
+        montant: montantLivraisonMatiere(Number(c.quantite), centimes(c.prix_unitaire_centimes)),
+      });
+    }
+    for (const o of prod) {
+      if (o.prix_facon_par_piece_centimes == null) continue;
+      if (!echue(o.mois_jeu_livraison, uneLigne(o.faconniers)?.delai_paiement_mois)) continue;
+      // Même calcul qu'à la livraison : façon + fournitures (si elles ont été facturées).
+      const fiche = o.fournitures_facturees
+        ? matiereDuJoueur(o.faconniers, o.products, o.product_id)
+        : null;
+      dettes.push({
+        ordreId: o.id,
+        nature: "faconnier",
+        montant: montantFactureFaconnier(o.quantite, centimes(o.prix_facon_par_piece_centimes), fiche),
+      });
+    }
+    return dettes;
   }
 
   async chargerCreances(companyId: string, moisEnCours: number): Promise<readonly CreanceAEncaisser[]> {
