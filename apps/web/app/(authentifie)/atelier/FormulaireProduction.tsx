@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Bouton, EcritureComptable } from "../../../components/ui";
 import { Choix, Curseur, Ligne, Note, Refus, Resultat, Succes, Vide } from "../../../components/ui";
+import { centimes, idMatiere, piecesPermisesParLaMatiere } from "@kapital/engine";
 import { apercuAtelier, apercuFaconnier, bornesQuantite, texteDelai } from "../../../lib/apercus";
 import { formaterEuros } from "../../../lib/formatage";
 import { lireErreur, MESSAGE_RESEAU, type MessageErreur } from "./erreurs";
@@ -19,7 +20,19 @@ export type ProduitGrossiste = {
   prixEstimeCentimes: number | null;
 };
 
-export type ProduitCatalogue = { id: string; nom: string; prixVenteTtc: number; stock: number };
+export type ProduitCatalogue = {
+  id: string;
+  nom: string;
+  prixVenteTtc: number;
+  stock: number;
+  /** Nomenclature et stock de la matière du produit (fabrication en atelier), ou null. */
+  fabrication: {
+    consommationParPiece: number;
+    fournituresParPiece: number;
+    nomMatiere: string;
+    stock: { quantite: number; valeurTotale: number } | null;
+  } | null;
+};
 
 type ResultatGrossiste = { quantite: number; prixParPieceCentimes: number; totalCentimes: number };
 
@@ -80,7 +93,6 @@ export function FormulaireProduction({
   produits,
   produitsGrossiste,
   delaiGrossisteMinutes,
-  stockMatiere,
   tresorerie,
   params,
 }: {
@@ -91,13 +103,12 @@ export function FormulaireProduction({
   produits: readonly ProduitCatalogue[];
   produitsGrossiste: readonly ProduitGrossiste[];
   delaiGrossisteMinutes: number;
-  /** Première matière en stock (celle que le moteur consomme en atelier), ou null. */
-  stockMatiere: { quantite: number; valeurTotale: number; nom: string } | null;
   /** Trésorerie du joueur : sert à borner le curseur de quantité. */
   tresorerie: number;
   params: Parametres;
 }) {
   const router = useRouter();
+  const tauxChute = params["taux_chute_matiere_defaut"]?.valeur ?? 0;
   const [productId, setProductId] = useState<string>(produits[0]?.id ?? "");
   const [lieu, setLieu] = useState<string>(aUnAtelier ? "atelier" : (faconniers[0]?.id ?? ""));
   const [quantiteN, setQuantiteN] = useState<number>(faconniers[0]?.minimum_commande ?? 1);
@@ -123,7 +134,20 @@ export function FormulaireProduction({
     minimum,
     plafonds:
       lieu === "atelier"
-        ? [stockMatiere?.quantite ?? 0]
+        ? [
+            produit?.fabrication?.stock
+              ? piecesPermisesParLaMatiere(
+                  produit.fabrication.stock.quantite,
+                  {
+                    matiere: idMatiere("apercu"),
+                    consommationParPiece: produit.fabrication.consommationParPiece,
+                    fournituresParPiece: centimes(produit.fabrication.fournituresParPiece),
+                    tempsStandardMinutes: 0,
+                  },
+                  tauxChute,
+                )
+              : 0,
+          ]
         : prix && prix > 0
           ? [tresorerie / prix]
           : [],
@@ -132,7 +156,16 @@ export function FormulaireProduction({
 
   const apercu = useMemo(() => {
     if (!produit) return null;
-    if (lieu === "atelier") return { mode: "atelier" as const, r: apercuAtelier({ quantite: quantiteBornee, stockMatiere }) };
+    if (lieu === "atelier")
+      return {
+        mode: "atelier" as const,
+        r: apercuAtelier({
+          quantite: quantiteBornee,
+          fiche: produit.fabrication,
+          stockMatiere: produit.fabrication?.stock ?? null,
+          tauxChute,
+        }),
+      };
     if (!faconnier) return null;
     if (prix === null) {
       return {
@@ -157,9 +190,18 @@ export function FormulaireProduction({
         moisCourant: 0,
         prixVenteTtc: produit.prixVenteTtc,
         params,
+        // Le façonnier travaille avec ta matière ; le grossiste fournit tout.
+        matiere:
+          grossiste || !produit.fabrication
+            ? null
+            : {
+                consommationParPiece: produit.fabrication.consommationParPiece,
+                fournituresParPiece: produit.fabrication.fournituresParPiece,
+                stock: produit.fabrication.stock,
+              },
       }),
     };
-  }, [produit, lieu, faconnier, prix, grossiste, quantiteBornee, stockMatiere, params]);
+  }, [produit, lieu, faconnier, prix, grossiste, quantiteBornee, tauxChute, params]);
 
   async function lancer(e: React.FormEvent) {
     e.preventDefault();
@@ -298,7 +340,11 @@ export function FormulaireProduction({
         <div className="flex flex-col gap-3">
           <div className="grid gap-4 sm:grid-cols-3">
             <Resultat libelle="Coût total" valeur={`${formaterEuros(apercu.r.total)} €`} />
-            <Resultat libelle="Coût par pièce" valeur={`${formaterEuros(apercu.r.prixParPiece)} €`} detail="prix du façonnier" />
+            <Resultat
+              libelle="Coût complet par pièce"
+              valeur={`${formaterEuros(apercu.r.coutParPiece)} €`}
+              detail={grossiste ? "tout compris chez le grossiste" : `dont façon ${formaterEuros(apercu.r.prixParPiece)} € ; matière et fournitures en plus`}
+            />
             <Resultat
               libelle="Livraison"
               valeur={grossiste ? `${delaiGrossisteMinutes} min` : `${faconnier?.delai_mois ?? 0} mois`}
@@ -332,10 +378,10 @@ export function FormulaireProduction({
       {apercu && apercu.mode === "atelier" && apercu.r.ok && (
         <div className="flex flex-col gap-3">
           <div>
-            <Ligne libelle={`Matière utilisée (${stockMatiere?.nom.toLowerCase() ?? "stock"})`}>
-              {apercu.r.piecesCouvertes} unités · {formaterEuros(apercu.r.valeurMatiere)} €
+            <Ligne libelle={`Matière utilisée (${produit?.fabrication?.nomMatiere.toLowerCase() ?? "stock"}, chutes comprises)`}>
+              {formaterEuros(apercu.r.valeurMatiere)} €
             </Ligne>
-            <Ligne libelle="Sortie de trésorerie aujourd'hui">0,00 € (matière déjà payée ou due)</Ligne>
+            <Ligne libelle="Fournitures payées comptant">{formaterEuros(apercu.r.valeurFournitures)} €</Ligne>
             {apercu.r.piecesCouvertes < quantiteBornee && (
               <Ligne libelle="Pièces sans matière" ton="critique">
                 {quantiteBornee - apercu.r.piecesCouvertes}

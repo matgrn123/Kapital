@@ -6,7 +6,9 @@
 // Montants en centimes entiers.
 
 import type { Parametres } from "@kapital/content";
+import { COMPTE_MARKETING } from "./marketing";
 import {
+  besoinMatiere,
   centimes,
   cumulVide,
   enregistrer,
@@ -22,6 +24,7 @@ import {
   idMatiere,
   idProduit,
   livrer,
+  piecesPermisesParLaMatiere,
   margeRevendeur,
   margeVenteDirecte,
   moisJeu,
@@ -73,8 +76,17 @@ function ecrituresDuMoteurPourLivraison(
   mois: number,
   livraison:
     | { type: "matiere"; matiere: string; quantite: number; prixUnitaire: number }
-    | { type: "faconnier"; produit: string; quantite: number; prixFaconParPiece: number },
+    | {
+        type: "faconnier";
+        produit: string;
+        quantite: number;
+        prixFaconParPiece: number;
+        /** Matière prise dans le stock du joueur (null : le façonnier fournit tout). */
+        matiere?: MatiereDuJoueur | null;
+      },
 ): EcritureComptable[] {
+  const matiere = livraison.type === "faconnier" ? (livraison.matiere ?? null) : null;
+  const idMat = idMatiere("apercu_matiere");
   const bacASable: Entreprise = {
     id: idEntreprise("apercu"),
     nom: "Aperçu",
@@ -83,7 +95,9 @@ function ecrituresDuMoteurPourLivraison(
     proprietaire: { type: "pnj" },
     statut: "active",
     tresorerie: centimes(0),
-    stocksMatiere: [],
+    stocksMatiere: matiere?.stock
+      ? [{ matiere: idMat, quantite: matiere.stock.quantite, valeurTotale: centimes(matiere.stock.valeurTotale) }]
+      : [],
     stocksFinis: [],
     salaries: [],
     atelier: null,
@@ -117,9 +131,15 @@ function ecrituresDuMoteurPourLivraison(
                 produit: idProduit(livraison.produit),
                 quantite: livraison.quantite,
                 prixFaconParPiece: centimes(livraison.prixFaconParPiece),
-                // Aperçu de la facture du façonnier seule : la sortie de matière du stock
-                // du joueur (31) dépend de son stock réel, calculée par le serveur à la livraison.
-                matiereDuJoueur: null,
+                // Matière du joueur : sortie du stock 31 au coût moyen, chute comprise (moteur/flux.ts).
+                matiereDuJoueur: matiere
+                  ? {
+                      matiere: idMat,
+                      consommationParPiece: matiere.consommationParPiece,
+                      fournituresParPiece: centimes(matiere.fournituresParPiece),
+                      tempsStandardMinutes: 0,
+                    }
+                  : null,
               },
             ]
           : [],
@@ -298,9 +318,18 @@ export function apercuCommandeMatiere(e: {
 
 /* -------------------------------------------------------------- Production */
 
+/** Nomenclature du produit et stock de sa matière chez le joueur. */
+export type MatiereDuJoueur = {
+  readonly consommationParPiece: number;
+  readonly fournituresParPiece: number;
+  readonly stock: { readonly quantite: number; readonly valeurTotale: number } | null;
+};
+
 export type ApercuFaconnier = {
   readonly ok: true;
   readonly prixParPiece: number;
+  /** Coût complet d'une pièce livrée (débit 35 ÷ quantité), calculé par le moteur. */
+  readonly coutParPiece: number;
   readonly total: number;
   readonly moisLivraison: number;
   readonly ecritureLivraison: LigneEcriture[];
@@ -316,7 +345,25 @@ export function apercuFaconnier(e: {
   moisCourant: number;
   prixVenteTtc: number | null;
   params: Parametres;
+  /** Matière du joueur ; absente ou null pour le grossiste, qui fournit tout. */
+  matiere?: MatiereDuJoueur | null;
 }): ApercuFaconnier | Refus {
+  if (e.matiere) {
+    const tauxChute = valeurParam(e.params, "taux_chute_matiere_defaut");
+    const fiche = {
+      matiere: idMatiere("apercu_matiere"),
+      consommationParPiece: e.matiere.consommationParPiece,
+      fournituresParPiece: centimes(e.matiere.fournituresParPiece),
+      tempsStandardMinutes: 0,
+    };
+    const besoin = besoinMatiere(e.quantite, fiche, tauxChute);
+    if (!e.matiere.stock || e.matiere.stock.quantite < besoin) {
+      return {
+        ok: false,
+        message: `Le façonnier travaille avec ta matière : il en faut ${besoin.toLocaleString("fr-FR")} unités (chutes comprises), tu en as ${(e.matiere.stock?.quantite ?? 0).toLocaleString("fr-FR")}. Commande-la d'abord (écran Achats).`,
+      };
+    }
+  }
   if (!entier(e.quantite)) return { ok: false, message: "Indique un nombre entier de pièces." };
   if (e.quantite < e.faconnier.minimumCommande) {
     return {
@@ -347,13 +394,16 @@ export function apercuFaconnier(e: {
       produit: e.produit,
       quantite: e.quantite,
       prixFaconParPiece: ordre.prixFaconParPiece,
+      matiere: e.matiere ?? null,
     })[0];
     if (!ecriture) return { ok: false, message: "Le moteur n'a pas pu calculer la livraison." };
+    const debitStock = ecriture.lignes.filter((l) => l.compte === "35" && l.sens === "debit").reduce((x, l) => x + l.montant, 0);
+    const coutParPiece = Math.round(debitStock / e.quantite);
     const margeParPiece =
       e.prixVenteTtc && e.prixVenteTtc > 0
         ? margeVenteDirecte({
             prixTtcUnitaire: centimes(e.prixVenteTtc),
-            coutRevientUnitaire: ordre.prixFaconParPiece,
+            coutRevientUnitaire: centimes(coutParPiece),
             tauxTva: valeurParam(e.params, "tva_standard"),
             tauxRetour: valeurParam(e.params, "taux_retour_vente_en_ligne"),
             coutTraitementRetourUnitaire: centimes(Math.round(valeurParam(e.params, "cout_traitement_retour"))),
@@ -362,6 +412,7 @@ export function apercuFaconnier(e: {
     return {
       ok: true,
       prixParPiece: ordre.prixFaconParPiece,
+      coutParPiece,
       total: ordre.prixFaconParPiece * ordre.quantite,
       moisLivraison: ordre.moisLivraisonPrevu,
       ecritureLivraison: versLignes(ecriture),
@@ -386,7 +437,7 @@ export type ApercuMarketing = {
 
 /**
  * Écriture que la route /api/actions/action-marketing passe au moment de l'action :
- * charge 6228 au débit, banque 512 au crédit. Elle est vérifiée par le moteur
+ * charge au compte de publicité (623, COMPTE_MARKETING, le même que la route) au débit, banque 512 au crédit. Elle est vérifiée par le moteur
  * (enregistrer refuse une écriture déséquilibrée ou un compte inconnu).
  */
 export function ecritureMarketing(montant: number): LigneEcriture[] {
@@ -395,7 +446,7 @@ export function ecritureMarketing(montant: number): LigneEcriture[] {
     mois: moisJeu(0),
     libelle: "Marketing",
     lignes: [
-      { compte: "6228", sens: "debit", montant: centimes(montant) },
+      { compte: COMPTE_MARKETING, sens: "debit", montant: centimes(montant) },
       { compte: "512", sens: "credit", montant: centimes(montant) },
     ],
   });
@@ -477,38 +528,52 @@ export function texteDelai(mois: number, params: Parametres): string {
 
 export type ApercuAtelier = {
   readonly ok: true;
-  /** Pièces que la matière en stock permet de couvrir (règle du moteur : 1 unité par pièce). */
+  /** Pièces que la matière du produit en stock permet de fabriquer (règle du moteur, chute comprise). */
   readonly piecesCouvertes: number;
   readonly valeurMatiere: number;
+  readonly valeurFournitures: number;
   readonly ecritureFabrication: LigneEcriture[];
 };
 
 /**
- * La fabrication en atelier n'a pas de fonction publique dans le moteur : elle se fait
- * dans avancerFlux (moteur/flux.ts), qui sort la matière au coût moyen pondéré, à raison
- * d'une unité par pièce, et passe 35 au débit / 31 au crédit. On reproduit ce calcul ici et
- * l'écriture est vérifiée par la fonction enregistrer du moteur.
+ * Aperçu d'une fabrication en atelier, avec les fonctions du moteur (moteur/fabrication.ts) :
+ * la matière du produit sort du stock au coût moyen (pièces × consommation × (1 + chute)),
+ * les fournitures sont payées comptant. Débit 35, crédit 31 et 512, comme moteur/flux.ts.
  */
 export function apercuAtelier(e: {
   quantite: number;
+  /** Nomenclature du produit (null si le catalogue ne la donne pas). */
+  fiche: { consommationParPiece: number; fournituresParPiece: number } | null;
+  /** Stock de LA matière du produit, ou null. */
   stockMatiere: { quantite: number; valeurTotale: number } | null;
+  tauxChute: number;
 }): ApercuAtelier | Refus {
   if (!entier(e.quantite)) return { ok: false, message: "Indique un nombre entier de pièces." };
+  if (!e.fiche) return { ok: false, message: "La fiche de fabrication de ce produit est introuvable." };
   const stock = e.stockMatiere;
   if (!stock || stock.quantite <= 0 || stock.valeurTotale <= 0) {
-    return { ok: false, message: "Ton stock de matière est vide : commande d'abord du tissu (écran Achats)." };
+    return { ok: false, message: "Tu n'as pas la matière de ce produit en stock : commande-la d'abord (écran Achats)." };
   }
-  const pieces = Math.min(e.quantite, Math.floor(stock.quantite));
-  const valeur = Math.round((stock.valeurTotale / stock.quantite) * pieces);
-  if (valeur <= 0) return { ok: false, message: "Pas assez de matière pour fabriquer." };
+  const fiche = {
+    matiere: idMatiere("apercu"),
+    consommationParPiece: e.fiche.consommationParPiece,
+    fournituresParPiece: centimes(e.fiche.fournituresParPiece),
+    tempsStandardMinutes: 0,
+  };
+  const pieces = Math.min(e.quantite, piecesPermisesParLaMatiere(stock.quantite, fiche, e.tauxChute));
+  if (pieces <= 0) return { ok: false, message: "Pas assez de matière pour fabriquer une seule pièce." };
+  const valeurMatiere = Math.round((stock.valeurTotale / stock.quantite) * besoinMatiere(pieces, fiche, e.tauxChute));
+  if (valeurMatiere <= 0) return { ok: false, message: "Pas assez de matière pour fabriquer." };
+  const valeurFournitures = pieces * e.fiche.fournituresParPiece;
   const gl = enregistrer(planComptableV1(), {
     id: "apercu_atelier",
     mois: moisJeu(0),
     libelle: "Production atelier",
     lignes: [
-      { compte: "35", sens: "debit", montant: centimes(valeur) },
-      { compte: "31", sens: "credit", montant: centimes(valeur) },
+      { compte: "35", sens: "debit", montant: centimes(valeurMatiere + valeurFournitures) },
+      { compte: "31", sens: "credit", montant: centimes(valeurMatiere) },
+      ...(valeurFournitures > 0 ? [{ compte: "512", sens: "credit" as const, montant: centimes(valeurFournitures) }] : []),
     ],
   });
-  return { ok: true, piecesCouvertes: pieces, valeurMatiere: valeur, ecritureFabrication: versLignes(derniere(gl)) };
+  return { ok: true, piecesCouvertes: pieces, valeurMatiere, valeurFournitures, ecritureFabrication: versLignes(derniere(gl)) };
 }

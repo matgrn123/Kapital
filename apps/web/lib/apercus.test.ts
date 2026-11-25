@@ -82,6 +82,37 @@ describe("apercuFaconnier", () => {
     expect(r.margeParPiece).not.toBeNull();
   });
 
+  it("avec ta matière en stock, compte matière + chutes + fournitures + façon, comme le moteur", () => {
+    const chute = params["taux_chute_matiere_defaut"]!.valeur;
+    const r = apercuFaconnier({
+      faconnier,
+      produit: "prod_tshirt",
+      prixParPiece: 800,
+      quantite: 100,
+      moisCourant: 2,
+      prixVenteTtc: 2500,
+      params,
+      matiere: { consommationParPiece: 0.8, fournituresParPiece: 60, stock: { quantite: 1000, valeurTotale: 350000 } },
+    });
+    if (!r.ok) throw new Error(r.message);
+    const matiere = Math.round(350 * 100 * 0.8 * (1 + chute));
+    expect(r.ecritureLivraison).toEqual([
+      { compte: "35", debit: matiere + 100 * (800 + 60) },
+      { compte: "31", credit: matiere },
+      { compte: "401", credit: 100 * (800 + 60) },
+    ]);
+    expect(r.coutParPiece).toBe(Math.round((matiere + 100 * 860) / 100));
+    expect(equilibreEcriture(r.ecritureLivraison).equilibree).toBe(true);
+  });
+
+  it("refuse si ta matière en stock ne suffit pas, comme la route", () => {
+    const r = apercuFaconnier({
+      faconnier, produit: "prod_tshirt", prixParPiece: 800, quantite: 100, moisCourant: 2, prixVenteTtc: 2500, params,
+      matiere: { consommationParPiece: 0.8, fournituresParPiece: 60, stock: { quantite: 10, valeurTotale: 3500 } },
+    });
+    expect(r.ok).toBe(false);
+  });
+
   it("refuse sous le minimum du façonnier", () => {
     const r = apercuFaconnier({ faconnier, produit: "p", prixParPiece: 800, quantite: 10, moisCourant: 0, prixVenteTtc: null, params });
     expect(r.ok).toBe(false);
@@ -106,9 +137,9 @@ describe("apercuMarketing", () => {
     expect(r.apres.notoriete).toBeCloseTo(10 + coefficients.kNotorietePublicite * Math.log(1 + 500), 9);
   });
 
-  it("passe 6228 au débit et 512 au crédit, comme la route", () => {
+  it("passe 623 au débit et 512 au crédit, comme la route", () => {
     expect(ecritureMarketing(1234)).toEqual([
-      { compte: "6228", debit: 1234 },
+      { compte: "623", debit: 1234 },
       { compte: "512", credit: 1234 },
     ]);
   });
@@ -129,20 +160,37 @@ describe("texteDelai", () => {
 });
 
 describe("apercuAtelier", () => {
-  it("sort la matière au coût moyen, une unité par pièce, comme le moteur", () => {
-    const r = apercuAtelier({ quantite: 40, stockMatiere: { quantite: 100, valeurTotale: 35000 } });
+  // Même règle que le moteur (moteur/flux.ts) : bonne matière, consommation × (1 + chute),
+  // fournitures payées comptant ; débit 35, crédit 31 et 512.
+  const fiche = { consommationParPiece: 0.8, fournituresParPiece: 60 };
+  const chute = params["taux_chute_matiere_defaut"]!.valeur;
+
+  it("sort la matière du produit au coût moyen, chute comprise, et paie les fournitures", () => {
+    const r = apercuAtelier({ quantite: 40, fiche, stockMatiere: { quantite: 100, valeurTotale: 35000 }, tauxChute: chute });
     if (!r.ok) throw new Error(r.message);
+    const besoin = 40 * 0.8 * (1 + chute);
+    const matiere = Math.round((35000 / 100) * besoin);
     expect(r.piecesCouvertes).toBe(40);
+    expect(r.valeurMatiere).toBe(matiere);
     expect(r.ecritureFabrication).toEqual([
-      { compte: "35", debit: 14000 },
-      { compte: "31", credit: 14000 },
+      { compte: "35", debit: matiere + 40 * 60 },
+      { compte: "31", credit: matiere },
+      { compte: "512", credit: 40 * 60 },
     ]);
+    expect(equilibreEcriture(r.ecritureFabrication).equilibree).toBe(true);
   });
 
-  it("plafonne au stock et refuse un stock vide", () => {
-    const r = apercuAtelier({ quantite: 500, stockMatiere: { quantite: 100, valeurTotale: 35000 } });
-    expect(r.ok && r.piecesCouvertes).toBe(100);
-    expect(apercuAtelier({ quantite: 5, stockMatiere: null }).ok).toBe(false);
+  it("plafonne à ce que la matière permet et refuse sans matière ni nomenclature", () => {
+    const r = apercuAtelier({ quantite: 500, fiche, stockMatiere: { quantite: 10, valeurTotale: 3500 }, tauxChute: 0 });
+    expect(r.ok && r.piecesCouvertes).toBe(12);
+    expect(apercuAtelier({ quantite: 5, fiche, stockMatiere: null, tauxChute: 0 }).ok).toBe(false);
+    expect(apercuAtelier({ quantite: 5, fiche: null, stockMatiere: { quantite: 10, valeurTotale: 3500 }, tauxChute: 0 }).ok).toBe(false);
+  });
+});
+
+describe("ecritureMarketing", () => {
+  it("passe la publicité au compte du moteur et de la route (623), contre la banque", () => {
+    expect(ecritureMarketing(100_00).map((l) => l.compte)).toEqual(["623", "512"]);
   });
 });
 

@@ -63,7 +63,7 @@ export default async function PageAtelier() {
       .eq("company_id", entreprise.id)
       .eq("statut", "en_cours")
       .order("instant_livraison_prevue"),
-    supabase.from("products").select("id, nom"),
+    supabase.from("products").select("id, nom, matiere_id, consommation_par_piece, fournitures_par_piece_centimes"),
   ]);
 
   const atelier = workshop as Workshop | null;
@@ -105,6 +105,24 @@ export default async function PageAtelier() {
   const stockFini = new Map(
     ((stocksFinis ?? []) as Array<{ product_id: string; quantite_pieces: number }>).map((s) => [s.product_id, s.quantite_pieces]),
   );
+  // En atelier, le moteur consomme la matière du produit (moteur/flux.ts) : on prépare
+  // pour chaque produit sa nomenclature et le stock de SA matière.
+  const nomsMat = new Map((matieres ?? []).map((m) => [m.id as string, m.nom as string]));
+  const stocksMatTab = (stocksMat ?? []) as Array<{ material_id: string; quantite: number; valeur_totale_centimes: number }>;
+  const fiches = new Map(
+    ((produits ?? []) as Array<{ id: string; matiere_id: string | null; consommation_par_piece: number | null; fournitures_par_piece_centimes: number | null }>).map((p) => [p.id, p]),
+  );
+  function ficheEtStock(productId: string): ProduitCatalogue["fabrication"] {
+    const f = fiches.get(productId);
+    if (!f || !f.matiere_id || f.consommation_par_piece == null) return null;
+    const st = stocksMatTab.find((x) => x.material_id === f.matiere_id && Number(x.quantite) > 0);
+    return {
+      consommationParPiece: Number(f.consommation_par_piece),
+      fournituresParPiece: Number(f.fournitures_par_piece_centimes ?? 0),
+      nomMatiere: nomsMat.get(f.matiere_id) ?? "Matière",
+      stock: st ? { quantite: Number(st.quantite), valeurTotale: Number(st.valeur_totale_centimes) } : null,
+    };
+  }
   const produitsCatalogue: ProduitCatalogue[] = (
     (lignesCatalogue ?? []) as { product_id: string; prix_vente_directe_centimes: number }[]
   )
@@ -114,19 +132,8 @@ export default async function PageAtelier() {
       nom: prodMap.get(l.product_id)!,
       prixVenteTtc: l.prix_vente_directe_centimes,
       stock: stockFini.get(l.product_id) ?? 0,
+      fabrication: ficheEtStock(l.product_id),
     }));
-  // Le moteur consomme en atelier la première matière en stock (moteur/flux.ts).
-  const premiereMatiere = ((stocksMat ?? []) as Array<{ material_id: string; quantite: number; valeur_totale_centimes: number }>).find(
-    (s) => Number(s.quantite) > 0,
-  );
-  const nomsMat = new Map((matieres ?? []).map((m) => [m.id as string, m.nom as string]));
-  const stockMatiere = premiereMatiere
-    ? {
-        quantite: Number(premiereMatiere.quantite),
-        valeurTotale: Number(premiereMatiere.valeur_totale_centimes),
-        nom: nomsMat.get(premiereMatiere.material_id) ?? "Matière",
-      }
-    : null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -145,7 +152,6 @@ export default async function PageAtelier() {
               produits={produitsCatalogue}
               produitsGrossiste={produitsGrossiste}
               delaiGrossisteMinutes={delaiMinutes}
-              stockMatiere={stockMatiere}
               tresorerie={Number(entreprise.tresorerie_centimes ?? 0)}
               params={params}
             />
