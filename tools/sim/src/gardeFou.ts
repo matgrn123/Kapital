@@ -202,7 +202,8 @@ export function verifierGardeFouMonetaire(e: EntreesGardeFou): readonly Anomalie
   }
 
   const depot =
-    (ent.atelier?.bail?.depotGarantie ?? 0) + somme((ent.pointsDeVente ?? []).map((p) => p.depotGarantie));
+    somme(ent.ateliers.map((a) => a.bail?.depotGarantie ?? 0)) +
+    somme((ent.pointsDeVente ?? []).map((p) => p.depotGarantie));
   if (depot !== soldeCompte(glApres, "275")) {
     ajouter({
       code: "depot_garantie_sans_ecriture",

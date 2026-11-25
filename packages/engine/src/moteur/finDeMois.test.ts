@@ -22,7 +22,7 @@ function entreprise(): Entreprise {
     stocksMatiere: [],
     stocksFinis: [],
     salaries: [],
-    atelier: null,
+    ateliers: [],
     marque: { notoriete: 50, desirabilite: 50 },
     prets: [],
     catalogue: [],

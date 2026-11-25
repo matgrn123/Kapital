@@ -11,7 +11,7 @@ import {
 } from "@kapital/engine";
 import { BandeauEtape, Carte, EcritureComptable, EncadreNotion, EnTete, FilRouge, Tableau } from "../../../components/ui";
 import { apercuLicenciement, apercuPaieEquipe } from "../../../lib/apercu-lot4";
-import { COLONNES_MODULES_POSES, postesPoses, type AvecModulesPoses } from "../../../lib/api-helpers";
+import { COLONNES_MODULES_POSES, postesPosesTousLocaux, type AvecModulesPoses } from "../../../lib/api-helpers";
 import { formaterDate, formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { lireVerrou } from "../_partage/verrou";
@@ -40,7 +40,7 @@ export default async function PageSalaries() {
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
-  const [{ data: employes }, { data: monde }, { verrou }, { data: atelier }, { data: boutiques }] = await Promise.all([
+  const [{ data: employes }, { data: monde }, { verrou }, { data: ateliers }, { data: boutiques }] = await Promise.all([
     supabase
       .from("employees")
       .select("id, poste, salaire_brut_mensuel_centimes, cree_le, anciennete_mois_debut, experience_mois_debut, mois_jeu_debut")
@@ -49,7 +49,8 @@ export default async function PageSalaries() {
       .order("cree_le"),
     supabase.from("worlds").select("mois_courant").eq("etat", "actif").limit(1).maybeSingle(),
     lireVerrou(supabase, entreprise.id, "embauche"),
-    supabase.from("workshops").select(`id, ${COLONNES_MODULES_POSES}`).eq("company_id", entreprise.id).maybeSingle(),
+    // 3D-7 : tous les locaux ; les postes se comptent sur tous.
+    supabase.from("workshops").select(`id, ${COLONNES_MODULES_POSES}`).eq("company_id", entreprise.id),
     // AE-10 : un vendeur ne s'embauche que pour une boutique ouverte ou en travaux.
     supabase.from("points_de_vente").select("id").eq("company_id", entreprise.id).eq("statut", "actif").limit(1),
   ]);
@@ -59,8 +60,8 @@ export default async function PageSalaries() {
   const paramsLicenciement = parametresLicenciementDepuis(params);
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
   // 3D-3 : les postes sont les modules « poste » posés dans le plan de l'atelier.
-  const aUnAtelier = atelier !== null;
-  const postes = postesPoses(atelier as AvecModulesPoses | null);
+  const aUnAtelier = (ateliers ?? []).length > 0;
+  const postes = postesPosesTousLocaux((ateliers ?? []) as AvecModulesPoses[]);
 
   const employesTab = (employes ?? []) as Employee[];
   const artisans = employesTab.filter((e) => e.poste === "artisan").length;

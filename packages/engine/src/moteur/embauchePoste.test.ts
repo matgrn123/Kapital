@@ -32,7 +32,7 @@ function entreprise(salaries: readonly Salarie[], machines: number): Entreprise 
     stocksMatiere: [],
     stocksFinis: [],
     salaries,
-    atelier: { surfaceM2: 100, loyerMensuel: centimes(100_000), modules: postesALaSignature(machines, MODULES_CATALOGUE) },
+    ateliers: [{ surfaceM2: 100, loyerMensuel: centimes(100_000), modules: postesALaSignature(machines, MODULES_CATALOGUE) }],
     marque: { notoriete: 50, desirabilite: 50 },
     prets: [],
     catalogue: [
@@ -93,7 +93,7 @@ describe("3D-3 : la production suit les postes posés dans le plan", () => {
   it("retirer un poste du plan fait baisser la production", () => {
     const equipe = [salarie("a", 12), salarie("b", 12)];
     const deux = entreprise(equipe, 2);
-    const un = { ...deux, atelier: { ...deux.atelier!, modules: deux.atelier!.modules.slice(1) } };
+    const un = { ...deux, ateliers: [{ ...deux.ateliers[0]!, modules: deux.ateliers[0]!.modules.slice(1) }] };
     expect(total(un)).toBeLessThan(total(deux));
     expect(total(un)).toBeGreaterThan(0);
   });
@@ -103,13 +103,13 @@ describe("3D-3 : la production suit les postes posés dans le plan", () => {
     const un = entreprise(equipe, 1);
     const avecTable = {
       ...un,
-      atelier: {
-        ...un.atelier!,
+      ateliers: [{
+        ...un.ateliers[0]!,
         modules: [
-          ...un.atelier!.modules,
+          ...un.ateliers[0]!.modules,
           ...resoudreModules([{ id_type: "table_coupe_simple", x: 2, y: 4, pivote: true }], MODULES_CATALOGUE),
         ],
-      },
+      }],
     };
     expect(total(avecTable)).toBe(total(un));
   });

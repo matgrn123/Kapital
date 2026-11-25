@@ -38,7 +38,7 @@ function entrepriseTest(): Entreprise {
     stocksMatiere: [],
     stocksFinis: [],
     salaries: [],
-    atelier: null,
+    ateliers: [],
     marque: { notoriete: 40, desirabilite: 40 },
     prets: [
       {

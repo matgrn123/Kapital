@@ -23,7 +23,7 @@ describe("création de la société", () => {
   it("naît à l'étape 0, sans atelier, société par actions simplifiée (SAS)", () => {
     const s = creerSociete({ params: PARAMS, nom: "Maison Test", gamme: "entree", mois: moisJeu(0) });
     expect(s.etape).toBe(0);
-    expect(s.atelier).toBeNull();
+    expect(s.ateliers).toEqual([]);
     expect(s.formeJuridique).toBe("SAS");
     expect(s.gamme).toBe("entree");
   });

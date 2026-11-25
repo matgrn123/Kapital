@@ -2,6 +2,7 @@ import type { Parametres } from "@kapital/content";
 import type { EcritureComptable } from "../comptabilite/types.js";
 import type { Bail } from "../types/entreprise.js";
 import { centimes, type Centimes, type MoisJeu } from "../types/primitifs.js";
+import { suffixeLocal } from "./achat.js";
 
 // AE-5 : bail d'un local. Fonctions pures ; les montants du local (loyer, charges) viennent
 // du catalogue des bâtiments, le dépôt et le préavis des paramètres sourcés (bail_*).
@@ -56,9 +57,15 @@ export function nouveauBail(args: {
 }
 
 /** Signature : le dépôt sort de la banque et devient une créance sur le bailleur (275). */
-export function ecritureSignatureBail(idEntreprise: string, mois: MoisJeu, bail: Bail): EcritureComptable {
+export function ecritureSignatureBail(
+  idEntreprise: string,
+  mois: MoisJeu,
+  bail: Bail,
+  /** 3D-7 : identifiant du local signé (absent = un seul local). */
+  idLocal?: string,
+): EcritureComptable {
   return {
-    id: `bail_signature_${mois}_${idEntreprise}`,
+    id: `bail_signature_${mois}_${idEntreprise}${suffixeLocal(idLocal)}`,
     mois,
     libelle: "Dépôt de garantie versé (signature du bail)",
     lignes: [
@@ -74,11 +81,13 @@ export function ecrituresMensuellesBail(
   mois: MoisJeu,
   loyerMensuel: Centimes,
   chargesMensuelles: Centimes,
+  /** 3D-7 : identifiant du local, ajouté à l'identifiant des écritures (absent = un seul local). */
+  idLocal?: string,
 ): EcritureComptable[] {
   const ecritures: EcritureComptable[] = [];
   if (loyerMensuel > 0) {
     ecritures.push({
-      id: `loyer_${mois}_${idEntreprise}`,
+      id: `loyer_${mois}_${idEntreprise}${suffixeLocal(idLocal)}`,
       mois,
       libelle: "Loyer atelier",
       lignes: [
@@ -89,7 +98,7 @@ export function ecrituresMensuellesBail(
   }
   if (chargesMensuelles > 0) {
     ecritures.push({
-      id: `charges_locatives_${mois}_${idEntreprise}`,
+      id: `charges_locatives_${mois}_${idEntreprise}${suffixeLocal(idLocal)}`,
       mois,
       libelle: "Charges locatives atelier",
       lignes: [
@@ -118,10 +127,12 @@ export function ecritureRestitutionDepot(
   idEntreprise: string,
   mois: MoisJeu,
   bail: Bail,
+  /** 3D-7 : identifiant du local ; le serveur libère en base le local dont l'id termine l'écriture. */
+  idLocal?: string,
 ): EcritureComptable | null {
   if (bail.depotGarantie <= 0) return null;
   return {
-    id: `${PREFIXE_RESTITUTION_DEPOT}${mois}_${idEntreprise}`,
+    id: `${PREFIXE_RESTITUTION_DEPOT}${mois}_${idEntreprise}${suffixeLocal(idLocal)}`,
     mois,
     libelle: "Restitution du dépôt de garantie (fin de bail)",
     lignes: [

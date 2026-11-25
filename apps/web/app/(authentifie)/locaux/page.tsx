@@ -9,7 +9,7 @@ import {
   tauxPret,
 } from "@kapital/engine";
 import { reglesPretV1 } from "@kapital/server";
-import { BandeauEtape, Carte, EncadreNotion, EnTete, Etapes, Faits, FilRouge, Puce } from "../../../components/ui";
+import { BandeauEtape, BoutonLien, Carte, EncadreNotion, EnTete, Etapes, Faits, FilRouge, Puce } from "../../../components/ui";
 import { apercuBail } from "../../../lib/apercu-lot4";
 import { formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
@@ -20,11 +20,14 @@ import { BoutonConge, CarteOffre, type OffreLocal } from "./ActionsLocaux";
 
 // Locaux (design V2, docs/maquette V.locaux) : louer ou acheter un local, avec pour chaque
 // offre l'écriture que le serveur passera, calculée par le moteur.
+// 3D-7 : une société peut avoir plusieurs locaux : chacun a sa carte (et son congé), et les offres
+// restent proposées pour louer ou acheter un autre local.
 
 // Durée sur laquelle on compare louer et acheter : un choix d'affichage, pas une règle du moteur.
 const HORIZON_COMPARATIF_MOIS = 24;
 
 type Local = AvecModulesPoses & {
+  id: string;
   batiment_id: string | null;
   surface_m2: number;
   loyer_mensuel_centimes: number;
@@ -42,6 +45,8 @@ type Local = AvecModulesPoses & {
 function parametresAchat(params: Parametres): Parametres {
   return Object.fromEntries(Object.entries(params).filter(([k]) => k.startsWith("achat_") || k.startsWith("pret_")));
 }
+
+const surTitreLocal = (i: number) => (i === 0 ? "Aujourd'hui" : `Local ${i + 1}`);
 
 export default async function PageLocaux() {
   const supabase = await creerClientServeur();
@@ -62,29 +67,31 @@ export default async function PageLocaux() {
     lireVerrou(supabase, entreprise.id, "achat_local"),
   ]);
 
-  const [{ data: ligne }, { data: monde }, { data: pretsActifs }] = await Promise.all([
+  const [{ data: lignes }, { data: monde }, { data: pretsActifs }] = await Promise.all([
     supabase
       .from("workshops")
       .select(
-        `batiment_id, surface_m2, loyer_mensuel_centimes, charges_mensuelles_centimes, depot_garantie_centimes, mode_detention, mois_conge, mois_fin, prix_achat_centimes, apport_centimes, duree_amortissement_mois, ${COLONNES_MODULES_POSES}`,
+        `id, batiment_id, surface_m2, loyer_mensuel_centimes, charges_mensuelles_centimes, depot_garantie_centimes, mode_detention, mois_conge, mois_fin, prix_achat_centimes, apport_centimes, duree_amortissement_mois, ${COLONNES_MODULES_POSES}`,
       )
       .eq("company_id", entreprise.id)
-      .maybeSingle(),
+      .order("cree_le"),
     supabase.from("worlds").select("mois_courant").eq("etat", "actif").limit(1).maybeSingle(),
     supabase.from("loans").select("id, objet, capital_restant_centimes").eq("company_id", entreprise.id).eq("statut", "actif"),
   ]);
-  const local = ligne as Local | null;
+  const locaux = (lignes ?? []) as Local[];
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
   const prets = (pretsActifs ?? []) as Array<{ id: string; objet: string | null; capital_restant_centimes: number }>;
   const detteEnCours = prets.reduce((s, p) => s + Number(p.capital_restant_centimes), 0);
   const catalogue = chargerBatimentsV1().filter((b) => b.categorie === "atelier");
-  const nomLocal = catalogue.find((b) => b.id === local?.batiment_id)?.nom ?? "Local";
+  const nomLocal = (l: Local) => catalogue.find((b) => b.id === l.batiment_id)?.nom ?? "Local";
+  const possedes = locaux.filter((l) => l.mode_detention !== "bail");
+  const titreLocal = (l: Local, i: number) => (locaux.length > 1 ? `${i + 1}. ${nomLocal(l)}` : nomLocal(l));
 
   // Détail du crédit d'un local acheté : dette et prochaine mensualité.
   const pretsImmo = prets.filter((p) => p.objet === "immobilier");
   const detteCredit = pretsImmo.reduce((s, p) => s + Number(p.capital_restant_centimes), 0);
   let mensualiteCredit: number | null = null;
-  if (local && local.mode_detention !== "bail" && pretsImmo.length > 0) {
+  if (possedes.length > 0 && pretsImmo.length > 0) {
     const { data: ech } = await supabase
       .from("loan_schedules")
       .select("mensualite_centimes")
@@ -137,12 +144,22 @@ export default async function PageLocaux() {
 
   return (
     <div className="flex flex-col gap-5">
-      <EnTete surTitre="Immobilier d'entreprise" titre="Locaux">
+      <EnTete
+        surTitre="Immobilier d'entreprise"
+        titre={locaux.length > 1 ? `Locaux (${locaux.length})` : "Locaux"}
+        action={
+          locaux.length > 0 ? (
+            <BoutonLien href="#autre-local" variante="principal">
+              Louer un autre local
+            </BoutonLien>
+          ) : undefined
+        }
+      >
         Louer garde ta trésorerie libre. Acheter te rend propriétaire, mais immobilise de l&apos;argent et
         alourdit ta dette.
       </EnTete>
 
-      {!local ? (
+      {locaux.length === 0 ? (
         <Carte surTitre="Aujourd'hui" titre="Pas encore de local">
           <div className="grid gap-4 md:grid-cols-2">
             <p className="text-[0.9rem]">
@@ -159,62 +176,76 @@ export default async function PageLocaux() {
             />
           </div>
         </Carte>
-      ) : local.mode_detention === "bail" ? (
-        <Carte surTitre="Aujourd'hui" titre={nomLocal} action={<Puce ton="accent">Locataire</Puce>}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Faits
-              lignes={[
-                ["Surface", `${local.surface_m2} m²`],
-                ["Statut", "Locataire, bail commercial"],
-                ["Loyer (613)", `${formaterEuros(local.loyer_mensuel_centimes)} € / mois`],
-                ["Charges (614)", `${formaterEuros(local.charges_mensuelles_centimes)} € / mois`],
-                ["Dépôt de garantie (275)", `${formaterEuros(local.depot_garantie_centimes)} €`],
-                ["Postes de travail (posés)", postesPoses(local)],
-              ]}
-            />
-            <div>
-              {local.mois_fin !== null ? (
-                <p className="text-[0.9rem]">
-                  Congé donné : le bail prend fin au mois de jeu {local.mois_fin}
-                  {local.mois_fin > moisCourant ? ` (dans ${local.mois_fin - moisCourant} mois)` : ""}. Le loyer reste
-                  dû jusque-là, puis le dépôt de garantie t&apos;est rendu.
-                </p>
-              ) : (
-                <BoutonConge preavisMois={bail.preavisMois} />
-              )}
-            </div>
-          </div>
-        </Carte>
       ) : (
-        <Carte surTitre="Aujourd'hui" titre={nomLocal} action={<Puce ton="bon">Propriétaire</Puce>}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Faits
-              lignes={[
-                ["Surface", `${local.surface_m2} m²`],
-                ["Prix payé (213)", `${formaterEuros(local.prix_achat_centimes)} €`],
-                ["Apport versé", `${formaterEuros(local.apport_centimes)} €`],
-                ["Dette immobilière (164)", `${formaterEuros(detteCredit)} €`],
-                ["Mensualité du crédit", mensualiteCredit === null ? "aucune" : `${formaterEuros(mensualiteCredit)} € / mois`],
-                ["Charges d'entretien (614)", `${formaterEuros(local.charges_mensuelles_centimes)} € / mois`],
-                ["Postes de travail (posés)", postesPoses(local)],
-                [
-                  "Amortissement",
-                  local.duree_amortissement_mois
-                    ? `${formaterEuros(Math.round(local.prix_achat_centimes / local.duree_amortissement_mois))} € / mois sur ${local.duree_amortissement_mois} mois`
-                    : "non défini",
-                ],
-              ]}
-            />
-            <p className="text-[0.84rem] text-muted">
-              Propriétaire, tu ne paies plus de loyer. L&apos;amortissement répartit le prix du bâtiment sur sa durée
-              de vie : c&apos;est une charge comptable, pas une sortie d&apos;argent.
-            </p>
-          </div>
-        </Carte>
+        locaux.map((local, i) =>
+          local.mode_detention === "bail" ? (
+            <Carte key={local.id} surTitre={surTitreLocal(i)} titre={titreLocal(local, i)} action={<Puce ton="accent">Locataire</Puce>}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Faits
+                  lignes={[
+                    ["Surface", `${local.surface_m2} m²`],
+                    ["Statut", "Locataire, bail commercial"],
+                    ["Loyer (613)", `${formaterEuros(local.loyer_mensuel_centimes)} € / mois`],
+                    ["Charges (614)", `${formaterEuros(local.charges_mensuelles_centimes)} € / mois`],
+                    ["Dépôt de garantie (275)", `${formaterEuros(local.depot_garantie_centimes)} €`],
+                    ["Postes de travail (posés)", postesPoses(local)],
+                  ]}
+                />
+                <div>
+                  {local.mois_fin !== null ? (
+                    <p className="text-[0.9rem]">
+                      Congé donné : le bail prend fin au mois de jeu {local.mois_fin}
+                      {local.mois_fin > moisCourant ? ` (dans ${local.mois_fin - moisCourant} mois)` : ""}. Le loyer reste
+                      dû jusque-là, puis le dépôt de garantie t&apos;est rendu.
+                    </p>
+                  ) : (
+                    <BoutonConge preavisMois={bail.preavisMois} workshopId={local.id} />
+                  )}
+                </div>
+              </div>
+            </Carte>
+          ) : (
+            <Carte key={local.id} surTitre={surTitreLocal(i)} titre={titreLocal(local, i)} action={<Puce ton="bon">Propriétaire</Puce>}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Faits
+                  lignes={[
+                    ["Surface", `${local.surface_m2} m²`],
+                    ["Prix payé (213)", `${formaterEuros(local.prix_achat_centimes)} €`],
+                    ["Apport versé", `${formaterEuros(local.apport_centimes)} €`],
+                    [possedes.length > 1 ? "Dette immobilière (164, tous locaux)" : "Dette immobilière (164)", `${formaterEuros(detteCredit)} €`],
+                    [possedes.length > 1 ? "Prochaine mensualité (tous locaux)" : "Mensualité du crédit", mensualiteCredit === null ? "aucune" : `${formaterEuros(mensualiteCredit)} € / mois`],
+                    ["Charges d'entretien (614)", `${formaterEuros(local.charges_mensuelles_centimes)} € / mois`],
+                    ["Postes de travail (posés)", postesPoses(local)],
+                    [
+                      "Amortissement",
+                      local.duree_amortissement_mois
+                        ? `${formaterEuros(Math.round(local.prix_achat_centimes / local.duree_amortissement_mois))} € / mois sur ${local.duree_amortissement_mois} mois`
+                        : "non défini",
+                    ],
+                  ]}
+                />
+                <p className="text-[0.84rem] text-muted">
+                  Propriétaire, tu ne paies plus de loyer. L&apos;amortissement répartit le prix du bâtiment sur sa durée
+                  de vie : c&apos;est une charge comptable, pas une sortie d&apos;argent.
+                </p>
+              </div>
+            </Carte>
+          ),
+        )
       )}
 
-      {!local && (
-        <>
+      <>
+          {locaux.length > 0 && (
+            <h2 id="autre-local" className="text-[1.05rem] font-semibold">
+              Louer ou acheter un autre local
+            </h2>
+          )}
+          {locaux.length > 0 && (
+            <p className="-mt-3 text-[0.88rem] text-muted">
+              Chaque local a son loyer (ou son crédit), ses {bail.machinesALaSignature} postes de départ et son dépôt de
+              garantie. Les postes de tous tes locaux s&apos;additionnent : plus de postes, plus d&apos;artisans au travail.
+            </p>
+          )}
           {verrou && <BandeauEtape verrou={verrou} action="La location d'un local" />}
           {verrouAchat && !verrou && <BandeauEtape verrou={verrouAchat} action="L'achat d'un local" />}
           <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -238,8 +269,7 @@ export default async function PageLocaux() {
               />
             ))}
           </div>
-        </>
-      )}
+      </>
 
       <div className="grid gap-4 md:grid-cols-2">
         <EncadreNotion titre="Louer ou acheter ?">

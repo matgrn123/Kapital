@@ -22,6 +22,7 @@ import {
   moisJeu,
   montantFactureFaconnier,
   montantLivraisonMatiere,
+  type Atelier,
   type CreanceAEncaisser,
   type CumulMois,
   type DetteFournisseurEchue,
@@ -94,6 +95,77 @@ export function materielDepuisLedger(
     if (l.compte === "2815") amorti -= signe * Number(l.montant_centimes);
   }
   return { valeurBrute: centimes(brut), amortissementsCumules: centimes(amorti) };
+}
+
+/** Un local (table workshops) tel que chargerEtat le lit, avec ses modules posés. */
+export type LigneWorkshop = {
+  id: string;
+  surface_m2: number;
+  loyer_mensuel_centimes: number;
+  placed_modules: LigneModulePose[] | null;
+  depot_garantie_centimes: number;
+  charges_mensuelles_centimes: number;
+  mois_signature: number | null;
+  mois_fin: number | null;
+  mode_detention: string;
+  prix_achat_centimes: number;
+  apport_centimes: number;
+  mois_achat: number | null;
+  duree_amortissement_mois: number | null;
+};
+
+/**
+ * 3D-7 : matériel au bilan (2154 / 2815) réparti entre les locaux. Une écriture dont l'identifiant
+ * contient l'id d'un local lui revient (amenagement_<local>_…, amort_<mois>_<société>_<local>) ;
+ * les autres (écritures d'avant 3D-7) reviennent au plus ancien local. Avec un seul local, il a
+ * tout le matériel, exactement comme avant.
+ */
+export function materielParLocal(
+  lignes: readonly { ecriture_id?: string | null; compte: string; sens: string; montant_centimes: number }[],
+  idsLocaux: readonly string[],
+): Map<string, MaterielAtelier> {
+  const parLocal = new Map<string, typeof lignes[number][]>(idsLocaux.map((id) => [id, []]));
+  const premier = idsLocaux[0];
+  if (premier === undefined) return new Map();
+  for (const l of lignes) {
+    const id = idsLocaux.find((w) => (l.ecriture_id ?? "").includes(w)) ?? premier;
+    parLocal.get(id)!.push(l);
+  }
+  return new Map([...parLocal].map(([id, ls]) => [id, materielDepuisLedger(ls)]));
+}
+
+/** Un local lu en base, pour le moteur : loué (bail) ou acheté (AE-6). */
+export function atelierDepuisLigne(w: LigneWorkshop, modules: ModulePose[], materiel: MaterielAtelier): Atelier {
+  if (w.mode_detention === "bail") {
+    return {
+      id: w.id,
+      surfaceM2: w.surface_m2,
+      loyerMensuel: centimes(w.loyer_mensuel_centimes),
+      modules,
+      materiel,
+      bail: {
+        depotGarantie: centimes(Number(w.depot_garantie_centimes)),
+        chargesMensuelles: centimes(Number(w.charges_mensuelles_centimes)),
+        moisSignature: moisJeu(w.mois_signature ?? 0),
+        moisFin: w.mois_fin === null ? null : moisJeu(w.mois_fin),
+      },
+    };
+  }
+  // Local acheté à crédit (AE-6) : plus de loyer, une immobilisation à amortir.
+  return {
+    id: w.id,
+    surfaceM2: w.surface_m2,
+    loyerMensuel: centimes(0),
+    modules,
+    materiel,
+    achat: {
+      prixAchat: centimes(Number(w.prix_achat_centimes)),
+      apport: centimes(Number(w.apport_centimes)),
+      chargesMensuelles: centimes(Number(w.charges_mensuelles_centimes)),
+      moisAchat: moisJeu(w.mois_achat ?? 0),
+      dureeAmortissementMois: w.duree_amortissement_mois ?? 0,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -417,9 +489,11 @@ export class StockageSupabase implements StockageMonde {
           .eq("statut", "actif"),
         this.supabase
           .from("workshops")
-          .select("surface_m2, loyer_mensuel_centimes, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin, mode_detention, prix_achat_centimes, apport_centimes, mois_achat, duree_amortissement_mois, placed_modules(module_type_id, x, y, pivote, statut)")
+          .select("id, surface_m2, loyer_mensuel_centimes, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin, mode_detention, prix_achat_centimes, apport_centimes, mois_achat, duree_amortissement_mois, placed_modules(module_type_id, x, y, pivote, statut)")
           .eq("company_id", companyId)
-          .maybeSingle(),
+          // 3D-7 : tous les locaux de la société, du plus ancien au plus récent.
+          .order("cree_le")
+          .order("id"),
         this.supabase
           .from("loans")
           .select("id, capital_initial_centimes, capital_restant_centimes, taux_annuel, duree_mois, mois_jeu_debut, objet")
@@ -442,7 +516,7 @@ export class StockageSupabase implements StockageMonde {
           .maybeSingle(),
         this.supabase
           .from("ledger_entries")
-          .select("compte, sens, montant_centimes")
+          .select("ecriture_id, compte, sens, montant_centimes")
           .eq("company_id", companyId)
           .in("compte", ["2154", "2815"]),
         this.supabase
@@ -470,14 +544,7 @@ export class StockageSupabase implements StockageMonde {
       id: string; poste: Poste; salaire_brut_mensuel_centimes: number;
       anciennete_mois_debut: number; experience_mois_debut: number; mois_jeu_debut: number | null;
     }>;
-    const workshop = verifier("workshops", atelierR) as {
-      surface_m2: number; loyer_mensuel_centimes: number;
-      placed_modules: LigneModulePose[] | null;
-      depot_garantie_centimes: number; charges_mensuelles_centimes: number;
-      mois_signature: number | null; mois_fin: number | null;
-      mode_detention: string; prix_achat_centimes: number; apport_centimes: number;
-      mois_achat: number | null; duree_amortissement_mois: number | null;
-    } | null;
+    const workshops = (verifier("workshops", atelierR) ?? []) as LigneWorkshop[];
     const loans = (verifier("loans", pretsR) ?? []) as Array<{
       id: string; capital_initial_centimes: number; capital_restant_centimes: number;
       taux_annuel: number; duree_mois: number; mois_jeu_debut: number | null; objet: string | null;
@@ -490,10 +557,15 @@ export class StockageSupabase implements StockageMonde {
     }>;
     const marque = verifier("brand_state", marqueR) as { notoriete: number; desirabilite: number } | null;
     const etat = verifier("etat_mois_entreprise", etatR) as { cumul: CumulMois } | null;
-    const materiel = materielDepuisLedger(
-      (verifier("ledger 2154 / 2815", materielR) ?? []) as Array<{ compte: string; sens: string; montant_centimes: number }>,
+    const materiels = materielParLocal(
+      (verifier("ledger 2154 / 2815", materielR) ?? []) as Array<{ ecriture_id: string; compte: string; sens: string; montant_centimes: number }>,
+      workshops.map((w) => w.id),
     );
-    const modules = modulesDepuisLignes(workshop?.placed_modules, chargerModulesV1());
+    const catalogueModules = chargerModulesV1();
+    // 3D-7 : chaque local avec ses modules en service (statut 'actif') et sa part du matériel.
+    const ateliers = workshops.map((w) =>
+      atelierDepuisLigne(w, modulesDepuisLignes(w.placed_modules, catalogueModules), materiels.get(w.id)!),
+    );
     // AE-10 : boutiques (aucune tant que la migration 0038 n'est pas appliquée).
     const lignesBoutiques = tableAbsente(boutiquesR.error)
       ? []
@@ -540,35 +612,7 @@ export class StockageSupabase implements StockageMonde {
           experienceMois: e.experience_mois_debut + dureeService,
         };
       }),
-      atelier: workshop
-        ? workshop.mode_detention === "bail"
-          ? {
-              surfaceM2: workshop.surface_m2,
-              loyerMensuel: centimes(workshop.loyer_mensuel_centimes),
-              modules,
-              materiel,
-              bail: {
-                depotGarantie: centimes(Number(workshop.depot_garantie_centimes)),
-                chargesMensuelles: centimes(Number(workshop.charges_mensuelles_centimes)),
-                moisSignature: moisJeu(workshop.mois_signature ?? 0),
-                moisFin: workshop.mois_fin === null ? null : moisJeu(workshop.mois_fin),
-              },
-            }
-          : {
-              // Local acheté à crédit (AE-6) : plus de loyer, une immobilisation à amortir.
-              surfaceM2: workshop.surface_m2,
-              loyerMensuel: centimes(0),
-              modules,
-              materiel,
-              achat: {
-                prixAchat: centimes(Number(workshop.prix_achat_centimes)),
-                apport: centimes(Number(workshop.apport_centimes)),
-                chargesMensuelles: centimes(Number(workshop.charges_mensuelles_centimes)),
-                moisAchat: moisJeu(workshop.mois_achat ?? 0),
-                dureeAmortissementMois: workshop.duree_amortissement_mois ?? 0,
-              },
-            }
-        : null,
+      ateliers,
       marque: { notoriete: marque?.notoriete ?? 50, desirabilite: marque?.desirabilite ?? 50 },
       prets: loans.map((l) => ({
         id: idPret(l.id),

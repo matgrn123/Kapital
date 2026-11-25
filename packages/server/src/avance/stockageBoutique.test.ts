@@ -60,7 +60,7 @@ function lot(e: Partial<Entreprise>): ResultatLotAEnregistrer {
     stocksMatiere: [],
     stocksFinis: [],
     salaries: [],
-    atelier: null,
+    ateliers: [],
     marque: { notoriete: 0, desirabilite: 0 },
     prets: [],
     catalogue: [],

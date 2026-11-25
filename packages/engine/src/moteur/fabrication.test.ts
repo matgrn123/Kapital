@@ -61,7 +61,7 @@ function entreprise(surcharge: Partial<Entreprise> = {}): Entreprise {
       ancienneteMois: 12,
       experienceMois: 12,
     })),
-    atelier: { surfaceM2: 80, loyerMensuel: centimes(150_000), modules: postesALaSignature(2, MODULES_CATALOGUE) },
+    ateliers: [{ surfaceM2: 80, loyerMensuel: centimes(150_000), modules: postesALaSignature(2, MODULES_CATALOGUE) }],
     marque: { notoriete: 50, desirabilite: 50 },
     prets: [],
     catalogue: [
@@ -192,7 +192,7 @@ describe("production atelier : bonne matière, nomenclature, temps standard", ()
 
 describe("règlement des fournisseurs et façonniers à l'échéance", () => {
   it("401 débit / 512 crédit, une écriture par commande, trésorerie diminuée", () => {
-    const ent = entreprise({ catalogue: [], atelier: null, salaries: [] });
+    const ent = entreprise({ catalogue: [], ateliers: [], salaries: [] });
     const r = unMois(ent, {
       ...FLUX_VIDE,
       dettesEchues: [
@@ -211,7 +211,7 @@ describe("règlement des fournisseurs et façonniers à l'échéance", () => {
   });
 
   it("trésorerie insuffisante : la dette est payée quand même (découvert facturé à la clôture)", () => {
-    const ent = entreprise({ catalogue: [], atelier: null, salaries: [], tresorerie: centimes(10_000) });
+    const ent = entreprise({ catalogue: [], ateliers: [], salaries: [], tresorerie: centimes(10_000) });
     const r = unMois(ent, {
       ...FLUX_VIDE,
       dettesEchues: [{ ordreId: "po2", nature: "matiere", montant: centimes(30_000) }],
@@ -220,7 +220,7 @@ describe("règlement des fournisseurs et façonniers à l'échéance", () => {
   });
 
   it("livraison puis règlement : 401 revient à zéro et actif = passif après chaque écriture", () => {
-    const ent = entreprise({ catalogue: [], atelier: null, salaries: [] });
+    const ent = entreprise({ catalogue: [], ateliers: [], salaries: [] });
     const livraison = unMois(ent, {
       ...FLUX_VIDE,
       livraisonsMatiere: [

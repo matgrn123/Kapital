@@ -124,7 +124,7 @@ export function missionsDuBanc(etat: EtatBanc): readonly ProgressionMission[] {
         mois_signature: p.moisSignature,
         mois_ouverture: p.moisOuverture,
       })),
-      localEnregistre: etat.entreprise.atelier !== null,
+      localEnregistre: etat.entreprise.ateliers.length > 0,
     }),
   );
 }

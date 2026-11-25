@@ -6,8 +6,8 @@ import { formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { VignetteBatiment } from "./VignetteBatiment";
 
-// 3D-8 : « Mon Empire », tous les bâtiments du joueur connecté. Aujourd'hui son atelier ;
-// la liste s'allongera avec la boutique et les autres locaux (lib/empire.ts).
+// 3D-8 : « Mon Empire », tous les bâtiments du joueur connecté : 3D-7, tous ses locaux ; la liste
+// s'allongera avec la boutique (lib/empire.ts).
 
 export default async function PageEmpire() {
   const supabase = await creerClientServeur();
@@ -15,13 +15,13 @@ export default async function PageEmpire() {
   const entreprise = entreprises?.[0] as { id: string; nom: string } | undefined;
   if (!entreprise) return null;
 
-  const { data: atelier } = await supabase
+  const { data: ateliers } = await supabase
     .from("workshops")
-    .select("batiment_id, surface_m2, loyer_mensuel_centimes, charges_mensuelles_centimes, mode_detention")
+    .select("id, batiment_id, surface_m2, loyer_mensuel_centimes, charges_mensuelles_centimes, mode_detention")
     .eq("company_id", entreprise.id)
-    .maybeSingle();
+    .order("cree_le");
 
-  const batiments = batimentsDeLEmpire({ atelier: (atelier as LocalDuJoueur | null) ?? null }, chargerBatimentsV1());
+  const batiments = batimentsDeLEmpire({ ateliers: (ateliers ?? []) as LocalDuJoueur[] }, chargerBatimentsV1());
   const loyers = batiments.reduce((s, b) => s + (b.mode === "locataire" ? b.loyerMensuelCentimes + b.chargesMensuellesCentimes : 0), 0);
 
   return (

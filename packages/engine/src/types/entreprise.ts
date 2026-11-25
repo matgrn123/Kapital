@@ -65,6 +65,13 @@ export type AchatLocal = {
 };
 
 export type Atelier = {
+  /**
+   * 3D-7 : identifiant du local (workshops.id). Il suffixe les écritures propres au local
+   * (loyer, charges, énergie, amortissements, restitution du dépôt) pour qu'elles restent
+   * distinctes d'un local à l'autre. Obligatoire dès que la société a plusieurs locaux ;
+   * absent (un seul local, anciens tests) = identifiants d'avant 3D-7.
+   */
+  readonly id?: string;
   readonly surfaceM2: number;
   readonly loyerMensuel: Centimes;
   /**
@@ -187,7 +194,8 @@ export type Entreprise = {
   readonly stocksMatiere: readonly LigneStockMatiere[];
   readonly stocksFinis: readonly LigneStockFini[];
   readonly salaries: readonly Salarie[];
-  readonly atelier: Atelier | null;
+  /** 3D-7 : locaux de la société (ateliers loués ou achetés), du plus ancien au plus récent ; [] = aucun. */
+  readonly ateliers: readonly Atelier[];
   readonly marque: EtatMarque;
   readonly prets: readonly Pret[];
   readonly catalogue: readonly ProduitEntreprise[];

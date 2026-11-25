@@ -74,7 +74,7 @@ function entreprise(o: Partial<Entreprise> = {}): Entreprise {
         experienceMois: 0,
       },
     ],
-    atelier: { surfaceM2: 50, loyerMensuel: centimes(50_000), modules: postesALaSignature(2, MODULES_CATALOGUE) },
+    ateliers: [{ surfaceM2: 50, loyerMensuel: centimes(50_000), modules: postesALaSignature(2, MODULES_CATALOGUE) }],
     marque: { notoriete: 0, desirabilite: 0 },
     prets: [
       {

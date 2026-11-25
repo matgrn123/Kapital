@@ -78,13 +78,15 @@ export type DemandeAchat = {
   readonly detteEnCours: Centimes;
   /** Mois de découvert consécutifs (prime de risque du taux) ; absent = 0. */
   readonly moisDecouvertConsecutifs?: number | undefined;
-  /** Une entreprise ne détient qu'un local à la fois (loué ou acheté). */
-  readonly aDejaUnLocal: boolean;
+  /**
+   * 3D-7 : identifiant du nouveau local, ajouté aux identifiants des écritures (prêt, achat).
+   * Une société peut détenir plusieurs locaux : avoir déjà un local n'empêche plus d'en acheter un.
+   */
+  readonly idLocal?: string | undefined;
   readonly params: Parametres;
 };
 
 export type CodeRefusAchat =
-  | "local_deja_detenu"
   | "apport_insuffisant"
   | "tresorerie_insuffisante"
   | "montant_invalide"
@@ -120,10 +122,6 @@ export function acheterLocal(d: DemandeAchat): AchatAccepte | RefusAchat {
   const pa = parametresAchatDepuis(d.params);
   const regles = reglesPretDepuis(d.params);
   const prix = d.batiment.prixAchat;
-
-  if (d.aDejaUnLocal) {
-    return { ok: false, code: "local_deja_detenu", message: "Vous détenez déjà un local : donnez congé avant d'en acheter un autre." };
-  }
 
   const minimum = apportMinimal(prix, pa);
   const apport = d.apport ?? minimum;
@@ -174,7 +172,7 @@ export function acheterLocal(d: DemandeAchat): AchatAccepte | RefusAchat {
   const ecritures: EcritureComptable[] = [];
   if (montantPret > 0) {
     ecritures.push({
-      id: `pret_achat_${d.mois}_${d.idEntreprise}`,
+      id: `pret_achat_${d.mois}_${d.idEntreprise}${suffixeLocal(d.idLocal)}`,
       mois: d.mois,
       libelle: "Mise à disposition du prêt immobilier",
       lignes: [
@@ -184,7 +182,7 @@ export function acheterLocal(d: DemandeAchat): AchatAccepte | RefusAchat {
     });
   }
   ecritures.push({
-    id: `achat_local_${d.mois}_${d.idEntreprise}`,
+    id: `achat_local_${d.mois}_${d.idEntreprise}${suffixeLocal(d.idLocal)}`,
     mois: d.mois,
     libelle: `Achat du local (${d.batiment.id})`,
     lignes: [
@@ -212,6 +210,11 @@ export function acheterLocal(d: DemandeAchat): AchatAccepte | RefusAchat {
   };
 }
 
+/** 3D-7 : « _<id du local> » quand le local a un identifiant, rien sinon (identifiants d'avant 3D-7). */
+export function suffixeLocal(idLocal: string | undefined): string {
+  return idLocal === undefined ? "" : `_${idLocal}`;
+}
+
 /**
  * Amortissement linéaire de la construction, de la clôture suivant l'achat jusqu'à la fin de la
  * durée. Le montant du mois est la différence des cumuls arrondis : la somme fait exactement le prix.
@@ -220,6 +223,8 @@ export function ecritureAmortissementConstruction(
   idEntreprise: string,
   mois: MoisJeu,
   achat: AchatLocal,
+  /** 3D-7 : identifiant du local, ajouté à l'identifiant de l'écriture (absent = un seul local). */
+  idLocal?: string,
 ): EcritureComptable | null {
   const numero = mois - achat.moisAchat;
   if (numero < 1 || numero > achat.dureeAmortissementMois) return null;
@@ -228,7 +233,7 @@ export function ecritureAmortissementConstruction(
     Math.round((achat.prixAchat * numero) / duree) - Math.round((achat.prixAchat * (numero - 1)) / duree);
   if (montant <= 0) return null;
   return {
-    id: `amort_construction_${mois}_${idEntreprise}`,
+    id: `amort_construction_${mois}_${idEntreprise}${suffixeLocal(idLocal)}`,
     mois,
     libelle: "Amortissement de la construction",
     lignes: [
@@ -243,10 +248,12 @@ export function ecritureEntretienLocal(
   idEntreprise: string,
   mois: MoisJeu,
   achat: AchatLocal,
+  /** 3D-7 : identifiant du local, ajouté à l'identifiant de l'écriture (absent = un seul local). */
+  idLocal?: string,
 ): EcritureComptable | null {
   if (achat.chargesMensuelles <= 0) return null;
   return {
-    id: `entretien_local_${mois}_${idEntreprise}`,
+    id: `entretien_local_${mois}_${idEntreprise}${suffixeLocal(idLocal)}`,
     mois,
     libelle: "Charges d'entretien du local",
     lignes: [

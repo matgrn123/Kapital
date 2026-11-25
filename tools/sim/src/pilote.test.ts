@@ -1,6 +1,6 @@
 import { chargerParametresV1 } from "@kapital/content";
 import { describe, expect, it } from "vitest";
-import { centimes, postesEquipesAtelier } from "@kapital/engine";
+import { centimes, postesEquipesAteliers } from "@kapital/engine";
 import { verifierGardeFouMonetaire } from "./gardeFou.js";
 import {
   ajouterProduit,
@@ -39,7 +39,7 @@ describe("pilote du banc : décisions", () => {
     const capital = PARAMS["capital_depart_centimes"]!.valeur;
     expect(e.entreprise.tresorerie).toBe(capital);
     expect(e.entreprise.etape).toBe(0);
-    expect(e.entreprise.atelier).toBeNull();
+    expect(e.entreprise.ateliers).toEqual([]);
     expect(e.ecritures).toHaveLength(1);
   });
 
@@ -60,14 +60,14 @@ describe("pilote du banc : décisions", () => {
 
   it("bail : dépôt de garantie (275 / 512) et postes de départ posés", () => {
     const e = ok(signerBail(aEtape2(depart()), "petit_atelier"));
-    expect(postesEquipesAtelier(e.entreprise.atelier ?? null)).toBe(PARAMS["bail_machines_a_la_signature"]!.valeur);
-    expect(e.entreprise.atelier?.bail?.depotGarantie).toBe(250_000);
+    expect(postesEquipesAteliers(e.entreprise.ateliers)).toBe(PARAMS["bail_machines_a_la_signature"]!.valeur);
+    expect(e.entreprise.ateliers[0]?.bail?.depotGarantie).toBe(250_000);
     expect(e.ecritures.at(-1)!.lignes.map((l) => l.compte)).toEqual(["275", "512"]);
   });
 
   it("poser un poste : achat au 2154 et un poste de plus", () => {
     const e = ok(poserModules(ok(signerBail(aEtape2(depart()), "petit_atelier")), "poste_couture_base", 1));
-    expect(postesEquipesAtelier(e.entreprise.atelier ?? null)).toBe(3);
+    expect(postesEquipesAteliers(e.entreprise.ateliers)).toBe(3);
     expect(e.ecritures.at(-1)!.lignes[0]).toMatchObject({ compte: "2154", montant: 130_000 });
   });
 

@@ -30,7 +30,7 @@ const ENTREPRISE: Entreprise = {
   stocksMatiere: [],
   stocksFinis: [{ produit: TSHIRT, quantite: 50, valeurTotale: centimes(100_000) }],
   salaries: [],
-  atelier: null,
+  ateliers: [],
   marque: { notoriete: 0, desirabilite: 0 },
   prets: [],
   catalogue: [

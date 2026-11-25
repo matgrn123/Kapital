@@ -95,7 +95,7 @@ function entrepriseDeTest(surcharge: Partial<Entreprise> = {}): Entreprise {
       ancienneteMois: 6,
       experienceMois: 6,
     })),
-    atelier: { surfaceM2: 150, loyerMensuel: centimes(250_000), modules: postesALaSignature(3, MODULES_CATALOGUE) },
+    ateliers: [{ surfaceM2: 150, loyerMensuel: centimes(250_000), modules: postesALaSignature(3, MODULES_CATALOGUE) }],
     marque: { notoriete: 50, desirabilite: 50 },
     prets: [
       {

@@ -41,7 +41,7 @@ export default async function PageProduits() {
     { data: stocks },
     { data: matieres },
     { data: prixFacon },
-    { data: atelier },
+    { data: ateliers },
     { data: ecritures },
     { data: faconniers },
     { data: prixMatieres },
@@ -61,7 +61,8 @@ export default async function PageProduits() {
         .eq("company_id", entreprise.id),
       supabase.from("materials").select("id, nom"),
       supabase.from("faconnier_catalogue").select("faconnier_id, product_id, prix_par_piece_centimes"),
-      supabase.from("workshops").select("id").eq("company_id", entreprise.id).maybeSingle(),
+      // 3D-7 : au moins un local suffit (la société peut en avoir plusieurs).
+      supabase.from("workshops").select("id").eq("company_id", entreprise.id).limit(1),
       supabase
         .from("ledger_entries")
         .select("ecriture_id, mois_jeu, libelle, compte, sens, montant_centimes")
@@ -173,7 +174,7 @@ export default async function PageProduits() {
                         coutRevient={cout}
                         origineCout={origine}
                         params={params}
-                        aUnAtelier={!!atelier}
+                        aUnAtelier={(ateliers ?? []).length > 0}
                       />
                     </section>
                   );

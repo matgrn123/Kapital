@@ -37,7 +37,7 @@ export type Societe = {
   readonly formeJuridique: "SAS";
   readonly etape: 0;
   /** Pas d'atelier à la création : le joueur démarre sans local. */
-  readonly atelier: null;
+  readonly ateliers: readonly [];
   readonly tresorerie: Centimes;
   /** 512 Banque (débit) / 101 Capital (crédit). */
   readonly ecritureApport: EcritureComptable;
@@ -58,7 +58,7 @@ export function creerSociete(e: EntreesCreationSociete): Societe {
     gamme: e.gamme,
     formeJuridique: "SAS",
     etape: 0,
-    atelier: null,
+    ateliers: [],
     tresorerie: capital,
     ecritureApport: {
       id: "apport_initial",

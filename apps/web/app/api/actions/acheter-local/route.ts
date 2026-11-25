@@ -17,6 +17,7 @@ export const runtime = "nodejs";
 // l'apport minimal et les durées des paramètres, le prêt suit les règles de l'objet « immobilier »
 // (AE-4). Le moteur décide (acheterLocal) ; la fonction SQL acheter_local enregistre le prêt, son
 // échéancier, le local et les écritures (512/164 puis 213/512) dans une seule transaction.
+// 3D-7 : une société peut détenir plusieurs locaux ; chaque achat crée un nouveau local.
 
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
@@ -50,11 +51,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Apport ou durée invalide.", code: "montant_invalide" }, { status: 400 });
   }
 
-  const { data: atelier } = await ctx.supabaseAdmin
-    .from("workshops")
-    .select("id")
-    .eq("company_id", ctx.companyId)
-    .maybeSingle();
   const { data: prets } = await ctx.supabaseAdmin
     .from("loans")
     .select("capital_restant_centimes")
@@ -100,13 +96,12 @@ export async function POST(request: Request) {
     tresorerie: centimes(ctx.companyTresorerie),
     detteEnCours: centimes(detteEnCours),
     moisDecouvertConsecutifs: ctx.companyMoisDecouvert,
-    aDejaUnLocal: atelier !== null,
     params,
   });
   if (!decision.ok) {
     return NextResponse.json(
       { error: decision.message, code: decision.code, manqueCentimes: decision.manque },
-      { status: decision.code === "local_deja_detenu" ? 409 : 400 },
+      { status: 400 },
     );
   }
 
@@ -137,9 +132,6 @@ export async function POST(request: Request) {
     p_echeancier: lignes,
   });
   if (error) {
-    if (error.code === "KP409" || error.message.startsWith("local_deja_detenu")) {
-      return NextResponse.json({ error: "Vous détenez déjà un local.", code: "local_deja_detenu" }, { status: 409 });
-    }
     if (error.code === "KP422") {
       const code = error.message.startsWith("apport_insuffisant") ? "apport_insuffisant" : "endettement_excessif";
       return NextResponse.json(

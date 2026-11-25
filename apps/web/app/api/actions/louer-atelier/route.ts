@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 // AE-5 : le local, son loyer, ses charges viennent du catalogue des bâtiments ; le dépôt de
 // garantie et le nombre de machines des paramètres. La fonction SQL signer_bail enregistre le
 // local et l'écriture du dépôt (275 / 512) dans une seule transaction.
+// 3D-7 : une société peut louer plusieurs locaux ; chaque bail crée un nouveau local.
 
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error } = await ctx.supabaseAdmin.rpc("signer_bail", {
+  const { data: idLocal, error } = await ctx.supabaseAdmin.rpc("signer_bail", {
     p_company_id: ctx.companyId,
     p_batiment_id: batiment.id,
     p_surface_m2: batiment.surface_m2,
@@ -67,10 +68,7 @@ export async function POST(request: Request) {
     p_mois_jeu: ctx.moisCourant,
   });
   if (error) {
-    if (error.code === "KP409" || error.message.startsWith("local_deja_loue")) {
-      return NextResponse.json({ error: "Vous avez déjà un atelier." }, { status: 409 });
-    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, depotGarantieCentimes: bail.depotGarantie });
+  return NextResponse.json({ ok: true, id: idLocal, depotGarantieCentimes: bail.depotGarantie });
 }

@@ -101,11 +101,11 @@ describe("estIdentifiantSociete", () => {
 
 describe("batimentsDeLEmpire", () => {
   it("rend une liste vide sans local", () => {
-    expect(batimentsDeLEmpire({ atelier: null }, catalogue)).toEqual([]);
+    expect(batimentsDeLEmpire({ ateliers: [] }, catalogue)).toEqual([]);
   });
 
   it("décrit l'atelier loué avec le catalogue : nom, catégorie, étages, loyer, liens", () => {
-    const [b] = batimentsDeLEmpire({ atelier: atelierLoue }, catalogue);
+    const [b] = batimentsDeLEmpire({ ateliers: [atelierLoue] }, catalogue);
     expect(b).toMatchObject({
       cle: "atelier",
       nom: "Petit atelier",
@@ -121,14 +121,26 @@ describe("batimentsDeLEmpire", () => {
 
   it("classe l'achat comptant et l'achat à crédit comme propriétaire", () => {
     for (const mode of ["achat", "credit"] as const) {
-      const [b] = batimentsDeLEmpire({ atelier: { ...atelierLoue, mode_detention: mode, loyer_mensuel_centimes: 0 } }, catalogue);
+      const [b] = batimentsDeLEmpire({ ateliers: [{ ...atelierLoue, mode_detention: mode, loyer_mensuel_centimes: 0 }] }, catalogue);
       expect(b!.mode).toBe("proprietaire");
     }
   });
 
   it("garde un atelier ancien sans bâtiment du catalogue (avant AE-5)", () => {
-    const [b] = batimentsDeLEmpire({ atelier: { ...atelierLoue, batiment_id: null, surface_m2: 50 } }, catalogue);
+    const [b] = batimentsDeLEmpire({ ateliers: [{ ...atelierLoue, batiment_id: null, surface_m2: 50 }] }, catalogue);
     expect(b).toMatchObject({ nom: "Atelier", categorie: "atelier", surfaceM2: 50, nbEtages: 1 });
+  });
+});
+
+describe("3D-7 : plusieurs locaux dans l'empire", () => {
+  it("un bâtiment par local, chacun avec son lien vers son intérieur", () => {
+    const b = batimentsDeLEmpire(
+      { ateliers: [{ ...atelierLoue, id: "wA" }, { ...atelierLoue, id: "wB", mode_detention: "credit", loyer_mensuel_centimes: 0 }] },
+      catalogue,
+    );
+    expect(b.map((x) => x.cle)).toEqual(["atelier_wA", "atelier_wB"]);
+    expect(b.map((x) => x.mode)).toEqual(["locataire", "proprietaire"]);
+    expect(b[1]!.liens[0]!.href).toBe("/atelier-3d?local=wB");
   });
 });
 
