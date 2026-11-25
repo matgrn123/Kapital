@@ -1,11 +1,11 @@
 import { chargerParametresV1 } from "@kapital/content";
-import { parametreObligatoire } from "@kapital/engine";
-import { ID_GROSSISTE_LOCAL } from "@kapital/server";
+import { parametreObligatoire, quantiteSerieLancement } from "@kapital/engine";
+import { coutUsineParPiece, ID_GROSSISTE_LOCAL } from "@kapital/server";
 import { Carte, EncadreNotion, EnTete, FilRouge, Ligne, Puce } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros } from "../../../lib/formatage";
 import { nomMatiere } from "../../../lib/lisible";
-import { besoinFondsRoulementDepuisLignes, coutRevientEstimeSansStock } from "../../../lib/vente";
+import { besoinFondsRoulementDepuisLignes, coutRevientEstimeSansStock, coutsProduitAAjouter } from "../../../lib/vente";
 import { AjouterProduit, FormulairePrix } from "./FormulairePrix";
 
 type Produit = {
@@ -134,6 +134,24 @@ export default async function PageProduits() {
   const aAjouter = produitsRefTab.filter((p) => !cataMap.has(p.id));
   const catalogueVide = auCatalogue.length === 0;
 
+  // Le premier produit arrive avec la série de lancement, payée au coût de l'usine : on annonce
+  // ce coût-là, calculé par le serveur (coutUsineParPiece, celui de la route ajouter-produit).
+  const quantiteSerie = quantiteSerieLancement(params);
+  const coutsSerie = new Map<string, number | null>(
+    catalogueVide
+      ? await Promise.all(
+          aAjouter.map(async (p) => [p.id, await coutUsineParPiece(supabase, p.id).catch(() => null)] as const),
+        )
+      : [],
+  );
+  function textesCout(p: Produit) {
+    const coutSerie = coutsSerie.get(p.id) ?? null;
+    return coutsProduitAAjouter({
+      serie: coutSerie === null ? null : { quantite: quantiteSerie, coutParPiece: coutSerie },
+      coutFaconnier: coutEstime(p),
+    });
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <EnTete surTitre="Canaux de vente" titre="Vente">
@@ -187,12 +205,16 @@ export default async function PageProduits() {
             <Carte titre={catalogueVide ? "Produits disponibles" : "Ajouter un produit"}>
               <AjouterProduit
                 premier={catalogueVide}
-                produits={aAjouter.map((p) => ({
-                  id: p.id,
-                  nom: p.nom,
-                  detail: `${p.consommation_par_piece.toLocaleString("fr-FR")} m de ${nomMatiere(p.matiere_id, nomsMatieres)} · ${p.temps_standard_minutes} min de couture`,
-                  prix: ((c) => (c === null ? null : `Coût de revient estimé ${formaterEuros(c)} € la pièce`))(coutEstime(p)),
-                }))}
+                produits={aAjouter.map((p) => {
+                  const { principal, ensuite } = textesCout(p);
+                  return {
+                    id: p.id,
+                    nom: p.nom,
+                    detail: `${p.consommation_par_piece.toLocaleString("fr-FR")} m de ${nomMatiere(p.matiere_id, nomsMatieres)} · ${p.temps_standard_minutes} min de couture`,
+                    prix: principal,
+                    ensuite,
+                  };
+                })}
               />
             </Carte>
           )}

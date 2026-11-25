@@ -9,7 +9,8 @@ import {
   tauxPret,
 } from "@kapital/engine";
 import { reglesPretV1 } from "@kapital/server";
-import { BandeauEtape, BoutonLien, Carte, EncadreNotion, EnTete, Etapes, Faits, FilRouge, Puce } from "../../../components/ui";
+import { BandeauEtape, BoutonLien, Carte, EncadreNotion, EnTete, Etapes, Faits, FilRouge, Puce, Succes } from "../../../components/ui";
+import { messageSignature, PARAM_SIGNATURE } from "../../../lib/locaux";
 import { apercuBail } from "../../../lib/apercu-lot4";
 import { formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
@@ -48,7 +49,13 @@ function parametresAchat(params: Parametres): Parametres {
 
 const surTitreLocal = (i: number) => (i === 0 ? "Aujourd'hui" : `Local ${i + 1}`);
 
-export default async function PageLocaux() {
+export default async function PageLocaux({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // Après une signature, le message de réussite s'affiche ici, en haut, et non au pied de l'offre.
+  const signature = messageSignature((await searchParams)[PARAM_SIGNATURE]);
   const supabase = await creerClientServeur();
 
   const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes").limit(1);
@@ -158,6 +165,17 @@ export default async function PageLocaux() {
         Louer garde ta trésorerie libre. Acheter te rend propriétaire, mais immobilise de l&apos;argent et
         alourdit ta dette.
       </EnTete>
+
+      {signature && (
+        <Succes>
+          <span className="flex flex-wrap items-center justify-between gap-2">
+            <span>{signature}</span>
+            <BoutonLien href="/salaries" petit>
+              Embaucher
+            </BoutonLien>
+          </span>
+        </Succes>
+      )}
 
       {locaux.length === 0 ? (
         <Carte surTitre="Aujourd'hui" titre="Pas encore de local">

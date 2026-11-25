@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { chargerParametresV1 } from "@kapital/content";
-import { capitalDeDepart } from "@kapital/engine";
+import { capitalDeDepart, quantiteSerieLancement } from "@kapital/engine";
 import { creerClientServeur } from "../../lib/supabase/server";
 import { formaterEuros } from "../../lib/formatage";
 import { FormulaireSociete } from "./FormulaireSociete";
@@ -23,8 +23,8 @@ export default async function LayoutAuthentifie({
       <div className="mx-auto max-w-2xl px-8 py-16">
         <h1 className="text-xl font-semibold">Connexion impossible pour le moment</h1>
         <p className="mt-2 text-sm text-[color:var(--color-g-500)]">
-          Nous n'avons pas pu ouvrir votre session. Rechargez la page dans un instant ; si le
-          problème continue, signalez-le à l'équipe.
+          Nous n'avons pas pu ouvrir ta session. Recharge la page dans un instant ; si le
+          problème continue, signale-le à l'équipe.
         </p>
       </div>
     );
@@ -42,16 +42,20 @@ export default async function LayoutAuthentifie({
     .eq("owner_profile_id", user.id)
     .limit(1);
   if (!entreprises || entreprises.length === 0) {
-    const capital = capitalDeDepart(chargerParametresV1());
+    const params = chargerParametresV1();
+    const capital = capitalDeDepart(params);
     return (
       <div className="mx-auto max-w-3xl px-8 py-16">
         <p className="text-xs uppercase tracking-wider text-[color:var(--color-g-500)]">Bienvenue</p>
         <h1 className="text-3xl font-semibold tracking-tight">Créer ma société</h1>
         <p className="mt-2 text-sm text-[color:var(--color-g-500)]">
-          Vous allez lancer votre marque de textile. Choisissez son nom et sa gamme : c'est le point
-          de départ de votre entreprise.
+          Tu vas lancer ta marque de textile. Choisis son nom et sa gamme : c'est le point de départ
+          de ton entreprise.
         </p>
-        <FormulaireSociete capitalAffiche={formaterEuros(capital)} />
+        <FormulaireSociete
+          capitalAffiche={formaterEuros(capital)}
+          serieLancementPieces={quantiteSerieLancement(params)}
+        />
       </div>
     );
   }
