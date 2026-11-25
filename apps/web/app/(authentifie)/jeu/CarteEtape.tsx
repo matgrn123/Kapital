@@ -9,6 +9,7 @@ import {
 } from "@kapital/engine";
 import { chargerParametresV1 } from "@kapital/content";
 import { formaterEuros } from "../../../lib/formatage";
+import { INTITULES_ETAPES } from "../societe/donnees";
 
 const LIBELLES_ACTIONS: Record<ActionVerrouillable, string> = {
   action_marketing: "la publicité",
@@ -20,11 +21,8 @@ const LIBELLES_ACTIONS: Record<ActionVerrouillable, string> = {
   vente_revendeur: "la vente aux revendeurs",
 };
 
-const INTITULES: Record<EtapeEntreprise, string> = {
-  0: "Démarrage",
-  1: "Marque lancée",
-  2: "Entreprise installée",
-};
+// Une seule source pour les noms d'étapes (ceux de plan-architecture-entreprise.md).
+const INTITULES = INTITULES_ETAPES;
 
 function debloquesPar(etape: EtapeEntreprise): string[] {
   return (Object.keys(DEBLOCAGES_PAR_ACTION) as ActionVerrouillable[])

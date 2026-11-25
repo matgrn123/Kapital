@@ -5,6 +5,7 @@
 import {
   besoinEnFondsDeRoulement,
   centimes,
+  coutRevientFaconnier,
   moisJeu,
   planComptableV1,
   type BesoinEnFondsDeRoulement,
@@ -53,4 +54,30 @@ export function besoinFondsRoulementDepuisLignes(
     lignes: e.lignes,
   }));
   return besoinEnFondsDeRoulement({ ...gl, ecritures });
+}
+
+/**
+ * Coût de revient estimé d'une pièce avant toute production : matière au prix le plus bas
+ * (chute comprise) + fournitures + façon, chez le façonnier qui revient le moins cher.
+ * Le calcul est celui du moteur (coutRevientFaconnier) ; null si aucun façonnier ne fait le produit.
+ */
+export function coutRevientEstimeSansStock(e: {
+  produit: { consommationParPiece: number; fournituresCentimes: number };
+  prixMatiereCentimes: readonly number[];
+  tauxChute: number;
+  faconniers: ReadonlyArray<{ prixFaconCentimes: number; fournitMatiere: boolean }>;
+}): number | null {
+  const prixMatiere = e.prixMatiereCentimes.length > 0 ? Math.min(...e.prixMatiereCentimes) : 0;
+  const couts = e.faconniers.map((f) =>
+    f.fournitMatiere
+      ? f.prixFaconCentimes
+      : coutRevientFaconnier({
+          prixMatiereParUnite: centimes(prixMatiere),
+          consommationParPiece: e.produit.consommationParPiece,
+          tauxChute: e.tauxChute,
+          fournitures: centimes(e.produit.fournituresCentimes),
+          prixFaconParPiece: centimes(f.prixFaconCentimes),
+        }),
+  );
+  return couts.length > 0 ? Math.min(...couts) : null;
 }
