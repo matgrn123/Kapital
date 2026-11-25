@@ -2,12 +2,21 @@ import { chargerBatimentsV1, chargerModulesV1, chargerParametresV1 } from "@kapi
 import { BoutonLien, Carte, EnTete, Etapes } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { EcranAtelier } from "./EcranAtelier";
-import type { ModulePlace, SalarieAtelier } from "./plan";
+import type { ModulePlace } from "./plan";
+import type { SalarieFiche } from "./salaries";
 
 // Écran « L'atelier » (design V2, maquette V.atelier), dessiné en SVG isométrique.
 // placed_modules.x / y comptent les cases à partir de 1 (convention de validerPlanEtage).
 
-type Employe = { id: string; poste: "artisan" | "encadrement"; experience_mois_debut: number; mois_jeu_debut: number | null };
+type Employe = {
+  id: string;
+  poste: "artisan" | "encadrement";
+  salaire_brut_mensuel_centimes: number;
+  cree_le: string;
+  anciennete_mois_debut: number;
+  experience_mois_debut: number;
+  mois_jeu_debut: number | null;
+};
 
 export default async function PageAtelier() {
   const supabase = await creerClientServeur();
@@ -23,7 +32,7 @@ export default async function PageAtelier() {
       .maybeSingle(),
     supabase
       .from("employees")
-      .select("id, poste, experience_mois_debut, mois_jeu_debut")
+      .select("id, poste, salaire_brut_mensuel_centimes, cree_le, anciennete_mois_debut, experience_mois_debut, mois_jeu_debut")
       .eq("company_id", entreprise.id)
       .eq("statut", "actif")
       .order("cree_le"),
@@ -55,12 +64,18 @@ export default async function PageAtelier() {
     .order("cree_le");
 
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
-  const salaries: SalarieAtelier[] = ((employes ?? []) as Employe[]).map((e) => ({
-    id: e.id,
-    poste: e.poste,
-    // Même calcul que la page des salariés : expérience de départ + mois passés dans l'entreprise.
-    experienceMois: e.experience_mois_debut + Math.max(0, moisCourant - (e.mois_jeu_debut ?? 0)),
-  }));
+  const salaries: SalarieFiche[] = ((employes ?? []) as Employe[]).map((e) => {
+    // Même calcul que la page des salariés : valeur de départ + mois passés dans l'entreprise.
+    const service = Math.max(0, moisCourant - (e.mois_jeu_debut ?? 0));
+    return {
+      id: e.id,
+      poste: e.poste,
+      experienceMois: e.experience_mois_debut + service,
+      ancienneteMois: e.anciennete_mois_debut + service,
+      depuis: e.cree_le,
+      salaireBrutCentimes: e.salaire_brut_mensuel_centimes,
+    };
+  });
 
   return (
     <EcranAtelier

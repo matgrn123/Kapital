@@ -20,6 +20,7 @@ import {
   resultat,
   soldeCompte,
 } from "../comptabilite/index.js";
+import { eurosTexte } from "../types/euros.js";
 import { centimes, moisJeu } from "../types/primitifs.js";
 
 const PARAMS = chargerParametresV1();
@@ -158,6 +159,21 @@ describe("evaluerDemandePret : refus chiffrés", () => {
       expect(r.depassement).toEqual({ plafond, demande, manque: 12_345 });
       expect(r.message).toMatch(/dette/i);
     }
+  });
+
+  it("le refus d'endettement annonce ce qu'on peut vraiment emprunter (plafond du prêt compris), en euros lisibles", () => {
+    // Cas relevé par le robot : 1 M€ demandés avec 25 911,50 € en caisse, prêt de trésorerie.
+    const r = evaluerDemandePret(
+      sit(2_591_150),
+      { objet: "tresorerie", montant: centimes(100_000_000), dureeMois: 12 },
+      REGLES,
+    );
+    expect(r).toMatchObject({ ok: false, code: "endettement_excessif" });
+    if (r.ok) return;
+    const cap = capaciteEmprunt(sit(2_591_150), "tresorerie", REGLES);
+    expect(cap.montantMaximal).toBeLessThan(cap.margeEndettement);
+    expect(r.message).toContain(`Vous pouvez encore emprunter ${eurosTexte(cap.montantMaximal)}`);
+    expect(r.message).toContain("1 000 000,00 €");
   });
 
   it("l'endettement tient compte des prêts déjà en cours", () => {
