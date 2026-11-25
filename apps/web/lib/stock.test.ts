@@ -130,6 +130,7 @@ describe("textes", () => {
   });
   it("dureeReelleLisible : un jour de jeu = 48 minutes réelles", () => {
     expect(dureeReelleLisible(null, TEMPS)).toBeNull();
+    expect(dureeReelleLisible(0, TEMPS)).toBeNull();
     expect(dureeReelleLisible(0.01, TEMPS)).toBe("moins d'une minute réelle");
     expect(dureeReelleLisible(0.5, TEMPS)).toBe("24 min réelles");
     expect(dureeReelleLisible(5, TEMPS)).toBe("4 h réelles");

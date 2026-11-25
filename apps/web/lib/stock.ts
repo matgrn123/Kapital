@@ -96,9 +96,10 @@ export function libelleJours(jours: number | null, joursParMois: number): string
   return `${n} jour${n > 1 ? "s" : ""}`;
 }
 
-/** Les mêmes jours de jeu, en temps réel (un jour de jeu = minutes réelles par mois ÷ jours par mois). */
+/** Les mêmes jours de jeu, en temps réel (un jour de jeu = minutes réelles par mois ÷ jours par mois) ; null à 0 jour. */
 export function dureeReelleLisible(jours: number | null, t: Temps): string | null {
-  if (jours === null || !(t.joursParMois > 0)) return null;
+  // Sans stock (0 jour), il n'y a pas de durée à traduire.
+  if (jours === null || !(jours > 0) || !(t.joursParMois > 0)) return null;
   const minutes = (jours * t.minutesReellesParMois) / t.joursParMois;
   if (!Number.isFinite(minutes)) return null;
   if (minutes < 1) return "moins d'une minute réelle";

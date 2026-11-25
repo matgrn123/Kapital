@@ -44,7 +44,9 @@ function LigneProduit({
   const s = STATUT[l.statut];
   const reel = dureeReelleLisible(l.jours, { joursParMois, minutesReellesParMois, pasParMois });
   const texteJours =
-    l.jours === null
+    l.statut === "rupture"
+      ? "rupture : plus rien à vendre"
+      : l.jours === null
       ? l.statut === "dort"
         ? "aucune vente depuis un mois"
         : "pas encore de vente"
@@ -120,7 +122,7 @@ export default async function PageStock() {
         laisser dormir trop de pièces.
       </EnTete>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi libelle="Pièces prêtes à vendre" valeur={disponible.toLocaleString("fr-FR")} detail="atelier et boutique" />
         <Kpi libelle="Pièces en route" valeur={enRoute.toLocaleString("fr-FR")} detail="productions et commandes en cours" />
         <Kpi
