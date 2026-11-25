@@ -1,3 +1,4 @@
+import { eurosTexte } from "../types/euros.js";
 import type { Parametres } from "@kapital/content";
 import type { ObjetPret } from "../types/entreprise.js";
 import { centimes, type Centimes } from "../types/primitifs.js";
@@ -219,9 +220,7 @@ export type EvaluationDemandePret =
       readonly depassement?: Depassement;
     };
 
-function euros(c: number): string {
-  return `${(c / 100).toFixed(2).replace(".", ",")} €`;
-}
+const euros = eurosTexte;
 
 const LIBELLE_OBJET: Readonly<Record<ObjetPret, string>> = {
   tresorerie: "de trésorerie",
@@ -256,7 +255,7 @@ export function evaluerDemandePret(
     return {
       ok: false,
       code: "endettement_excessif",
-      message: `Dette totale après prêt ${libelle} : ${euros(detteApres)}, au-dessus du plafond de ${euros(cap.plafondEndettement)} (${regles.parObjet[d.objet].plafondEndettementMultipleTresorerie} fois votre trésorerie de ${euros(Math.max(situation.tresorerie, 0))}), soit ${euros(manque)} de trop. Vous pouvez encore emprunter ${euros(cap.margeEndettement)}.`,
+      message: `Dette totale après prêt ${libelle} : ${euros(detteApres)}, au-dessus du plafond de ${euros(cap.plafondEndettement)} (${regles.parObjet[d.objet].plafondEndettementMultipleTresorerie} fois votre trésorerie de ${euros(Math.max(situation.tresorerie, 0))}), soit ${euros(manque)} de trop. Vous pouvez encore emprunter ${euros(cap.montantMaximal)}.`,
       depassement: { plafond: cap.plafondEndettement, demande: detteApres, manque },
     };
   }
