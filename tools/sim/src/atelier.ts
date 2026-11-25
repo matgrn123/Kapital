@@ -23,11 +23,14 @@ export function nombrePostes(modules: readonly ModulePose[]): number {
 
 /** Atelier loué : loyer et surface du catalogue des bâtiments, bail signé, postes posés. */
 export function construireAtelier(e: {
+  /** 3D-7 : identifiant du local (il suffixe ses écritures, comme workshops.id côté serveur). */
+  readonly id: string;
   readonly batiment: TypeBatiment;
   readonly bail: Bail;
   readonly modulesPoses: readonly ModulePose[];
 }): Atelier {
   return {
+    id: e.id,
     surfaceM2: e.batiment.surface_m2,
     loyerMensuel: centimes(e.batiment.loyer_mensuel_centimes),
     modules: resoudreModules(

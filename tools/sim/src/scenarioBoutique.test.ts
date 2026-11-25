@@ -86,7 +86,7 @@ describe("AE-11 · banc de 36 mois jusqu'à la boutique", () => {
     const moisOuverts = 36 - pdv!.moisOuverture;
     const amortissementMensuel = Math.round(pdv!.agencement.valeurBrute / pdv!.agencement.dureeAmortissementMois);
     expect(soldeCompte(gl, "28135")).toBe(moisOuverts * amortissementMensuel);
-    expect(soldeCompte(gl, "275")).toBe(pdv!.depotGarantie + (etat.entreprise.atelier?.bail?.depotGarantie ?? 0));
+    expect(soldeCompte(gl, "275")).toBe(pdv!.depotGarantie + etat.entreprise.ateliers.reduce((s, a) => s + (a.bail?.depotGarantie ?? 0), 0));
   });
 
   it("les cinq missions se valident, dont « Ouvrir ma boutique sans découvert » et « Louer ou acheter »", () => {

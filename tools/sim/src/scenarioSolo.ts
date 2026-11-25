@@ -79,13 +79,13 @@ export function decisionsDuMois(etat: EtatBanc, journal: string[]): EtatBanc {
   let e = etat;
 
   // Étape 2 : l'atelier, puis un artisan par poste libre.
-  if (e.entreprise.etape >= 2 && e.entreprise.atelier === null) {
+  if (e.entreprise.etape >= 2 && e.entreprise.ateliers.length === 0) {
     e = essayer(e, signerBail(e, P.batiment), journal, `bail ${P.batiment}`);
   }
-  if (e.entreprise.atelier !== null && e.mois === P.moisPosteSupplementaire) {
+  if (e.entreprise.ateliers.length > 0 && e.mois === P.moisPosteSupplementaire) {
     e = essayer(e, poserModules(e, "poste_couture_base", 1), journal, "pose d'un poste de couture");
   }
-  if (e.entreprise.atelier !== null) {
+  if (e.entreprise.ateliers.length > 0) {
     const smic = coefficientsSalairesDepuisParametres(params).smicMensuelBrut;
     let artisans = e.entreprise.salaries.filter((s) => s.poste === "artisan").length;
     while (artisans < nombrePostes(e.modulesPoses)) {

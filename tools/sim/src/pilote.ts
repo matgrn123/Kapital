@@ -9,7 +9,7 @@ import {
   transfererStockVersBoutique,
   debutExercice,
   planComptableV1,
-  postesEquipesAtelier,
+  postesEquipesAteliers,
   resultatDepuisLignes,
   tvaRestantDue,
   centimes,
@@ -30,6 +30,8 @@ import {
   montantFactureFaconnier,
   montantLivraisonMatiere,
   nouveauBail,
+  donnerConge as donnerCongeBail,
+  parametresBailDepuis,
   passerCommande,
   preparerSerieLancement,
   seuilsEtapesDepuis,
@@ -101,6 +103,7 @@ export type EtatBanc = {
   /** Tout le grand livre depuis la création, dans l'ordre. */
   readonly ecritures: readonly EcritureComptable[];
   readonly commandes: readonly CommandeEnCours[];
+  /** Bâtiment et modules du premier local (celui que poserModules aménage). */
   readonly batimentId: string | null;
   readonly modulesPoses: readonly ModulePose[];
   readonly moisDecouvertConsecutifs: number;
@@ -194,7 +197,7 @@ export function creerEntreprise(p: {
     stocksMatiere: [],
     stocksFinis: [],
     salaries: [],
-    atelier: null,
+    ateliers: [],
     // Valeurs par défaut de la table brand_state (0007_marketing.sql).
     marque: { notoriete: 0, desirabilite: 0 },
     prets: [],
@@ -386,12 +389,12 @@ export function commanderMatiere(
 /**
  * AE-5 : signature d'un bail. Comme la fonction SQL signer_bail : dépôt de garantie
  * (275 / 512) et les postes de départ posés (paramètre bail_machines_a_la_signature,
- * en postes de couture de base).
+ * en postes de couture de base). 3D-7 : chaque bail crée un nouveau local, avec son
+ * identifiant ; le premier local reste celui que poserModules aménage.
  */
 export function signerBail(etat: EtatBanc, batimentId: string): ResultatAction {
   const bloque = verrou(etat, "louer_atelier");
   if (bloque) return bloque;
-  if (etat.entreprise.atelier !== null) return refus("local_deja_loue", "La société a déjà un atelier.");
   const batiment = chargerBatimentsV1().find((b) => b.id === batimentId && b.categorie === "atelier");
   if (!batiment) return refus("batiment_inconnu", `Local inconnu : ${batimentId}.`);
   const bail = nouveauBail({
@@ -407,19 +410,45 @@ export function signerBail(etat: EtatBanc, batimentId: string): ResultatAction {
   const modulesPoses: ModulePose[] = Array.from({ length: postesALaSignature }, () => ({
     id_type: "poste_couture_base",
   }));
-  const apres = passerEcriture(etat, ecritureSignatureBail(etat.entreprise.id, moisJeu(etat.mois), bail));
+  const existants = etat.entreprise.ateliers;
+  const idLocal = `local_${etat.mois}_${existants.length + 1}`;
+  const apres = passerEcriture(etat, ecritureSignatureBail(etat.entreprise.id, moisJeu(etat.mois), bail, idLocal));
+  const premier = existants.length === 0;
   return accepte({
     ...apres,
-    batimentId: batiment.id,
-    modulesPoses,
-    entreprise: { ...apres.entreprise, atelier: construireAtelier({ batiment, bail, modulesPoses }) },
+    batimentId: premier ? batiment.id : etat.batimentId,
+    modulesPoses: premier ? modulesPoses : etat.modulesPoses,
+    entreprise: {
+      ...apres.entreprise,
+      ateliers: [...existants, construireAtelier({ id: idLocal, batiment, bail, modulesPoses })],
+    },
+  });
+}
+
+/**
+ * AE-5 / 3D-7 : congé donné à un local loué précis (comme la fonction SQL donner_conge) : le bail
+ * prend fin au mois du congé + préavis (paramètre bail_preavis_mois) ; les autres locaux ne bougent pas.
+ */
+export function donnerConge(etat: EtatBanc, idLocal: string): ResultatAction {
+  const local = etat.entreprise.ateliers.find((a) => a.id === idLocal);
+  if (!local) return refus("aucun_local", `Local inconnu : ${idLocal}.`);
+  if (!local.bail) return refus("local_possede", "On ne donne pas congé d'un local possédé.");
+  if (local.bail.moisFin !== null) return refus("conge_deja_donne", `Le bail prend déjà fin au mois ${local.bail.moisFin}.`);
+  const preavis = parametresBailDepuis(etat.params).preavisMois;
+  const bail = donnerCongeBail(local.bail, moisJeu(etat.mois), preavis);
+  return accepte({
+    ...etat,
+    entreprise: {
+      ...etat.entreprise,
+      ateliers: etat.entreprise.ateliers.map((a) => (a.id === idLocal ? { ...a, bail } : a)),
+    },
   });
 }
 
 /** Aménagement : pose de modules achetés (2154 / 512), comme l'enregistrement du plan. */
 export function poserModules(etat: EtatBanc, idType: string, nombre: number): ResultatAction {
-  const atelier = etat.entreprise.atelier;
-  if (atelier === null || atelier.bail === undefined || etat.batimentId === null) {
+  const atelier = etat.entreprise.ateliers[0];
+  if (atelier === undefined || atelier.id === undefined || atelier.bail === undefined || etat.batimentId === null) {
     return refus("sans_atelier", "Il faut un atelier loué pour poser des modules.");
   }
   const nouveaux = [...etat.modulesPoses, ...Array.from({ length: nombre }, () => ({ id_type: idType }))];
@@ -445,7 +474,10 @@ export function poserModules(etat: EtatBanc, idType: string, nombre: number): Re
     modulesPoses: nouveaux,
     entreprise: {
       ...apres.entreprise,
-      atelier: construireAtelier({ batiment, bail: atelier.bail, modulesPoses: nouveaux }),
+      ateliers: [
+        construireAtelier({ id: atelier.id, batiment, bail: atelier.bail, modulesPoses: nouveaux }),
+        ...apres.entreprise.ateliers.slice(1),
+      ],
     },
   });
 }
@@ -563,7 +595,7 @@ export function embaucher(etat: EtatBanc, poste: Poste, salaireBrutMensuel: numb
 export function fixerProduction(etat: EtatBanc, produit: string, piecesParMois: number): ResultatAction {
   const bloque = verrou(etat, "production_atelier");
   if (bloque) return bloque;
-  if (etat.entreprise.atelier === null) return refus("sans_atelier", "Pas d'atelier propre.");
+  if (etat.entreprise.ateliers.length === 0) return refus("sans_atelier", "Pas d'atelier propre.");
   return modifierProduit(etat, produit, (p) => ({ ...p, productionMensuelleCible: piecesParMois }));
 }
 
@@ -724,7 +756,7 @@ export function avancerMois(etat: EtatBanc, graine: number, options: OptionsAvan
     stockFiniPieces: entreprise.stocksFinis.reduce((s, l) => s + l.quantite, 0),
     stockBoutiquePieces: (entreprise.pointsDeVente ?? []).flatMap((p) => p.stock).reduce((s, l) => s + l.quantite, 0),
     salaries: entreprise.salaries.length,
-    postes: postesEquipesAtelier(entreprise.atelier ?? null),
+    postes: postesEquipesAteliers(entreprise.ateliers),
     ventesPerdues: r.ventesPerdues,
     anomalies,
   };
