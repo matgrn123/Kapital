@@ -4,6 +4,7 @@
     { "path": "packages/engine" },
     { "path": "packages/content" },
     { "path": "packages/server" },
-    { "path": "tools/supabase" }
+    { "path": "tools/supabase" },
+    { "path": "tools/sim" }
   ]
 }
