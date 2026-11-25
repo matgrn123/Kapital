@@ -15,12 +15,16 @@ export function formaterEurosCompact(centimes: number): string {
   return formaterEuros(centimes);
 }
 
+// Le jeu se joue à l'heure de Paris, même quand la page est rendue sur un serveur en UTC.
+const FUSEAU = "Europe/Paris";
+
 export function formaterDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("fr-FR", {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    timeZone: FUSEAU,
   });
 }
 
@@ -31,5 +35,6 @@ export function formaterDateHeure(iso: string): string {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: FUSEAU,
   });
 }

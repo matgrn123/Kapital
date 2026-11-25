@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { besoinFondsRoulementDepuisLignes, bornesPrix } from "./vente";
+import { besoinFondsRoulementDepuisLignes, bornesPrix, coutRevientEstimeSansStock } from "./vente";
 
 const l = (id: string, compte: string, sens: "debit" | "credit", montant: number) => ({
   ecriture_id: id,
@@ -41,5 +41,35 @@ describe("besoinFondsRoulementDepuisLignes", () => {
   });
   it("vaut zéro sans écriture", () => {
     expect(besoinFondsRoulementDepuisLignes([]).besoin).toBe(0);
+  });
+});
+
+describe("coutRevientEstimeSansStock", () => {
+  const tshirt = { consommationParPiece: 0.8, fournituresCentimes: 60 };
+  it("compte la matière (chute comprise), les fournitures et la façon, chez le façonnier le moins cher", () => {
+    const cout = coutRevientEstimeSansStock({
+      produit: tshirt,
+      prixMatiereCentimes: [500, 350, 420],
+      tauxChute: 0.1,
+      faconniers: [
+        { prixFaconCentimes: 450, fournitMatiere: false },
+        { prixFaconCentimes: 300, fournitMatiere: false },
+      ],
+    });
+    // 3,50 € × 0,8 × 1,1 = 3,08 € de matière + 0,60 € + 3,00 € de façon
+    expect(cout).toBe(668);
+  });
+  it("prend le prix tel quel quand le façonnier fournit la matière", () => {
+    expect(
+      coutRevientEstimeSansStock({
+        produit: tshirt,
+        prixMatiereCentimes: [350],
+        tauxChute: 0.1,
+        faconniers: [{ prixFaconCentimes: 900, fournitMatiere: true }],
+      }),
+    ).toBe(900);
+  });
+  it("renvoie null sans façonnier", () => {
+    expect(coutRevientEstimeSansStock({ produit: tshirt, prixMatiereCentimes: [350], tauxChute: 0, faconniers: [] })).toBeNull();
   });
 });

@@ -130,9 +130,7 @@ export function FormulaireProduction({
   const prix = lieu === "atelier" ? null : prixChez(lieu);
   const minimum = lieu === "atelier" || grossiste ? 1 : (faconnier?.minimum_commande ?? 1);
   // Plafond tiré des données : ta matière en stock (atelier) ou ce que ta trésorerie peut payer.
-  const bornes = bornesQuantite({
-    minimum,
-    plafonds:
+  const plafonds =
       lieu === "atelier"
         ? [
             produit?.fabrication?.stock
@@ -150,8 +148,11 @@ export function FormulaireProduction({
           ]
         : prix && prix > 0
           ? [quantiteMaxPayable(tresorerie, prix)]
-          : [],
-  });
+          : [];
+  const bornes = bornesQuantite({ minimum, plafonds });
+  // Plafond réel (avant de forcer le curseur au minimum) : 0 si rien n'est possible.
+  const plafondReel = plafonds.length > 0 ? Math.floor(Math.min(...plafonds)) : Number.POSITIVE_INFINITY;
+  const rienPossible = plafondReel < bornes.min;
   const quantiteBornee = Math.min(Math.max(quantiteN, bornes.min), bornes.max);
 
   const apercu = useMemo(() => {
@@ -331,8 +332,12 @@ export function FormulaireProduction({
         onChange={setQuantiteN}
         aide={
           lieu === "atelier"
-            ? `De 1 à ta matière en stock (${bornes.max} unités).`
-            : `De ${bornes.min} (minimum${faconnier && !grossiste ? ` chez ${faconnier.nom}` : ""}) à ${bornes.max} (ce que ta trésorerie peut payer).`
+            ? rienPossible
+              ? "Aucune matière en stock pour ce produit : commande-la d'abord (écran Achats)."
+              : `De 1 à ${bornes.max} pièces (ce que permet ta matière en stock).`
+            : rienPossible
+              ? `Ta trésorerie ne couvre pas le minimum de ${bornes.min} pièces.`
+              : `De ${bornes.min} (minimum${faconnier && !grossiste ? ` chez ${faconnier.nom}` : ""}) à ${bornes.max} (ce que ta trésorerie peut payer).`
         }
       />
 
@@ -401,7 +406,7 @@ export function FormulaireProduction({
       {confirmation && <Succes>{confirmation}</Succes>}
 
       <div className="flex justify-end">
-        <Bouton type="submit" variante="principal" disabled={enCours || !apercu?.r.ok}>
+        <Bouton type="submit" variante="principal" disabled={enCours || rienPossible || !apercu?.r.ok}>
           {enCours ? "Lancement…" : grossiste ? "Commander au grossiste" : "Lancer la production"}
         </Bouton>
       </div>
