@@ -1,11 +1,14 @@
+import { jouerScenarioBoutique, missionsDuBanc } from "./scenarioBoutique.js";
 import { jouerScenarioSolo } from "./scenarioSolo.js";
 
-// npm run banc-solo -w @kapital/tool-sim [-- <mois> <graine>]
-// Affiche le tableau de bord mois par mois du scénario solo et les anomalies du garde-fou.
+// npm run banc-solo -w @kapital/tool-sim [-- <mois> <graine> [boutique]]
+// Affiche le tableau de bord mois par mois du scénario solo (ou, avec « boutique », du banc de
+// 36 mois jusqu'à l'étape 3 et la boutique) et les anomalies du garde-fou.
 
 const mois = Number(process.argv[2] ?? 24);
 const graine = Number(process.argv[3] ?? 1);
-const { etat, journal } = jouerScenarioSolo({ mois, graine });
+const avecBoutique = process.argv[4] === "boutique";
+const { etat, journal } = avecBoutique ? jouerScenarioBoutique({ mois, graine }) : jouerScenarioSolo({ mois, graine });
 
 const euros = (c: number): string => (c / 100).toFixed(2).padStart(11);
 console.log("mois étape  trésorerie   CA HT cumulé  vendues  stock  salariés postes  anomalies");
@@ -16,3 +19,8 @@ for (const b of etat.historique) {
 }
 console.log("\nDécisions :");
 for (const l of journal) console.log(`  ${l}`);
+
+if (avecBoutique) {
+  console.log("\nMissions :");
+  for (const m of missionsDuBanc(etat)) console.log(`  ${m.id} : ${m.etat} (${m.actuel} / ${m.cible})`);
+}

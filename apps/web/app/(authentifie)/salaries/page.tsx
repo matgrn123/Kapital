@@ -1,10 +1,12 @@
 import { chargerParametresV1 } from "@kapital/content";
+import { MESSAGE_SANS_BOUTIQUE } from "@kapital/server";
 import {
   centimes,
   coefficientsSalairesDepuisParametres,
   coutEmployeur,
   idSalarie,
   indemniteLicenciement,
+  parametresBoutiqueDepuis,
   parametresLicenciementDepuis,
 } from "@kapital/engine";
 import { BandeauEtape, Carte, EcritureComptable, EncadreNotion, EnTete, FilRouge, Tableau } from "../../../components/ui";
@@ -38,7 +40,7 @@ export default async function PageSalaries() {
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
-  const [{ data: employes }, { data: monde }, { verrou }, { data: atelier }] = await Promise.all([
+  const [{ data: employes }, { data: monde }, { verrou }, { data: atelier }, { data: boutiques }] = await Promise.all([
     supabase
       .from("employees")
       .select("id, poste, salaire_brut_mensuel_centimes, cree_le, anciennete_mois_debut, experience_mois_debut, mois_jeu_debut")
@@ -48,6 +50,8 @@ export default async function PageSalaries() {
     supabase.from("worlds").select("mois_courant").eq("etat", "actif").limit(1).maybeSingle(),
     lireVerrou(supabase, entreprise.id, "embauche"),
     supabase.from("workshops").select(`id, ${COLONNES_MODULES_POSES}`).eq("company_id", entreprise.id).maybeSingle(),
+    // AE-10 : un vendeur ne s'embauche que pour une boutique ouverte ou en travaux.
+    supabase.from("points_de_vente").select("id").eq("company_id", entreprise.id).eq("statut", "actif").limit(1),
   ]);
 
   const params = chargerParametresV1();
@@ -98,6 +102,9 @@ export default async function PageSalaries() {
         postesLibres={libres}
         aUnAtelier={aUnAtelier}
         verrouille={verrou !== null}
+        aUneBoutique={(boutiques ?? []).length > 0}
+        ventesMaxParVendeur={parametresBoutiqueDepuis(params).ventesMaxParVendeur}
+        messageSansBoutique={MESSAGE_SANS_BOUTIQUE}
       />
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">

@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { chargerBatimentsV1 } from "@kapital/content";
 import { reglesPretV1 } from "@kapital/server";
 import { Bandeau, EnTete } from "../../../components/ui/formulaire";
 import { Puce } from "../../../components/ui";
@@ -20,12 +22,26 @@ const pluriel = (n: number, mot: string) => `${n.toLocaleString("fr-FR")} ${mot}
 
 /**
  * Bâtiments du joueur en plus de l'atelier principal (table workshops, une ligne au plus).
- * Deuxième local et points de vente : leurs tables n'existent pas encore, on ne les requête
- * donc pas. Quand la table `points_de_vente` existera, la lire ici (id, nom) ; le village
- * dessinera alors la boutique à la place du terrain, sans autre changement.
+ * Points de vente (AE-11) : la table `points_de_vente` (0038), lue avec le client du joueur
+ * (RLS : ses boutiques seulement) ; le nom vient du catalogue des bâtiments. Le village dessine
+ * alors la boutique à la place du terrain. Deuxième local : pas encore de table (3D-7).
  */
-async function lireBatimentsDuJoueur(): Promise<BatimentsDuJoueur> {
-  return AUCUN_AUTRE_BATIMENT;
+async function lireBatimentsDuJoueur(supabase: SupabaseClient, companyId: string): Promise<BatimentsDuJoueur> {
+  const { data, error } = await supabase
+    .from("points_de_vente")
+    .select("id, batiment_id")
+    .eq("company_id", companyId)
+    .eq("statut", "actif")
+    .order("cree_le");
+  if (error || !data || data.length === 0) return AUCUN_AUTRE_BATIMENT;
+  const catalogue = chargerBatimentsV1();
+  return {
+    ...AUCUN_AUTRE_BATIMENT,
+    pointsDeVente: (data as { id: string; batiment_id: string }[]).map((p) => ({
+      id: p.id,
+      nom: catalogue.find((b) => b.id === p.batiment_id)?.nom ?? "Ta boutique",
+    })),
+  };
 }
 
 export default async function PageVillage() {
@@ -48,7 +64,7 @@ export default async function PageVillage() {
       lireEstrAnnuel(supabase, reglesPretV1().estrDeSecoursAnnuel),
     ]);
 
-  const batiments = await lireBatimentsDuJoueur();
+  const batiments = await lireBatimentsDuJoueur(supabase, entreprise.id);
 
   const stockFinis = ((stocks ?? []) as { quantite_pieces: number }[]).reduce((s, r) => s + Number(r.quantite_pieces), 0);
   const nbEmployes = employes?.length ?? 0;

@@ -13,7 +13,9 @@ import {
   resultatDepuisLignes,
   tvaRestantDue,
   centimes,
+  coefficientsMarketingDepuisParametres,
   coefficientsSalairesDepuisParametres,
+  fluxMarque,
   commanderAuGrossiste,
   configTempsDepuis,
   coutRevientEstime,
@@ -34,6 +36,7 @@ import {
   simulerMoisEntreprise,
   verifierQuantiteCommande,
   verrouPour,
+  type ActionMarketing,
   type ActionVerrouillable,
   type Canal,
   type CreanceAEncaisser,
@@ -139,6 +142,7 @@ function verrou(etat: EtatBanc, action: ActionVerrouillable): Refus | null {
       etape: e.etape,
       cumuls: e.cumulsEtape ?? { piecesVendues: 0, chiffreAffairesHt: centimes(0) },
       tresorerie: e.tresorerie,
+      notoriete: e.marque.notoriete,
     },
     seuilsEtapesDepuis(etat.params),
   );
@@ -452,6 +456,9 @@ export function poserModules(etat: EtatBanc, idType: string, nombre: number): Re
  * les travaux. Le verrou d'étape (étape 3) arrive avec AE-11 : le banc ne le vérifie pas encore.
  */
 export function ouvrirBoutique(etat: EtatBanc, batimentId: string): ResultatAction {
+  // AE-11 : comme la route ouvrir-boutique, l'ouverture attend l'étape 3 (étape réelle ici).
+  const bloque = verrou(etat, "ouverture_boutique");
+  if (bloque) return bloque;
   if ((etat.entreprise.pointsDeVente ?? []).length > 0) {
     return refus("boutique_deja_ouverte", "La société a déjà une boutique.");
   }
@@ -481,6 +488,34 @@ export function ouvrirBoutique(etat: EtatBanc, batimentId: string): ResultatActi
     ...apres,
     entreprise: { ...apres.entreprise, pointsDeVente: [...(apres.entreprise.pointsDeVente ?? []), pdv] },
   });
+}
+
+/**
+ * AE-11 : une action marketing, comme la route action-marketing : effet immédiat sur la marque
+ * (fluxMarque du moteur, sans décroissance, coefficients marketing_k_*) et écriture 623 / 512.
+ */
+export function fairePublicite(etat: EtatBanc, action: ActionMarketing, montant: number): ResultatAction {
+  const bloque = verrou(etat, "action_marketing");
+  if (bloque) return bloque;
+  if (!Number.isInteger(montant) || montant <= 0) return refus("montant_invalide", "Montant invalide.");
+  if (montant > etat.entreprise.tresorerie) return refus("tresorerie_insuffisante", "Trésorerie insuffisante.");
+  const { id, etat: e2 } = suivant(etat, "marketing");
+  const apres = passerEcriture(e2, {
+    id,
+    mois: moisJeu(etat.mois),
+    libelle: `Marketing : ${action}`,
+    lignes: [
+      { compte: "623", sens: "debit", montant: centimes(montant) },
+      { compte: "512", sens: "credit", montant: centimes(montant) },
+    ],
+  });
+  const marque = fluxMarque(
+    apres.entreprise.marque,
+    0,
+    [{ action, montant: centimes(montant) }],
+    coefficientsMarketingDepuisParametres(etat.params),
+  );
+  return accepte({ ...apres, entreprise: { ...apres.entreprise, marque } });
 }
 
 /** AE-10 : transfert de pièces de l'atelier vers la boutique, au coût moyen, sans écriture. */

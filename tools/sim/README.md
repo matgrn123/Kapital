@@ -30,6 +30,22 @@ Les tests vérifient : l'étape 2 est atteinte (sans retour en arrière), le bil
 - `src/catalogueBanc.ts` : produits, fournisseurs et grossiste recopiés des graines SQL
   (`supabase/migrations/0003`, `0004`, `0023`).
 
+## Banc de 36 mois jusqu'à la boutique (AE-11)
+
+`jouerScenarioBoutique` (`src/scenarioBoutique.ts`) reprend le joueur du scénario solo et
+ajoute une publicité mensuelle dès l'étape 1 (la notoriété est une condition de l'étape 3).
+Dès l'étape 3 constatée, il ouvre une boutique s'il garde sa réserve de sécurité après la
+signature, embauche un vendeur et y envoie chaque mois la moitié du stock de l'atelier.
+
+```bash
+npm run banc-solo -w @kapital/tool-sim -- 36 7 boutique
+```
+
+Les tests vérifient : l'étape 3 est atteinte, le pilote refuse la boutique avant l'étape 3,
+aucune vente pendant les travaux, aucune anomalie du garde-fou, et les cinq missions se
+valident avec la règle du site (`missionsDuBanc`, qui appelle `metriquesDepuisGrandLivre`
+et `evaluerMissions` du moteur).
+
 ## Garde-fou monétaire (3D-9)
 
 `verifierGardeFouMonetaire` (`src/gardeFou.ts`) contrôle une clôture : aucune richesse
