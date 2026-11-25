@@ -186,7 +186,7 @@ export function EcranAtelier(p: ProprietesAtelier) {
           <Carte titre="Acheter et placer">
             <div className="flex flex-col gap-2.5">
               <Catalogue
-                articles={p.catalogue.map((m) => ({ id: m.id, nom: m.nom, prix: formaterEuros(m.prix_centimes), effet: texteEffet(m.effet) }))}
+                articles={p.catalogue.map((m) => ({ id: m.id, nom: m.nom, prix: `${formaterEuros(m.prix_centimes)} €`, effet: texteEffet(m.effet) }))}
                 choisi={placement}
                 onChoisir={(id) => { setPlacement(id); setChoisi(null); }}
               />
