@@ -2,7 +2,7 @@ import { chargerParametresV1 } from "@kapital/content";
 import {
   coefficientsSalairesDepuisParametres,
   evaluerEmbauche,
-  postesEquipesAtelier,
+  postesEquipesAteliers,
   postesLibres,
   type DecisionEmbauche,
 } from "@kapital/engine";
@@ -20,7 +20,8 @@ export const MESSAGE_SANS_BOUTIQUE =
 /**
  * 3D-3 (décision du 25 novembre 2026) : embaucher un ARTISAN sans poste libre est REFUSÉ. Les
  * postes sont les modules « poste » posés dans le plan de l'atelier (atelier/effetsPlan) ; un
- * encadrant n'occupe pas de poste et reste embauchable.
+ * encadrant n'occupe pas de poste et reste embauchable. 3D-7 : les postes libres se comptent sur
+ * tous les locaux de la société.
  * Autres refus : salaire sous le SMIC, ou trésorerie sous la réserve (paramètre
  * embauche_reserve_mois_cout_employeur × coût employeur calculé par le moteur).
  */
@@ -36,7 +37,7 @@ export function validerEmbauche(
   }
   if (
     d.poste === "artisan" &&
-    postesLibres(ctx.entreprise.salaries, postesEquipesAtelier(ctx.entreprise.atelier)) === 0
+    postesLibres(ctx.entreprise.salaries, postesEquipesAteliers(ctx.entreprise.ateliers)) === 0
   ) {
     return refuse("aucun_poste_libre", MESSAGE_AUCUN_POSTE_LIBRE);
   }

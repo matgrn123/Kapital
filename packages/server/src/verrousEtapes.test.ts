@@ -38,7 +38,7 @@ function entreprise(overrides: Partial<Entreprise> = {}): Entreprise {
     stocksMatiere: [{ matiere: MAT, quantite: 100, valeurTotale: centimes(50_000) }],
     stocksFinis: [],
     salaries: [],
-    atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(2, MODULES_CATALOGUE) },
+    ateliers: [{ surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(2, MODULES_CATALOGUE) }],
     marque: { notoriete: 40, desirabilite: 40 },
     prets: [],
     catalogue: [

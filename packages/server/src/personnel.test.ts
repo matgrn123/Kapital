@@ -37,7 +37,7 @@ function ctx(over: Partial<Entreprise> = {}): ContexteValidation {
       stocksMatiere: [],
       stocksFinis: [],
       salaries: [salarie("a")],
-      atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(1, MODULES_CATALOGUE) },
+      ateliers: [{ surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(1, MODULES_CATALOGUE) }],
       marque: { notoriete: 40, desirabilite: 40 },
       prets: [],
       catalogue: [],
@@ -63,7 +63,7 @@ describe("3D-3 : embauche sans poste libre", () => {
     const r = validerDecision(
       ctx({
         salaries: [salarie("a"), salarie("b")],
-        atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(2, MODULES_CATALOGUE) },
+        ateliers: [{ surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(2, MODULES_CATALOGUE) }],
       }),
       artisan,
     );
@@ -72,7 +72,7 @@ describe("3D-3 : embauche sans poste libre", () => {
 
   it("aucun module posé : même le premier artisan est refusé", () => {
     const r = validerDecision(
-      ctx({ salaries: [], atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), modules: [] } }),
+      ctx({ salaries: [], ateliers: [{ surfaceM2: 50, loyerMensuel: centimes(100_000), modules: [] }] }),
       artisan,
     );
     expect(r.ok).toBe(false);
@@ -80,10 +80,20 @@ describe("3D-3 : embauche sans poste libre", () => {
 
   it("un poste libre : l'artisan est accepté", () => {
     const r = validerDecision(
-      ctx({ atelier: { surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(2, MODULES_CATALOGUE) } }),
+      ctx({ ateliers: [{ surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(2, MODULES_CATALOGUE) }] }),
       artisan,
     );
     expect(r.ok).toBe(true);
+  });
+
+  it("3D-7 : les postes libres se comptent sur tous les locaux", () => {
+    const local = (id: string) => ({ id, surfaceM2: 50, loyerMensuel: centimes(100_000), modules: postesALaSignature(1, MODULES_CATALOGUE) });
+    // 2 locaux d'un poste, 1 artisan : un poste libre dans le 2e local.
+    expect(validerDecision(ctx({ ateliers: [local("w1"), local("w2")] }), artisan).ok).toBe(true);
+    // 2 locaux d'un poste, 2 artisans : plus rien de libre.
+    expect(
+      validerDecision(ctx({ salaries: [salarie("a"), salarie("b")], ateliers: [local("w1"), local("w2")] }), artisan).ok,
+    ).toBe(false);
   });
 
   it("un encadrant n'occupe pas de poste : il reste embauchable", () => {

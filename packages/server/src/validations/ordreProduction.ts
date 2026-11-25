@@ -37,7 +37,7 @@ export function validerOrdreProduction(
     );
   }
   // Si production en atelier, vérifie que l'atelier existe
-  if (d.lieu.type === "atelier" && ctx.entreprise.atelier === null) {
+  if (d.lieu.type === "atelier" && ctx.entreprise.ateliers.length === 0) {
     return refuse(
       "sans_atelier",
       `Votre entreprise n'a pas d'atelier propre. Utilisez un façonnier.`,

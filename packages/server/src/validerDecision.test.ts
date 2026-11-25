@@ -57,11 +57,11 @@ function entreprise(overrides: Partial<Entreprise> = {}): Entreprise {
         experienceMois: 6,
       },
     ],
-    atelier: {
+    ateliers: [{
       surfaceM2: 50,
       loyerMensuel: centimes(100_000),
       modules: postesALaSignature(2, MODULES_CATALOGUE),
-    },
+    }],
     marque: { notoriete: 40, desirabilite: 40 },
     prets: [],
     catalogue: [
@@ -252,7 +252,7 @@ describe("ordre_production", () => {
   });
 
   it("refuse une production en atelier si l'entreprise n'en a pas", () => {
-    const ctx = ctxDefault(entreprise({ atelier: null }));
+    const ctx = ctxDefault(entreprise({ ateliers: [] }));
     const r = validerDecision(ctx, {
       type: "ordre_production",
       produit: PROD,
@@ -264,7 +264,7 @@ describe("ordre_production", () => {
   });
 
   it("accepte une production chez un façonnier même sans atelier", () => {
-    const ctx = ctxDefault(entreprise({ atelier: null }));
+    const ctx = ctxDefault(entreprise({ ateliers: [] }));
     const r = validerDecision(ctx, {
       type: "ordre_production",
       produit: PROD,
