@@ -1,5 +1,6 @@
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros } from "../../../lib/formatage";
+import { nomMatiere } from "../../../lib/lisible";
 import { AjouterProduitBouton, FormulairePrix } from "./FormulairePrix";
 
 type Produit = {
@@ -46,6 +47,12 @@ export default async function PageProduits() {
     .select("product_id, quantite_pieces")
     .eq("company_id", entreprise.id);
 
+  const { data: matieres } = await supabase.from("materials").select("id, nom");
+  const nomsMatieres: Record<string, string> = {};
+  for (const m of (matieres ?? []) as Array<{ id: string; nom: string }>) {
+    nomsMatieres[m.id] = m.nom;
+  }
+
   const produitsRefTab = (produitsRef ?? []) as Produit[];
   const cataMap = new Map<string, CompanyProduit>(
     ((catalogue ?? []) as CompanyProduit[]).map((c) => [c.product_id, c]),
@@ -81,8 +88,8 @@ export default async function PageProduits() {
                 <div>
                   <h2 className="text-sm font-semibold">{p.nom}</h2>
                   <p className="text-xs text-[color:var(--color-g-500)]">
-                    <span className="chiffre">{p.consommation_par_piece}</span>{" "}
-                    m de {p.matiere_id.replace("mat_", "")} ·{" "}
+                    <span className="chiffre">{p.consommation_par_piece.toLocaleString("fr-FR")}</span>{" "}
+                    m de {nomMatiere(p.matiere_id, nomsMatieres)} ·{" "}
                     <span className="chiffre">{p.temps_standard_minutes}</span>{" "}
                     min atelier · fournitures{" "}
                     <span className="chiffre">{formaterEuros(p.fournitures_par_piece_centimes)}</span>{" "}
