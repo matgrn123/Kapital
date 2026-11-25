@@ -233,6 +233,27 @@ export function apercuEmbauche(a: {
   };
 }
 
+/** Paie de fin de mois de toute l'équipe : cotisations calculées salarié par salarié, une écriture. */
+export function apercuPaieEquipe(a: {
+  salairesBruts: readonly number[];
+  coefficients: CoefficientsSalaires;
+  mois: number;
+}): { coutEmployeur: number; paie: EcritureAffichee } | null {
+  if (a.salairesBruts.length === 0) return null;
+  const brut = a.salairesBruts.reduce((s, x) => s + x, 0);
+  const cotisations = a.salairesBruts.reduce(
+    (s, x) => s + cotisationsPatronales({ ...a.coefficients, salaireBrutMensuel: centimes(x) }),
+    0,
+  );
+  const gl = enregistrerPaieMensuelle(planComptableV1(), {
+    idEcriture: "apercu_paie_equipe",
+    mois: moisJeu(a.mois),
+    salaireBrutMensuel: centimes(brut),
+    cotisationsPatronales: centimes(cotisations),
+  });
+  return { coutEmployeur: brut + cotisations, paie: affichee(gl.ecritures[gl.ecritures.length - 1]!) };
+}
+
 export function apercuLicenciement(a: { indemnite: number; mois: number; idSalarie: string }): EcritureAffichee | null {
   const e = ecritureLicenciement("apercu", moisJeu(a.mois), versIdSalarie(a.idSalarie), centimes(a.indemnite));
   return e ? affichee(e) : null;

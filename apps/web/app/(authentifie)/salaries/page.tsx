@@ -7,9 +7,8 @@ import {
   indemniteLicenciement,
   parametresLicenciementDepuis,
 } from "@kapital/engine";
-import { Carte, EncadreNotion, Kpi } from "../../../components/ui";
-import { BandeauEtape, EnTeteEcran } from "../../../components/ui/lot4";
-import { apercuLicenciement } from "../../../lib/apercu-lot4";
+import { BandeauEtape, Carte, EcritureComptable, EncadreNotion, EnTete, FilRouge, Tableau } from "../../../components/ui";
+import { apercuLicenciement, apercuPaieEquipe } from "../../../lib/apercu-lot4";
 import { formaterDate, formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { lireVerrou } from "../_partage/verrou";
@@ -60,7 +59,11 @@ export default async function PageSalaries() {
   const artisans = employesTab.filter((e) => e.poste === "artisan").length;
   const cout = (e: Employee) =>
     coutEmployeur({ ...coefficients, salaireBrutMensuel: centimes(e.salaire_brut_mensuel_centimes) });
-  const totalBrut = employesTab.reduce((s, e) => s + e.salaire_brut_mensuel_centimes, 0);
+  const paieEquipe = apercuPaieEquipe({
+    salairesBruts: employesTab.map((e) => e.salaire_brut_mensuel_centimes),
+    coefficients,
+    mois: moisCourant,
+  });
   const totalCharge = employesTab.reduce((s, e) => s + cout(e), 0);
   // Même calcul que la route de licenciement : ancienneté de départ + mois passés dans l'entreprise.
   const indemnite = (e: Employee): number => {
@@ -79,28 +82,21 @@ export default async function PageSalaries() {
 
   return (
     <div className="flex flex-col gap-5">
-      <EnTeteEcran surTitre="Bureau de l'emploi" titre="Embauche et salariés">
+      <EnTete surTitre="Bureau de l'emploi" titre="Embauche et salariés">
         Chaque salarié augmente ta capacité, mais ajoute un coût fixe chaque mois, que tu vendes ou non.
-      </EnTeteEcran>
+      </EnTete>
 
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <Kpi libelle="Effectif" valeur={employesTab.length} detail={`${artisans} artisan(s) pour ${postes} poste(s) de travail`} />
-        <Kpi libelle="Masse salariale brute" valeur={`${formaterEuros(totalBrut)} €`} detail="par mois, compte 641" />
-        <Kpi libelle="Coût employeur" valeur={`${formaterEuros(totalCharge)} €`} detail="brut + cotisations patronales (645)" />
-        <Kpi libelle="SMIC mensuel brut" valeur={`${formaterEuros(coefficients.smicMensuelBrut)} €`} detail="le salaire le plus bas permis" />
-      </div>
+      {verrou && <BandeauEtape verrou={verrou} action="L'embauche" />}
+      <FormulaireEmbauche
+        coefficients={coefficients}
+        moisCourant={moisCourant}
+        tresorerie={Number(entreprise.tresorerie_centimes)}
+        postesLibres={Math.max(0, postes - artisans)}
+        verrouille={verrou !== null}
+      />
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
-          {verrou && <BandeauEtape verrou={verrou} action="L'embauche" />}
-          <FormulaireEmbauche
-            coefficients={coefficients}
-            moisCourant={moisCourant}
-            tresorerie={Number(entreprise.tresorerie_centimes)}
-            postesLibres={Math.max(0, postes - artisans)}
-            verrouille={verrou !== null}
-          />
-
           <Carte titre="Ton équipe">
             {employesTab.length === 0 ? (
               <p className="text-[0.88rem] text-muted">
@@ -110,44 +106,46 @@ export default async function PageSalaries() {
                   : `Tu as ${postes} poste(s) libre(s) : embauche un artisan pour produire toi-même.`}
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-[0.86rem]">
-                  <thead className="text-[0.7rem] uppercase tracking-[0.06em] text-muted">
-                    <tr>
-                      <th className="py-1 text-left font-semibold">Poste</th>
-                      <th className="py-1 text-left font-semibold">Depuis</th>
-                      <th className="py-1 text-right font-semibold">Brut</th>
-                      <th className="py-1 text-right font-semibold">Coût employeur</th>
-                      <th className="py-1" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {employesTab.map((e) => {
-                      const ind = indemnite(e);
-                      return (
-                        <tr key={e.id} className="border-t border-line align-top">
-                          <td className="py-1.5">{POSTES[e.poste]}</td>
-                          <td className="py-1.5 text-muted">{formaterDate(e.cree_le)}</td>
-                          <td className="py-1.5 text-right tabular-nums">{formaterEuros(e.salaire_brut_mensuel_centimes)} €</td>
-                          <td className="py-1.5 text-right tabular-nums">{formaterEuros(cout(e))} €</td>
-                          <td className="py-1.5 text-right">
-                            <BoutonLicencier
-                              id={e.id}
-                              indemniteCentimes={ind}
-                              ecriture={apercuLicenciement({ indemnite: ind, mois: moisCourant, idSalarie: e.id })}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    <tr className="border-t border-line font-bold">
-                      <td className="py-1.5" colSpan={3}>Masse salariale chargée</td>
-                      <td className="py-1.5 text-right tabular-nums">{formaterEuros(totalCharge)} €</td>
-                      <td />
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <Tableau
+                  entetes={[
+                    { texte: "Poste" },
+                    { texte: "Depuis" },
+                    { texte: "Brut", droite: true },
+                    { texte: "Coût employeur", droite: true },
+                    { texte: "" },
+                  ]}
+                >
+                  {employesTab.map((e) => {
+                    const ind = indemnite(e);
+                    return (
+                      <tr key={e.id} className="align-top">
+                        <td>{POSTES[e.poste]}</td>
+                        <td className="text-muted">{formaterDate(e.cree_le)}</td>
+                        <td className="text-right">{formaterEuros(e.salaire_brut_mensuel_centimes)} €</td>
+                        <td className="text-right">{formaterEuros(cout(e))} €</td>
+                        <td className="text-right">
+                          <BoutonLicencier
+                            id={e.id}
+                            indemniteCentimes={ind}
+                            ecriture={apercuLicenciement({ indemnite: ind, mois: moisCourant, idSalarie: e.id })}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="font-bold">
+                    <td colSpan={3}>Masse salariale chargée · {artisans} artisan(s) pour {postes} poste(s)</td>
+                    <td className="text-right">{formaterEuros(totalCharge)} € / mois</td>
+                    <td />
+                  </tr>
+                </Tableau>
+                {paieEquipe && (
+                  <div className="mt-3">
+                    <EcritureComptable libelle="Paie du mois" etiquette="à la clôture" lignes={paieEquipe.paie.lignes} />
+                  </div>
+                )}
+              </>
             )}
           </Carte>
         </div>
@@ -168,6 +166,7 @@ export default async function PageSalaries() {
             Après {paramsLicenciement.ancienneteMinimaleMois} mois d&apos;ancienneté, un licenciement donne droit à une
             indemnité légale, payée tout de suite par la banque. C&apos;est une charge de personnel (641).
           </EncadreNotion>
+          <FilRouge ecran="embauche" />
         </div>
       </div>
     </div>

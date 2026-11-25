@@ -15,6 +15,7 @@ import {
   apercuBail,
   apercuEmbauche,
   apercuLicenciement,
+  apercuPaieEquipe,
   apercuPret,
   bornesSalaire,
   curseurMontant,
@@ -229,5 +230,21 @@ describe("bornesSalaire", () => {
     expect(b.min).toBe(co.smicMensuelBrut);
     expect(b.max).toBe(Math.round(co.smicMensuelBrut * co.seuilCotisationsPleinesEnSmic));
     expect(b.pas).toBeGreaterThan(0);
+  });
+});
+
+describe("apercuPaieEquipe", () => {
+  const co = coefficientsSalairesDepuisParametres(params);
+  it("additionne la paie de chaque salarié, calculée par le moteur", () => {
+    const a = apercuEmbauche({ salaireBrut: 200_000, coefficients: co, mois: 3 });
+    const b = apercuEmbauche({ salaireBrut: 300_000, coefficients: co, mois: 3 });
+    const e = apercuPaieEquipe({ salairesBruts: [200_000, 300_000], coefficients: co, mois: 3 });
+    expect(e).not.toBeNull();
+    expect(e!.coutEmployeur).toBe(a.coutEmployeur + b.coutEmployeur);
+    expect(somme(e!.paie.lignes, "debit")).toBe(somme(e!.paie.lignes, "credit"));
+    expect(somme(e!.paie.lignes, "debit")).toBe(somme(a.paie.lignes, "debit") + somme(b.paie.lignes, "debit"));
+  });
+  it("sans salarié : rien", () => {
+    expect(apercuPaieEquipe({ salairesBruts: [], coefficients: co, mois: 3 })).toBeNull();
   });
 });
