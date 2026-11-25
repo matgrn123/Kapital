@@ -7,7 +7,7 @@ Seuls les modèles listés ci-dessous peuvent être committés dans `apps/web/pu
 
 - **Licence** : CC0 (domaine public, aucune restriction d'usage)
 - **Source** : https://quaternius.com/packs/downtowncitymegakit.html
-- **Version téléchargée** : Standard (sans textures), export glTF (Godot)
+- **Version téléchargée** : Standard, export glTF (Godot) ; les textures PNG référencées par les .gltf sont fournies dans le pack et ajoutées ci-dessous
 - **Date d'acquisition** : 2026-11-22
 
 ### Modèles utilisés
@@ -26,6 +26,14 @@ Seuls les modèles listés ci-dessous peuvent être committés dans `apps/web/pu
 
 > Les fichiers « réserve » sont présents dans `public/models/` mais pas encore référencés dans un catalogue.
 > Ils peuvent être supprimés s'ils restent inutilisés à la fin du ticket 3D-4.
+
+### Textures utilisées (ajoutées le 2026-11-24)
+
+Les 9 fichiers .gltf référencent par URI relative 23 textures PNG, désormais présentes dans `public/models/` (seules ces 23 ont été copiées, pas le pack complet) :
+`T_Concrete_BaseColor`, `T_Concrete_Normal`, `T_Concrete_ORM`, `T_Concrete_Asphalt_BaseColor`, `T_Trim_BaseColor`, `T_Trim_Normal`, `T_Trim_ORM`, `T_RedBrick_BaseColor`, `T_RedBrick_Normal`, `T_RedBrick_ORM`, `T_MarbleFloor_BaseColor`, `T_MarbleFloor_Normal`, `T_MarbleFloor_ORM`, `T_MetalConcrete_BaseColor`, `T_MetalConcrete_Normal`, `T_MetalConcrete_ORM`, `T_Dirt_BaseColor`, `T_Dirt_Normal`, `T_Dirt_ORM`, `T_Street_Decals`, `T_dark_interior`, `T_lit_interior_1`, `T_lit_interior_2` (toutes en `.png`).
+
+- **Provenance** : Quaternius, Downtown City MegaKit (dossier Textures / export glTF Godot), licence CC0.
+- **Compression** : originaux 55 Mo au total (2048 px pour la plupart). Réduits avec `sips` en restant en PNG : couleurs et ORM à 1024 px maximum, cartes de normales à 512 px. Poids final : environ 13 Mo pour les 23 textures.
 
 ---
 
