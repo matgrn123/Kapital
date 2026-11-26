@@ -313,8 +313,9 @@ export function cloturerMois(
 
   let moisDecouvertConsecutifsApres = donnees.moisDecouvertConsecutifs;
   if (tresorerieFinAvantStatut < 0) {
-    // Agios à 15 % annuel
-    const agios = centimes(Math.round((Math.abs(tresorerieFinAvantStatut) * 0.15) / 12));
+    // Agios : taux annuel du paramètre, ramené au mois.
+    const tauxAgios = lireParametre(params, "agios_taux_annuel");
+    const agios = centimes(Math.round((Math.abs(tresorerieFinAvantStatut) * tauxAgios) / 12));
     if (agios > 0) {
       enr({
         id: `agios_${mois}_${ent.id}`,
@@ -332,7 +333,7 @@ export function cloturerMois(
   }
 
   let nouveauStatut = ent.statut;
-  if (moisDecouvertConsecutifsApres >= 3) {
+  if (moisDecouvertConsecutifsApres >= lireParametre(params, "decouvert_mois_avant_difficulte")) {
     nouveauStatut = "en_difficulte";
   }
 
