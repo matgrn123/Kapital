@@ -204,6 +204,14 @@ export function heureLisible(instant: string | number): string {
   return heureDe(partiesParis(ms));
 }
 
+/** « jeu. 10 h 21 » : le jour de la semaine et l'heure, pour un instant des dernières 24 heures. */
+export function jourEtHeureLisible(instant: string | number): string {
+  const ms = enMs(instant);
+  if (!Number.isFinite(ms)) return INCONNUE;
+  const p = partiesParis(ms);
+  return `${p.jourSemaine} ${heureDe(p)}`;
+}
+
 /** Délai réel lisible : « dans 48 min », « il y a 3 h 05 », « dans 2 jours ». */
 export function delaiReel(ecartMs: number): string {
   const minutes = Math.floor(Math.abs(ecartMs) / MS_MINUTE);
@@ -281,6 +289,24 @@ export function jourEcoule(
   if (!(horloge.pasParMois > 0)) return 1;
   const jour = Math.floor((horloge.indexDansMois / horloge.pasParMois) * JOURS_ANCIEN_COMPTEUR) + 1;
   return Math.min(JOURS_ANCIEN_COMPTEUR, Math.max(1, jour));
+}
+
+/**
+ * Jours sur lesquels répartir les ventes du mois en cours (« Ventes / jour ») : le temps écoulé
+ * depuis le début du mois, ou depuis la création de la société si elle est plus récente, jamais
+ * moins d'un jour (une société créée il y a une heure n'a pas vendu « par jour » sur une heure).
+ * `creationJeuMs` : instant du jeu où la société a été créée ; null si inconnu.
+ */
+export function joursDeVente(
+  horloge: { moisEnCours: number; indexDansMois: number; pasParMois: number },
+  instantJeuMs: number,
+  creationJeuMs: number | null,
+): number {
+  if (!estIndexCalendaire(horloge.moisEnCours)) return jourEcoule(horloge, instantJeuMs);
+  let debut = debutDuMoisMs(horloge.moisEnCours);
+  if (creationJeuMs !== null && Number.isFinite(creationJeuMs) && creationJeuMs > debut) debut = creationJeuMs;
+  const jours = (instantJeuMs - debut) / MS_JOUR;
+  return Number.isFinite(jours) ? Math.max(1, jours) : 1;
 }
 
 /** Chiffre d'affaires HT moyen par jour écoulé du mois, en centimes entiers. */

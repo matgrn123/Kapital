@@ -11,6 +11,7 @@ import {
   type SeuilsEtapes,
 } from "@kapital/engine";
 import type { LigneEcriture } from "../../../components/ui/calculs";
+import { libelleMois } from "../../../lib/cadre";
 import { formaterEuros } from "../../../lib/formatage";
 import type { LigneGrandLivre } from "../../../lib/tableau";
 
@@ -23,12 +24,21 @@ export function capitalSocial(lignes: readonly Ligne[]): number | null {
   return du101.reduce((s, l) => s + (l.sens === "credit" ? l.montant_centimes : -l.montant_centimes), 0);
 }
 
-/** L'écriture d'ouverture réelle (apport 512 / 101), telle qu'enregistrée. */
-export function ecritureOuverture(lignes: readonly Ligne[]): { libelle: string; lignes: LigneEcriture[] } | null {
+/**
+ * L'écriture d'ouverture réelle (apport 512 / 101), telle qu'enregistrée, avec son mois
+ * (index de mois) et l'étiquette à afficher (« novembre 2026 ») quand le mois est connu.
+ */
+export function ecritureOuverture(
+  lignes: readonly (Ligne & { readonly mois_jeu?: number | null })[],
+): { libelle: string; mois: number | null; etiquette?: string; lignes: LigneEcriture[] } | null {
   const apport = lignes.filter((l) => l.ecriture_id === "apport_initial");
   if (apport.length === 0) return null;
+  const moisLu = apport[0]!.mois_jeu;
+  const mois = typeof moisLu === "number" && Number.isFinite(moisLu) ? moisLu : null;
   return {
     libelle: apport[0]!.libelle,
+    mois,
+    ...(mois === null ? {} : { etiquette: libelleMois(mois) }),
     lignes: apport.map((l) =>
       l.sens === "debit" ? { compte: l.compte, debit: l.montant_centimes } : { compte: l.compte, credit: l.montant_centimes },
     ),

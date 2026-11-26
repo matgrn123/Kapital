@@ -60,7 +60,7 @@ export default async function PageEmpire() {
         <>
           <p className="text-[0.86rem] text-muted">
             {batiments.length} bâtiment{batiments.length > 1 ? "s" : ""}
-            {loyers > 0 ? ` · ${formaterEuros(loyers)} € de loyer et charges par mois de jeu` : ""}
+            {loyers > 0 ? ` · ${formaterEuros(loyers)} € de loyer et charges par mois` : ""}
           </p>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {batiments.map((b) => (

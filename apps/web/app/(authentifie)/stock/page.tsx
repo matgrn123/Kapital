@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { BoutonLien, Carte, EncadreNotion, EnTete, Jauge, Kpi, Puce, Vide } from "../../../components/ui";
 import { formaterEuros } from "../../../lib/formatage";
-import { libelleJours, libelleRythme, type LigneStock, type StatutStock } from "../../../lib/stock";
+import { jourEtHeureLisible } from "../../../lib/cadre";
+import { libelleJours, libelleRythme, libelleVenduDepuis, type LigneStock, type StatutStock } from "../../../lib/stock";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { chargerSituationStock } from "./donnees";
 
@@ -66,7 +67,15 @@ function LigneProduit({
           detail={boutiqueOuverte || l.boutique > 0 ? undefined : "pas de boutique ouverte"}
         />
         <Chiffre libelle="En route" valeur={l.enRoute.toLocaleString("fr-FR")} detail={l.enRoute > 0 ? "productions et commandes en cours" : undefined} />
-        <Chiffre libelle="Rythme de vente" valeur={libelleRythme(l.piecesParMois)} detail="sur le dernier mois de jeu" />
+        {l.depuisMs !== null ? (
+          <Chiffre
+            libelle="Rythme de vente"
+            valeur={libelleVenduDepuis(l.piecesObservees, jourEtHeureLisible(l.depuisMs))}
+            detail="en vente depuis moins d'un jour"
+          />
+        ) : (
+          <Chiffre libelle="Rythme de vente" valeur={libelleRythme(l.piecesParJour)} detail="en moyenne, sur le dernier mois" />
+        )}
       </div>
 
       <Jauge
@@ -158,7 +167,8 @@ export default async function PageStock() {
           <EncadreNotion titre="Les jours de stock">
             Jours de stock = pièces prêtes à vendre ÷ pièces vendues par jour. C&apos;est le temps qu&apos;il te reste avant
             la rupture si rien n&apos;arrive. Compare-le au délai de ta production : s&apos;il est plus court, relance-la
-            maintenant. Ici, un jour de jeu est un vrai jour.
+            maintenant. Tant que le produit est en vente depuis moins d&apos;un jour, ses ventes comptent pour une
+            journée entière.
           </EncadreNotion>
           <EncadreNotion titre="La rupture">
             Sans stock, les clients qui voulaient ton produit repartent les mains vides : la vente est perdue, elle ne se

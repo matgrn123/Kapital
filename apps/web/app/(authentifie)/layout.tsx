@@ -38,7 +38,7 @@ export default async function LayoutAuthentifie({
 
   const { data: entreprises } = await supabase
     .from("companies")
-    .select("id, nom, tresorerie_centimes, etape")
+    .select("id, nom, tresorerie_centimes, etape, cree_le")
     .eq("owner_profile_id", user.id)
     .limit(1);
   if (!entreprises || entreprises.length === 0) {
@@ -70,6 +70,7 @@ export default async function LayoutAuthentifie({
         nomEntreprise={entreprise.nom}
         tresorerieInitiale={entreprise.tresorerie_centimes}
         etapeInitiale={entreprise.etape}
+        creeLe={(entreprise.cree_le as string | null | undefined) ?? null}
       />
       <div className="grid grid-cols-[200px_minmax(0,1fr)] gap-6 pt-5 max-[900px]:grid-cols-1 max-[900px]:gap-3.5">
         <aside className="sticky top-[84px] flex flex-col gap-4 self-start max-[900px]:static">

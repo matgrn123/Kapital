@@ -1,10 +1,17 @@
 import { chargerBatimentsV1 } from "@kapital/content";
 import { Carte, EncadreNotion, EnTete, Puce } from "../../../components/ui";
-import { dateHeureLisible, indexDuMoisDe, instantDuJeu } from "../../../lib/cadre";
-import { friseDeLAnnee, NOMS_SAISONS, nomCollection, type MoisFrise, type TypeEvenementFrise } from "../../../lib/calendrier";
+import { dateHeureLisible, instantDuJeu, libelleMois } from "../../../lib/cadre";
+import {
+  friseDesDouzeMois,
+  NOMS_SAISONS,
+  nomCollection,
+  type ElementDate,
+  type MoisFrise,
+  type TypeEvenementFrise,
+} from "../../../lib/calendrier";
 import { creerClientServeur } from "../../../lib/supabase/server";
 
-// Calendrier : la vraie année civile, mois par mois, avec ce qui va arriver
+// Calendrier : les 12 mois à venir à partir du mois en cours, avec ce qui va arriver
 // (fins de mois, échéances, livraisons, fins de bail, collections, clôture de l'exercice).
 // L'horloge du jeu est l'horloge réelle, à l'heure de Paris. Tout vient de la base ;
 // l'écran ne décide d'aucun chiffre.
@@ -29,8 +36,8 @@ const PASTILLE: Record<TypeEvenementFrise, string> = {
 
 export default async function PageCalendrier() {
   const supabase = await creerClientServeur();
-  const { data: entreprises } = await supabase.from("companies").select("id, cree_le").limit(1);
-  const entreprise = entreprises?.[0] as { id: string; cree_le: string | null } | undefined;
+  const { data: entreprises } = await supabase.from("companies").select("id").limit(1);
+  const entreprise = entreprises?.[0] as { id: string } | undefined;
   if (!entreprise) return null;
 
   const [{ data: monde }, { data: prets }, { data: achats }, { data: productions }, { data: locaux }, { data: matieres }, { data: produits }] =
@@ -64,16 +71,14 @@ export default async function PageCalendrier() {
 
   // Aujourd'hui : l'horloge commune, lue à l'instant du rendu sur le serveur.
   const maintenantJeu = instantDuJeu(Date.now(), (monde as { debut_reel?: string | null } | null)?.debut_reel ?? null);
-  const creation = entreprise.cree_le ? Date.parse(entreprise.cree_le) : Number.NaN;
 
   const nomMatiere = new Map(((matieres ?? []) as { id: string; nom: string }[]).map((x) => [x.id, x.nom]));
   const nomProduit = new Map(((produits ?? []) as { id: string; nom: string }[]).map((x) => [x.id, x.nom]));
   const batiments = chargerBatimentsV1();
   const nombre = (n: unknown) => Number(n).toLocaleString("fr-FR");
 
-  const frise = friseDeLAnnee({
+  const frise = friseDesDouzeMois({
     maintenantJeuMs: maintenantJeu,
-    moisCreation: Number.isFinite(creation) ? indexDuMoisDe(creation) : null,
     echeances: ((echeances ?? []) as { mois_jeu: number | null; instant_prevu: string | null; mensualite_centimes: number }[]).map(
       (e) => ({
         moisJeu: e.mois_jeu === null ? null : Number(e.mois_jeu),
@@ -97,33 +102,38 @@ export default async function PageCalendrier() {
     })),
   });
 
+  const dernierMois = frise.mois.at(-1);
+
   return (
     <div className="flex flex-col gap-5">
       <EnTete
         surTitre="Temps du jeu"
-        titre={`Calendrier ${frise.annee}`}
+        titre="Calendrier"
         action={<Puce ton="accent">Aujourd&apos;hui : {dateHeureLisible(maintenantJeu)}</Puce>}
       >
         La date du jeu est la vraie date, à l&apos;heure de Paris : un mois de jeu est un vrai mois. Voici ce qui
-        t&apos;attend cette année, mois par mois.
+        t&apos;attend sur les douze prochains mois, de {frise.periode}.
       </EnTete>
 
-      <Carte titre="L'année en un coup d'œil">
-        <ol className="grid grid-cols-6 gap-[3px] sm:grid-cols-12" aria-label={`Mois de l'année ${frise.annee}`}>
-          {frise.mois.map((mo) => (
+      <Carte titre="Les douze prochains mois" surTitre={frise.periode}>
+        <ol className="grid grid-cols-6 gap-[3px] sm:grid-cols-12" aria-label={`Les douze prochains mois, de ${frise.periode}`}>
+          {frise.mois.map((mo, i) => (
             <li
               key={mo.index}
-              title={`${mo.nom} ${frise.annee} · ${NOMS_SAISONS[mo.saison]}`}
-              className={`flex h-10 flex-col items-center justify-center rounded-md text-[0.7rem] font-semibold uppercase ${
+              title={`${mo.nom} ${mo.annee} · ${NOMS_SAISONS[mo.saison]}`}
+              className={`flex h-12 flex-col items-center justify-center rounded-md text-[0.7rem] font-semibold uppercase ${
                 COULEUR_SAISON[mo.saison]
-              } ${mo.etat === "en_cours" ? "ring-2 ring-accent ring-offset-1 ring-offset-surface" : ""} ${
-                mo.etat === "passe" || mo.etat === "avant_la_societe" ? "opacity-50" : ""
-              }`}
+              } ${mo.etat === "en_cours" ? "ring-2 ring-accent ring-offset-1 ring-offset-surface" : ""}`}
             >
-              <span>{mo.nom.slice(0, 3)}</span>
-              {mo.evenements.some((e) => e.type !== "fin_de_mois") && (
-                <span aria-hidden="true" className="mt-0.5 h-1 w-1 rounded-full bg-current" />
-              )}
+              <span className="whitespace-nowrap">{mo.abrege}</span>
+              {/* L'année sous le premier mois et sous chaque janvier : on voit où elle change. */}
+              <span className="text-[0.6rem] font-medium normal-case leading-tight opacity-80">
+                {i === 0 || mo.nom === "janvier" ? mo.annee : "\u00a0"}
+              </span>
+              <span
+                aria-hidden="true"
+                className={`h-1 w-1 rounded-full ${mo.evenements.some((e) => e.type !== "fin_de_mois") ? "bg-current" : ""}`}
+              />
             </li>
           ))}
         </ol>
@@ -137,25 +147,21 @@ export default async function PageCalendrier() {
         </div>
       </Carte>
 
+      {frise.enRetard.length > 0 && (
+        <Carte titre="En retard" surTitre="Prévu avant ce mois-ci, pas encore arrivé">
+          <ListeDates elements={frise.enRetard} />
+        </Carte>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {frise.mois.map((mo) => (
-          <CarteMois key={mo.index} mois={mo} annee={frise.annee} jourCourant={frise.aujourdhui.jour} />
+          <CarteMois key={mo.index} mois={mo} jourCourant={frise.aujourdhui.jour} />
         ))}
       </div>
 
       {frise.plusTard.length > 0 && (
-        <Carte titre="Plus tard" surTitre={`Après décembre ${frise.annee}`}>
-          <ul className="flex flex-col gap-1.5 text-[0.86rem]">
-            {frise.plusTard.slice(0, 8).map((p, i) => (
-              <li key={`${p.quand}_${i}`} className="flex flex-wrap gap-x-2">
-                <b className="min-w-[9.5rem]">{p.quand}</b>
-                <span>{p.libelle}</span>
-              </li>
-            ))}
-            {frise.plusTard.length > 8 && (
-              <li className="text-muted">… et {frise.plusTard.length - 8} autres échéances ou livraisons.</li>
-            )}
-          </ul>
+        <Carte titre="Plus tard" surTitre={dernierMois ? `Après ${libelleMois(dernierMois.index)}` : undefined}>
+          <ListeDates elements={frise.plusTard} />
         </Carte>
       )}
 
@@ -174,20 +180,34 @@ export default async function PageCalendrier() {
   );
 }
 
-function CarteMois({ mois, annee, jourCourant }: { mois: MoisFrise; annee: number; jourCourant: number }) {
+function ListeDates({ elements }: { elements: readonly ElementDate[] }) {
+  return (
+    <ul className="flex flex-col gap-1.5 text-[0.86rem]">
+      {elements.slice(0, 8).map((p, i) => (
+        <li key={`${p.quand}_${i}`} className="flex flex-wrap gap-x-2">
+          <b className="min-w-[9.5rem]">{p.quand}</b>
+          <span>{p.libelle}</span>
+        </li>
+      ))}
+      {elements.length > 8 && <li className="text-muted">… et {elements.length - 8} autres échéances ou livraisons.</li>}
+    </ul>
+  );
+}
+
+function CarteMois({ mois, jourCourant }: { mois: MoisFrise; jourCourant: number }) {
   const enCours = mois.etat === "en_cours";
   return (
     <section
       className={`flex min-w-0 flex-col overflow-hidden rounded-[14px] border bg-surface ${
         enCours ? "border-accent shadow-carte" : "border-line"
-      } ${mois.etat === "passe" || mois.etat === "avant_la_societe" ? "opacity-60" : ""}`}
+      }`}
     >
       <div className={`h-1.5 ${COULEUR_SAISON[mois.saison]}`} aria-hidden="true" />
       <div className="flex flex-col gap-2 p-3.5">
         <header className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="text-base font-bold capitalize">
-              {mois.nom} <span className="font-medium normal-case text-muted">{annee}</span>
+              {mois.nom} <span className="font-medium normal-case text-muted">{mois.annee}</span>
             </h3>
             <span className="text-[0.76rem] text-muted">
               {enCours ? `Jour ${jourCourant} sur ${mois.jours} · ` : ""}Collection {nomCollection(mois.collection)}
@@ -196,24 +216,20 @@ function CarteMois({ mois, annee, jourCourant }: { mois: MoisFrise; annee: numbe
           {enCours ? (
             <Puce ton="accent">En cours</Puce>
           ) : (
-            <span className={`rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${COULEUR_SAISON[mois.saison]}`}>
+            <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${COULEUR_SAISON[mois.saison]}`}>
               {NOMS_SAISONS[mois.saison]}
             </span>
           )}
         </header>
-        {mois.etat === "avant_la_societe" ? (
-          <p className="text-[0.82rem] text-muted">Ta société n&apos;existait pas encore.</p>
-        ) : (
-          <ul className="flex flex-col gap-1 text-[0.82rem]">
-            {mois.evenements.map((e, i) => (
-              <li key={`${e.type}_${i}`} className={`flex items-start gap-2 ${e.type === "fin_de_mois" ? "text-muted" : ""}`}>
-                <span className="w-6 shrink-0 text-right tabular-nums text-muted">{e.jour}</span>
-                <i className={`mt-[0.4rem] h-2 w-2 shrink-0 rounded-full ${PASTILLE[e.type]}`} aria-hidden="true" />
-                <span className="min-w-0">{e.libelle}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="flex flex-col gap-1 text-[0.82rem]">
+          {mois.evenements.map((e, i) => (
+            <li key={`${e.type}_${i}`} className={`flex items-start gap-2 ${e.type === "fin_de_mois" ? "text-muted" : ""}`}>
+              <span className="w-6 shrink-0 text-right tabular-nums text-muted">{e.jour}</span>
+              <i className={`mt-[0.4rem] h-2 w-2 shrink-0 rounded-full ${PASTILLE[e.type]}`} aria-hidden="true" />
+              <span className="min-w-0">{e.libelle}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

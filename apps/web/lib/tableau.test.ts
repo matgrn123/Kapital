@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { alertes, bilanSimplifie, caParMois, dernieresEcritures, tresorerieFinDeMois, type LigneGrandLivre } from "./tableau";
+import {
+  alertes,
+  bilanSimplifie,
+  caParMois,
+  dernieresEcritures,
+  premierMoisDuLivre,
+  tresorerieFinDeMois,
+  type LigneGrandLivre,
+} from "./tableau";
 
 let n = 0;
 function l(
@@ -83,6 +91,26 @@ describe("caParMois", () => {
 
   it("ne remonte pas avant le mois 0", () => {
     expect(caParMois(GL, 1, 6).map((x) => x.mois)).toEqual([0, 1]);
+  });
+
+  it("ne montre pas les mois d'avant la création de la société", () => {
+    // Société créée en novembre 2026 (24322) : ni juin ni octobre.
+    expect(caParMois([], 24322, 6, 24322)).toEqual([{ mois: 24322, valeur: 0 }]);
+    expect(caParMois([], 24323, 6, 24322).map((x) => x.mois)).toEqual([24322, 24323]);
+    // Créée il y a plus de six mois : les six derniers mois.
+    expect(caParMois([], 24330, 6, 24322).map((x) => x.mois)).toEqual([24325, 24326, 24327, 24328, 24329, 24330]);
+  });
+
+  it("garde au moins le mois en cours, même avec une date de création incohérente", () => {
+    expect(caParMois([], 24322, 6, 24400)).toEqual([{ mois: 24322, valeur: 0 }]);
+  });
+});
+
+describe("premierMoisDuLivre", () => {
+  it("donne le mois de la première écriture (celle d'ouverture), ou null sans écriture", () => {
+    expect(premierMoisDuLivre(GL)).toBe(0);
+    expect(premierMoisDuLivre([l("x", 24323, "512", "debit", 1), l("y", 24322, "101", "credit", 1)])).toBe(24322);
+    expect(premierMoisDuLivre([])).toBeNull();
   });
 });
 

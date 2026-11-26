@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { pourcentageJauge } from "../../components/ui/calculs";
-import { dateHeureLisible, delaiReel, jourEcoule, ventesParJour } from "../../lib/cadre";
+import { dateHeureLisible, delaiReel, joursDeVente, ventesParJour } from "../../lib/cadre";
 import { creerClientNavigateur } from "../../lib/supabase/client";
 import { EVENEMENT_JOURNAL_VU } from "./journal/MarquerVu";
 
@@ -70,11 +70,14 @@ export function BarreJeu({
   nomEntreprise,
   tresorerieInitiale,
   etapeInitiale,
+  creeLe,
 }: {
   companyId: string;
   nomEntreprise: string;
   tresorerieInitiale: number;
   etapeInitiale: number;
+  /** Instant réel de la création de la société (companies.cree_le). */
+  creeLe: string | null;
 }) {
   const chemin = usePathname();
   const [etat, setEtat] = useState<Etat>({
@@ -195,9 +198,13 @@ export function BarreJeu({
   const instantServeur = maintenant === null ? null : maintenant + decalageMs;
   const instantJeu = instantServeur === null ? null : instantServeur + avanceJeuMs;
   const date = horloge && instantJeu !== null ? dateHeureLisible(instantJeu) : null;
+  // Ventes du mois réparties sur les jours écoulés depuis le début du mois, ou depuis la
+  // création de la société si elle est plus récente (au moins un jour).
+  const creeLeMs = creeLe ? Date.parse(creeLe) : Number.NaN;
+  const creationJeu = Number.isFinite(creeLeMs) ? creeLeMs + avanceJeuMs : null;
   const parJour =
     horloge && instantJeu !== null && etat.caMoisHt !== null
-      ? ventesParJour(etat.caMoisHt, jourEcoule(horloge, instantJeu))
+      ? ventesParJour(etat.caMoisHt, joursDeVente(horloge, instantJeu, creationJeu))
       : null;
   const reste = horloge && instantServeur !== null ? Math.max(0, horloge.finDuMoisMs - instantServeur) : null;
 

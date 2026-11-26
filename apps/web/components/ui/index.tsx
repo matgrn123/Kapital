@@ -60,7 +60,7 @@ export function Carte({
             {surTitre && <SurTitre className="block">{surTitre}</SurTitre>}
             {titre && <h3 className="text-base font-bold">{titre}</h3>}
           </div>
-          {action}
+          {action && <div className="shrink-0">{action}</div>}
         </header>
       )}
       {children}
@@ -171,7 +171,7 @@ export function Puce({
   return (
     <span
       className={classes(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.78rem] font-semibold",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[0.78rem] font-semibold",
         TON_PUCE[ton],
       )}
     >

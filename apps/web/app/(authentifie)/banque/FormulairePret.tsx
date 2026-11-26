@@ -209,7 +209,7 @@ export function FormulairePret({
         ) : sim ? (
           <Message ton="succes">
             Demande recevable. Ta trésorerie passerait de {formaterEuros(tresorerieActuelle)} € à{" "}
-            {formaterEuros(sim.tresorerieApres)} €, et tu rembourseras {formaterEuros(sim.mensualite)} € chaque mois de jeu.
+            {formaterEuros(sim.tresorerieApres)} €, et tu rembourseras {formaterEuros(sim.mensualite)} € chaque mois.
           </Message>
         ) : null}
 
