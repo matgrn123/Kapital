@@ -101,7 +101,8 @@ export function coutRevientDepuisStocks(e: Entreprise): Readonly<Record<string, 
 
 /**
  * Ventes servies depuis le début du mois, ramenées à un mois complet.
- * `pasParMois` vient de la configuration du temps ; l'arrondi est à l'entier le plus proche.
+ * `pasParMois` est le nombre de pas du mois du cumul (`pasDansLeMois(config, cumul.mois)` :
+ * les mois calendaires n'ont pas tous la même longueur) ; l'arrondi est à l'entier le plus proche.
  */
 export function ventesMensuellesDepuisCumul(
   cumul: CumulMois | null,

@@ -1,25 +1,29 @@
 import { chargerParametresV1 } from "@kapital/content";
+import { indexDuMois } from "@kapital/engine";
 import { describe, expect, it } from "vitest";
 import { construireVueCockpit, ligneJournalDepuisResultat, type DonneesCockpit } from "./cockpit.js";
 
 const PARAMS = chargerParametresV1();
 const MIN = 60_000;
-const JOUR = 24 * 60 * MIN;
-const DEBUT = Date.UTC(2026, 10, 1, 8, 0, 0);
-const MAINTENANT = DEBUT + 2 * JOUR + 30 * MIN; // pas terminés : 2 × 1440 + 30 = 2910
+const NOVEMBRE = indexDuMois(2026, 11);
+// Origine de l'horloge au 1er janvier 1970 : l'heure du jeu est l'heure réelle.
+const DEBUT = 0;
+// Jeudi 26 novembre 2026, 10 h 21 à Paris : pas terminés = minutes depuis 1970.
+const MAINTENANT = Date.parse("2026-11-26T09:21:00Z");
+const P = MAINTENANT / MIN;
 
 function donnees(surcharge: Partial<DonneesCockpit> = {}): DonneesCockpit {
   return {
-    monde: { id: "m1", moisCourant: 2, debutReelMs: DEBUT },
+    monde: { id: "m1", moisCourant: NOVEMBRE, debutReelMs: DEBUT },
     entreprises: [
-      { id: "a", nom: "Atelier A", statut: "active", pasTraites: 2910, tresorerieCentimes: 500_000 },
-      { id: "b", nom: "Atelier B", statut: "active", pasTraites: 2860, tresorerieCentimes: 120_000 },
+      { id: "a", nom: "Atelier A", statut: "active", pasTraites: P, tresorerieCentimes: 500_000 },
+      { id: "b", nom: "Atelier B", statut: "active", pasTraites: P - 50, tresorerieCentimes: 120_000 },
       { id: "c", nom: "Atelier C", statut: "active", pasTraites: null, tresorerieCentimes: 0 },
     ],
     dernierPassage: {
       creeLeMs: MAINTENANT - 20_000,
       declencheur: "minuterie",
-      pasCible: 2910,
+      pasCible: P,
       nbEntreprises: 3,
       nbAvancees: 2,
       nbErreurs: 0,
@@ -39,18 +43,28 @@ describe("construireVueCockpit — horloge", () => {
     const v = construireVueCockpit(donnees(), PARAMS, MAINTENANT);
     expect(v.horloge).toMatchObject({
       actif: true,
-      horloge: { pasTermines: 2910, moisEnCours: 2, indexDansMois: 30 },
+      horloge: { pasTermines: P, moisEnCours: NOVEMBRE, indexDansMois: 25 * 1440 + 621, pasParMois: 30 * 1440 },
     });
   });
 
   it("signale un monde dont l'horloge n'est pas initialisée", () => {
     const v = construireVueCockpit(
-      donnees({ monde: { id: "m1", moisCourant: 2, debutReelMs: null } }),
+      donnees({ monde: { id: "m1", moisCourant: NOVEMBRE, debutReelMs: null } }),
       PARAMS,
       MAINTENANT,
     );
     expect(v.horloge.actif).toBe(false);
     expect(v.alertes.join(" ")).toMatch(/Mettre le monde à jour/);
+  });
+
+  it("signale un monde encore sur l'ancien calendrier (migration 0043 non appliquée)", () => {
+    const v = construireVueCockpit(
+      donnees({ monde: { id: "m1", moisCourant: 11, debutReelMs: MAINTENANT - 11 * 1440 * MIN } }),
+      PARAMS,
+      MAINTENANT,
+    );
+    expect(v.horloge).toEqual({ actif: false, moisCourant: 11 });
+    expect(v.alertes.join(" ")).toMatch(/0043/);
   });
 });
 
@@ -65,7 +79,7 @@ describe("construireVueCockpit — entreprises", () => {
 
   it("tolère un retard de quelques pas entre deux passages de la minuterie", () => {
     const v = construireVueCockpit(
-      donnees({ entreprises: [{ id: "a", nom: "A", statut: "active", pasTraites: 2908, tresorerieCentimes: 0 }] }),
+      donnees({ entreprises: [{ id: "a", nom: "A", statut: "active", pasTraites: P - 2, tresorerieCentimes: 0 }] }),
       PARAMS,
       MAINTENANT,
     );

@@ -13,7 +13,7 @@ import {
 } from "./donneesMois.js";
 import { ajouterVentesAuxCumulsEtape } from "./cumulsEtape.js";
 import { avancerFlux } from "./flux.js";
-import { configTempsDepuis } from "./temps.js";
+import { configTempsDepuis, pasDansLeMois } from "./temps.js";
 
 export type ResultatSimulerPas = {
   readonly entrepriseApres: Entreprise;
@@ -29,7 +29,7 @@ export type ResultatSimulerPas = {
 };
 
 /**
- * Fait avancer une entreprise d'un pas (10 minutes réelles par défaut) :
+ * Fait avancer une entreprise d'un pas (1 minute réelle par défaut) :
  * production, marque, ventes, retours et événements datés de ce pas.
  * Au dernier pas du mois, passe aussi les échéances de fin de mois
  * (salaires, loyer, prêt, TVA, agios, impôt) et rend `cloture`.
@@ -38,6 +38,9 @@ export type ResultatSimulerPas = {
  * passer `cumul = null` ; pour les suivants, le `cumul` rendu par le pas précédent.
  *
  * `donneesFin` n'est lu qu'au dernier pas du mois (obligatoire alors).
+ *
+ * `mois` est l'index calendaire du mois (année × 12 + mois − 1) : le nombre de pas du
+ * mois en découle (`pasDansLeMois`, 28 à 31 jours, heure d'été comprise).
  */
 export function simulerPas(
   entreprise: Entreprise,
@@ -50,10 +53,10 @@ export function simulerPas(
   mois: MoisJeu,
   indexDansMois: number,
 ): ResultatSimulerPas {
-  const config = configTempsDepuis(params);
-  if (!Number.isInteger(indexDansMois) || indexDansMois < 0 || indexDansMois >= config.pasParMois) {
+  const nbPas = pasDansLeMois(configTempsDepuis(params), mois);
+  if (!Number.isInteger(indexDansMois) || indexDansMois < 0 || indexDansMois >= nbPas) {
     throw new Error(
-      `Index de pas hors du mois : ${indexDansMois} (un mois compte ${config.pasParMois} pas, de 0 à ${config.pasParMois - 1}).`,
+      `Index de pas hors du mois : ${indexDansMois} (le mois ${mois} compte ${nbPas} pas, de 0 à ${nbPas - 1}).`,
     );
   }
 
@@ -77,7 +80,7 @@ export function simulerPas(
     cumulAvant = cumul;
   }
 
-  const estDernierPas = indexDansMois === config.pasParMois - 1;
+  const estDernierPas = indexDansMois === nbPas - 1;
   if (estDernierPas && donneesFin === null) {
     throw new Error(
       `Le dernier pas du mois ${mois} clôture le mois : les données de fin de mois (donneesFin) sont obligatoires.`,
@@ -89,7 +92,7 @@ export function simulerPas(
     mois,
     pasDebut: indexDansMois,
     pasFin: indexDansMois + 1,
-    pasParMois: config.pasParMois,
+    pasParMois: nbPas,
     suffixeId: `_p${indexDansMois}`,
   });
   const cumulApres: CumulMois = { ...flux.cumul, pasTraites: indexDansMois + 1 };

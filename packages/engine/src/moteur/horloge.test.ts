@@ -2,155 +2,159 @@ import { chargerParametresV1, type Parametres } from "@kapital/content";
 import { describe, expect, it } from "vitest";
 import {
   configTempsDepuis,
+  debutDuMoisMs,
   debutDuPasEnMs,
+  heureLocaleParis,
   horlogeDepuis,
+  indexDuMois,
   pasAbsoluDepuisInstantReel,
   pasAbsoluDepuisPosition,
+  pasDansLeMois,
   pasTerminesDepuis,
   positionDuPasAbsolu,
 } from "./temps.js";
 
 const PARAMS = chargerParametresV1();
-const CONFIG = configTempsDepuis(PARAMS);
+const CONFIG = configTempsDepuis(PARAMS); // rythme réel : 1 minute par pas
 const MIN = 60_000;
-const JOUR = 24 * 60 * MIN;
-const P = CONFIG.minutesReellesParPas; // durée d'un pas, en minutes réelles (1)
-const N = CONFIG.pasParMois; // pas par mois de jeu (1440)
-// Création du monde : un instant quelconque, fixé pour que les tests soient déterministes
-const DEBUT = Date.UTC(2026, 10, 1, 8, 0, 0);
+const HEURE = 60 * MIN;
+const JOUR = 24 * HEURE;
+// En production, l'origine de l'horloge est le 1er janvier 1970 : heure du jeu = heure réelle.
+const ORIGINE = 0;
+const utc = (iso: string): number => Date.parse(iso);
+
+function parHeure(): Parametres {
+  return {
+    ...PARAMS,
+    temps_minutes_reelles_par_pas: { ...PARAMS["temps_minutes_reelles_par_pas"]!, valeur: 60 },
+  };
+}
 
 describe("pasTerminesDepuis", () => {
-  it("0 pas terminé à la création du monde et avant la fin du premier pas", () => {
-    expect(pasTerminesDepuis(CONFIG, DEBUT, DEBUT)).toBe(0);
-    expect(pasTerminesDepuis(CONFIG, DEBUT, DEBUT + P * MIN - 1)).toBe(0);
+  it("compte les minutes entièrement écoulées depuis l'origine", () => {
+    expect(pasTerminesDepuis(CONFIG, ORIGINE, ORIGINE)).toBe(0);
+    expect(pasTerminesDepuis(CONFIG, ORIGINE, MIN - 1)).toBe(0);
+    expect(pasTerminesDepuis(CONFIG, ORIGINE, MIN)).toBe(1);
+    expect(pasTerminesDepuis(CONFIG, ORIGINE, utc("2026-11-26T09:21:30Z"))).toBe(
+      utc("2026-11-26T09:21:00Z") / MIN,
+    );
   });
 
-  it("un pas est terminé quand sa durée est écoulée", () => {
-    expect(pasTerminesDepuis(CONFIG, DEBUT, DEBUT + P * MIN)).toBe(1);
-    expect(pasTerminesDepuis(CONFIG, DEBUT, DEBUT + 25 * P * MIN + 1)).toBe(25);
+  it("un pas absolu de 2026 tient dans un entier 32 bits (companies.pas_traites)", () => {
+    expect(pasTerminesDepuis(CONFIG, ORIGINE, utc("2100-01-01T00:00:00Z"))).toBeLessThan(2 ** 31 - 1);
   });
 
-  it("un jour réel = un mois de jeu = N pas", () => {
-    expect(pasTerminesDepuis(CONFIG, DEBUT, DEBUT + JOUR)).toBe(N);
-    expect(pasTerminesDepuis(CONFIG, DEBUT, DEBUT + 3 * JOUR)).toBe(3 * N);
-  });
-
-  it("jamais négatif, même si l'horloge du serveur est en retard sur la création du monde", () => {
-    expect(pasTerminesDepuis(CONFIG, DEBUT, DEBUT - 5 * JOUR)).toBe(0);
-  });
-
-  it("refuse des instants qui ne sont pas des nombres", () => {
-    expect(() => pasTerminesDepuis(CONFIG, Number.NaN, DEBUT)).toThrow();
-    expect(() => pasTerminesDepuis(CONFIG, DEBUT, Number.POSITIVE_INFINITY)).toThrow();
-  });
-
-  it("suit les paramètres : un mois de 720 minutes réelles et un pas de 10 minutes donnent 72 pas", () => {
-    const params: Parametres = {
-      ...PARAMS,
-      temps_minutes_reelles_par_pas: { ...PARAMS["temps_minutes_reelles_par_pas"]!, valeur: 10 },
-      temps_minutes_reelles_par_mois_jeu: {
-        ...PARAMS["temps_minutes_reelles_par_mois_jeu"]!,
-        valeur: 720,
-      },
-    };
-    const config = configTempsDepuis(params);
-    expect(config.pasParMois).toBe(72);
-    expect(pasTerminesDepuis(config, DEBUT, DEBUT + JOUR)).toBe(144);
-    expect(positionDuPasAbsolu(config, 144)).toEqual({
-      mois: 2,
-      indexDansMois: 0,
-      estDernierPasDuMois: false,
-    });
+  it("jamais négatif, et refuse un instant invalide", () => {
+    expect(pasTerminesDepuis(CONFIG, JOUR, 0)).toBe(0);
+    expect(() => pasTerminesDepuis(CONFIG, Number.NaN, 0)).toThrow();
+    expect(() => pasTerminesDepuis(CONFIG, 0, Number.POSITIVE_INFINITY)).toThrow();
   });
 });
 
 describe("positionDuPasAbsolu et pasAbsoluDepuisPosition", () => {
-  it("le pas 0 ouvre le mois 0", () => {
-    expect(positionDuPasAbsolu(CONFIG, 0)).toEqual({
-      mois: 0,
+  const nov = indexDuMois(2026, 11);
+
+  it("le premier pas de novembre 2026 est le 1er novembre à 0 h, heure de Paris", () => {
+    const premier = utc("2026-10-31T23:00:00Z") / MIN;
+    expect(positionDuPasAbsolu(CONFIG, premier)).toEqual({
+      mois: nov,
       indexDansMois: 0,
+      pasDansLeMois: 30 * 24 * 60,
       estDernierPasDuMois: false,
     });
-  });
-
-  it("le dernier pas du mois 0 est suivi du premier pas du mois 1", () => {
-    expect(positionDuPasAbsolu(CONFIG, N - 1)).toEqual({
-      mois: 0,
-      indexDansMois: N - 1,
+    expect(positionDuPasAbsolu(CONFIG, premier - 1)).toMatchObject({
+      mois: nov - 1,
+      indexDansMois: (31 * 24 + 1) * 60 - 1, // octobre compte une heure de plus : dernier pas
       estDernierPasDuMois: true,
     });
-    expect(positionDuPasAbsolu(CONFIG, N)).toEqual({
-      mois: 1,
-      indexDansMois: 0,
-      estDernierPasDuMois: false,
-    });
   });
 
-  it("aller-retour exact sur plusieurs mois", () => {
-    for (const pas of [0, 1, N - 1, N, N + 1, 2 * N - 1, 2 * N, 1000, 10_000]) {
-      const p = positionDuPasAbsolu(CONFIG, pas);
-      expect(pasAbsoluDepuisPosition(CONFIG, p.mois, p.indexDansMois)).toBe(pas);
+  it("jeudi 26 novembre 2026, 10 h 21 : pas n° 25 × 1440 + 621 du mois", () => {
+    const p = positionDuPasAbsolu(CONFIG, utc("2026-11-26T09:21:00Z") / MIN);
+    expect(p.mois).toBe(nov);
+    expect(p.indexDansMois).toBe(25 * 1440 + 10 * 60 + 21);
+  });
+
+  it("mars (heure perdue), octobre (heure gagnée), février : dernier pas et aller-retour", () => {
+    const config = configTempsDepuis(parHeure());
+    for (const [annee, mois, heures] of [
+      [2026, 3, 743],
+      [2026, 10, 745],
+      [2026, 2, 672],
+      [2028, 2, 696],
+      [2026, 12, 744],
+    ] as const) {
+      const m = indexDuMois(annee, mois);
+      expect(pasDansLeMois(config, m)).toBe(heures);
+      const premier = pasAbsoluDepuisPosition(config, m, 0);
+      const dernier = pasAbsoluDepuisPosition(config, m, heures - 1);
+      expect(dernier - premier).toBe(heures - 1);
+      expect(positionDuPasAbsolu(config, dernier)).toMatchObject({ mois: m, estDernierPasDuMois: true });
+      expect(positionDuPasAbsolu(config, dernier + 1)).toMatchObject({ mois: m + 1, indexDansMois: 0 });
+      for (const k of [0, 1, Math.floor(heures / 2), heures - 1]) {
+        const p = positionDuPasAbsolu(config, premier + k);
+        expect(pasAbsoluDepuisPosition(config, p.mois, p.indexDansMois)).toBe(premier + k);
+      }
     }
   });
 
-  it("refuse un pas négatif ou non entier, ou une position hors du mois", () => {
+  it("décembre → janvier : le pas qui suit le dernier de décembre est le premier de janvier", () => {
+    const dec = indexDuMois(2026, 12);
+    const dernier = pasAbsoluDepuisPosition(CONFIG, dec, pasDansLeMois(CONFIG, dec) - 1);
+    expect(positionDuPasAbsolu(CONFIG, dernier + 1)).toMatchObject({
+      mois: indexDuMois(2027, 1),
+      indexDansMois: 0,
+    });
+    expect(heureLocaleParis((dernier + 1) * MIN)).toMatchObject({ annee: 2027, mois: 1, jour: 1, heure: 0 });
+  });
+
+  it("refuse des entrées invalides", () => {
     expect(() => positionDuPasAbsolu(CONFIG, -1)).toThrow();
     expect(() => positionDuPasAbsolu(CONFIG, 1.5)).toThrow();
-    expect(() => pasAbsoluDepuisPosition(CONFIG, 0, N)).toThrow(/pas/);
+    expect(() => pasAbsoluDepuisPosition(CONFIG, nov, 30 * 1440)).toThrow(/pas/);
     expect(() => pasAbsoluDepuisPosition(CONFIG, -1, 0)).toThrow();
   });
 });
 
 describe("debutDuPasEnMs et pasAbsoluDepuisInstantReel", () => {
-  it("le pas k commence à debut + k × durée d'un pas", () => {
-    expect(debutDuPasEnMs(CONFIG, DEBUT, 0)).toBe(DEBUT);
-    expect(debutDuPasEnMs(CONFIG, DEBUT, 30)).toBe(DEBUT + 30 * P * MIN);
+  it("le pas k commence k minutes après l'origine", () => {
+    expect(debutDuPasEnMs(CONFIG, ORIGINE, 0)).toBe(0);
+    expect(debutDuPasEnMs(CONFIG, ORIGINE, 30)).toBe(30 * MIN);
+    // une origine reculée (outil d'admin « avancer le temps ») décale tout d'autant
+    expect(debutDuPasEnMs(CONFIG, -JOUR, 30)).toBe(30 * MIN - JOUR);
   });
 
-  it("un événement tombe dans le pas dont l'intervalle le contient", () => {
-    expect(pasAbsoluDepuisInstantReel(CONFIG, DEBUT, DEBUT)).toBe(0);
-    expect(pasAbsoluDepuisInstantReel(CONFIG, DEBUT, DEBUT + P * MIN - 1)).toBe(0);
-    expect(pasAbsoluDepuisInstantReel(CONFIG, DEBUT, DEBUT + P * MIN)).toBe(1);
-    // une livraison à 48 minutes réelles tombe au 48e pas d'une minute
-    expect(pasAbsoluDepuisInstantReel(CONFIG, DEBUT, DEBUT + 48 * MIN)).toBe(Math.floor(48 / P));
-  });
-
-  it("un événement daté avant la création du monde est traité au pas 0", () => {
-    expect(pasAbsoluDepuisInstantReel(CONFIG, DEBUT, DEBUT - JOUR)).toBe(0);
-  });
-
-  it("cohérent avec le début de pas : début du pas k appartient au pas k, et 1 ms avant au pas k-1", () => {
-    for (const k of [1, 7, N - 1, N, 5000]) {
-      const debut = debutDuPasEnMs(CONFIG, DEBUT, k);
-      expect(pasAbsoluDepuisInstantReel(CONFIG, DEBUT, debut)).toBe(k);
-      expect(pasAbsoluDepuisInstantReel(CONFIG, DEBUT, debut - 1)).toBe(k - 1);
-    }
+  it("un événement daté tombe dans le pas qui contient son instant", () => {
+    const livraison = utc("2026-11-26T11:21:30Z");
+    expect(pasAbsoluDepuisInstantReel(CONFIG, ORIGINE, livraison)).toBe(utc("2026-11-26T11:21:00Z") / MIN);
   });
 });
 
 describe("horlogeDepuis : ce que tous les joueurs voient", () => {
-  it("à la création du monde : mois 0, premier pas en cours", () => {
-    const h = horlogeDepuis(CONFIG, DEBUT, DEBUT);
-    expect(h.pasTermines).toBe(0);
-    expect(h.moisEnCours).toBe(0);
-    expect(h.indexDansMois).toBe(0);
-    expect(h.debutPasEnCoursMs).toBe(DEBUT);
-    expect(h.finPasEnCoursMs).toBe(DEBUT + P * MIN);
-    expect(h.finDuMoisMs).toBe(DEBUT + JOUR);
+  it("jeudi 26 novembre 2026, 10 h 21 dans la vie = 10 h 21 dans le jeu", () => {
+    const maintenant = utc("2026-11-26T09:21:30Z");
+    const h = horlogeDepuis(CONFIG, ORIGINE, maintenant);
+    expect(h.heureJeuMs).toBe(maintenant);
+    expect(heureLocaleParis(h.heureJeuMs)).toMatchObject({ annee: 2026, mois: 11, jour: 26, heure: 10, minute: 21 });
+    expect(h.moisEnCours).toBe(24322);
+    expect(h.pasParMois).toBe(30 * 1440);
+    expect(h.indexDansMois).toBe(25 * 1440 + 621);
+    expect(h.debutPasEnCoursMs).toBe(utc("2026-11-26T09:21:00Z"));
+    expect(h.finPasEnCoursMs).toBe(utc("2026-11-26T09:22:00Z"));
+    expect(h.finDuMoisMs).toBe(utc("2026-11-30T23:00:00Z")); // 1er décembre 0 h à Paris
   });
 
-  it("un jour et 25 minutes plus tard : mois 1, 26e pas en cours", () => {
-    const h = horlogeDepuis(CONFIG, DEBUT, DEBUT + JOUR + 25 * MIN);
-    expect(h.pasTermines).toBe(N + Math.floor(25 / P));
-    expect(h.moisEnCours).toBe(1);
-    expect(h.indexDansMois).toBe(Math.floor(25 / P));
-    expect(h.debutPasEnCoursMs).toBe(DEBUT + JOUR + 25 * MIN);
-    expect(h.finPasEnCoursMs).toBe(DEBUT + JOUR + (25 + P) * MIN);
-    expect(h.finDuMoisMs).toBe(DEBUT + 2 * JOUR);
+  it("une origine reculée d'un jour (avance du temps en recette) avance l'heure du jeu d'un jour", () => {
+    const maintenant = utc("2026-11-30T12:00:00Z");
+    const h = horlogeDepuis(CONFIG, -JOUR, maintenant);
+    expect(h.heureJeuMs).toBe(maintenant + JOUR);
+    expect(h.moisEnCours).toBe(indexDuMois(2026, 12));
+    // instant réel de la fin du mois = origine + fin du mois en heure du jeu
+    expect(h.finDuMoisMs).toBe(debutDuMoisMs(indexDuMois(2027, 1)) - JOUR);
   });
 
   it("deux joueurs qui lisent au même instant voient exactement la même horloge", () => {
-    const maintenant = DEBUT + 5 * JOUR + 123 * MIN;
-    expect(horlogeDepuis(CONFIG, DEBUT, maintenant)).toEqual(horlogeDepuis(CONFIG, DEBUT, maintenant));
+    const maintenant = utc("2026-11-26T09:21:30Z");
+    expect(horlogeDepuis(CONFIG, ORIGINE, maintenant)).toEqual(horlogeDepuis(CONFIG, ORIGINE, maintenant));
   });
 });

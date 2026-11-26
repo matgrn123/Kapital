@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { chargerParametresV1 } from "@kapital/content";
-import { configTempsDepuis, horlogeDepuis, parametreObligatoire } from "@kapital/engine";
+import {
+  configTempsDepuis,
+  horlogeDepuis,
+  parametreObligatoire,
+  pasAbsoluDepuisPosition,
+  pasDansLeMois,
+  positionDuPasAbsolu,
+} from "@kapital/engine";
 import { lignesStock, mouvementsDeVente, type LigneStock, type LigneVenteLivre, type Temps } from "../../../lib/stock";
 
 // Lecture en base de tout ce qu'il faut à l'écran Stock (et à l'alerte « stock bas » du tableau
@@ -39,11 +46,6 @@ async function lignesDeVente(supabase: SupabaseClient, companyId: string, depuis
 export async function chargerSituationStock(supabase: SupabaseClient, companyId: string): Promise<SituationStock> {
   const params = chargerParametresV1();
   const config = configTempsDepuis(params);
-  const temps: Temps = {
-    pasParMois: config.pasParMois,
-    joursParMois: parametreObligatoire(params, "temps_jours_par_mois_jeu"),
-    minutesReellesParMois: config.minutesReellesParMoisJeu,
-  };
   const seuilJours = parametreObligatoire(params, "alerte_stock_bas_jours");
 
   const [{ data: societe }, { data: monde }] = await Promise.all([
@@ -53,11 +55,14 @@ export async function chargerSituationStock(supabase: SupabaseClient, companyId:
   const debutMs = monde?.debut_reel ? Date.parse(monde.debut_reel as string) : Number.NaN;
   const horloge = Number.isFinite(debutMs) ? horlogeDepuis(config, debutMs, Date.now()) : null;
   // Les ventes sont enregistrées jusqu'au dernier pas traité pour la société.
-  const pasCourant =
-    societe?.pas_traites != null
-      ? Number(societe.pas_traites)
-      : (horloge?.pasTermines ?? (Number(monde?.mois_courant ?? 0) + 1) * config.pasParMois);
-  const moisCourant = Math.floor(pasCourant / config.pasParMois);
+  const pasCourant = societe?.pas_traites != null ? Number(societe.pas_traites) : (horloge?.pasTermines ?? 0);
+  // Mois calendaire du pas courant (index année × 12 + mois − 1) et son nombre de pas.
+  const moisCourant = positionDuPasAbsolu(config, pasCourant).mois;
+  const temps: Temps = {
+    pasParMois: pasDansLeMois(config, moisCourant),
+    joursParMois: parametreObligatoire(params, "temps_jours_par_mois_jeu"),
+    minutesReellesParMois: config.minutesReellesParMoisJeu,
+  };
   const pasDepuisInstant = (iso: string | null | undefined): number | null => {
     const ms = iso ? Date.parse(iso) : Number.NaN;
     if (!Number.isFinite(debutMs) || !Number.isFinite(ms) || ms < debutMs) return null;
@@ -127,7 +132,7 @@ export async function chargerSituationStock(supabase: SupabaseClient, companyId:
       })),
     ),
     boutiqueOuverte,
-    mouvements: mouvementsDeVente(ventes, config.pasParMois),
+    mouvements: mouvementsDeVente(ventes, (mois) => pasAbsoluDepuisPosition(config, mois, 0)),
     pasCourant,
     seuilJours,
   });

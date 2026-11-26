@@ -1,13 +1,17 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import type { Parametres } from "@kapital/content";
-import { configTempsDepuis } from "@kapital/engine";
+import { estMoisCalendaire, finDuMoisMs, moisDeLInstantMs } from "@kapital/engine";
 import type { StockageMonde } from "../avance/port.js";
 import { ErreurAdmin, type JournalAudit } from "./port.js";
 
-const MS_PAR_MINUTE = 60_000;
+const MS_PAR_HEURE = 3_600_000;
+const MS_PAR_JOUR = 24 * MS_PAR_HEURE;
 
-/** Durées proposées : jamais de saisie libre. */
-export const DUREES_AVANCE = ["jour", "semaine", "mois"] as const;
+/**
+ * Durées proposées : jamais de saisie libre. L'horloge du jeu est l'horloge réelle :
+ * « heure » et « jour » avancent d'une vraie heure ou d'un vrai jour, « fin_du_mois »
+ * amène le jeu au 1er du mois suivant à 0 h (heure de Paris), ce qui clôture le mois.
+ */
+export const DUREES_AVANCE = ["heure", "jour", "fin_du_mois"] as const;
 export type DureeAvance = (typeof DUREES_AVANCE)[number];
 
 export type ContexteAction = {
@@ -33,26 +37,27 @@ function codesIdentiques(attendu: string, saisi: string | undefined): boolean {
   return timingSafeEqual(empreinte(attendu), empreinte(saisi ?? ""));
 }
 
-function nombreDeJours(duree: DureeAvance, joursParMois: number): number {
-  if (duree === "jour") return 1;
-  if (duree === "semaine") return 7;
-  return joursParMois;
+/** Décalage à appliquer, à partir de l'heure du jeu actuelle (ms depuis le 1er janvier 1970). */
+function decalagePour(duree: DureeAvance, heureJeuMs: number): number {
+  if (duree === "heure") return MS_PAR_HEURE;
+  if (duree === "jour") return MS_PAR_JOUR;
+  return finDuMoisMs(moisDeLInstantMs(heureJeuMs)) - heureJeuMs;
 }
 
 /**
  * Fait avancer le temps du monde de recette d'une durée prédéfinie.
  *
- * L'horloge se déduit de la date de création du monde : l'avancer, c'est reculer cette date.
- * Le serveur seul décide (le navigateur n'envoie qu'un nom de durée), puis le moteur rattrape
- * les pas manquants à la mise à jour suivante. Irréversible : seule une remise à zéro du
- * monde de recette ramène en arrière.
+ * L'heure du jeu vaut « maintenant − worlds.debut_reel » : l'avancer, c'est reculer cette
+ * origine. Le serveur seul décide (le navigateur n'envoie qu'un nom de durée ; l'instant
+ * `maintenantMs` est l'horloge du serveur), puis le moteur rattrape les pas manquants à la
+ * mise à jour suivante. Irréversible : seule une remise à zéro du monde ramène en arrière.
  */
 export async function avancerLeTemps(
   stockage: StockageMonde,
   audit: JournalAudit,
-  params: Parametres,
   duree: string,
   ctx: ContexteAction,
+  maintenantMs: number,
 ): Promise<ResultatAvanceTemps> {
   if (!ctx.modeRecette) {
     throw new ErreurAdmin("Avancer le temps est désactivé hors du mode recette.", 403);
@@ -81,17 +86,14 @@ export async function avancerLeTemps(
       409,
     );
   }
-
-  const config = configTempsDepuis(params);
-  const joursParMois = params["temps_jours_par_mois_jeu"]?.valeur;
-  if (!joursParMois || joursParMois <= 0) {
-    throw new Error("Paramètre manquant : temps_jours_par_mois_jeu");
+  if (!estMoisCalendaire(monde.moisCourant)) {
+    throw new ErreurAdmin(
+      "Le monde est encore sur l'ancien calendrier : la migration 0043 (horloge réelle) n'est pas appliquée.",
+      409,
+    );
   }
-  const jours = nombreDeJours(duree as DureeAvance, joursParMois);
-  const decalageMs = Math.round(
-    ((config.minutesReellesParMoisJeu * jours) / joursParMois) * MS_PAR_MINUTE,
-  );
 
+  const decalageMs = decalagePour(duree as DureeAvance, maintenantMs - monde.debutReelMs);
   const debutReelApresMs = monde.debutReelMs - decalageMs;
   await stockage.definirDebutReel(monde.id, debutReelApresMs);
   await audit.enregistrer({

@@ -14,7 +14,7 @@ export type LigneVenteLivre = {
 /** Pièces sorties (vente) ou rentrées (retour, négatif) à un pas donné. */
 export type MouvementVente = {
   readonly produit: string;
-  /** Pas absolu depuis le début du monde (mois × pas par mois + rang du pas). */
+  /** Pas absolu (premier pas du mois + rang du pas dans le mois). */
   readonly pas: number;
   readonly pieces: number;
 };
@@ -24,8 +24,15 @@ const LIBELLE_VENTE = /^(Vente directe|Vente revendeur|Vente boutique|Retour) (\
 // Identifiant d'écriture d'un pas : « …_p<rang du pas dans le mois> » (moteur/pas.ts).
 const RANG_DU_PAS = /_p(\d+)$/;
 
-/** Ventes et retours, une fois par écriture, lus dans le libellé (pièces, produit) et l'identifiant (pas). */
-export function mouvementsDeVente(lignes: readonly LigneVenteLivre[], pasParMois: number): MouvementVente[] {
+/**
+ * Ventes et retours, une fois par écriture, lus dans le libellé (pièces, produit) et l'identifiant (pas).
+ * `premierPasDuMois` donne le pas absolu où commence un mois : les mois calendaires n'ont pas tous
+ * le même nombre de pas.
+ */
+export function mouvementsDeVente(
+  lignes: readonly LigneVenteLivre[],
+  premierPasDuMois: (mois: number) => number,
+): MouvementVente[] {
   const vues = new Set<string>();
   const r: MouvementVente[] = [];
   for (const l of lignes) {
@@ -37,7 +44,7 @@ export function mouvementsDeVente(lignes: readonly LigneVenteLivre[], pasParMois
     const pieces = Number(m[2]);
     r.push({
       produit: m[3]!,
-      pas: l.mois_jeu * pasParMois + (rang ? Number(rang) : 0),
+      pas: premierPasDuMois(l.mois_jeu) + (rang ? Number(rang) : 0),
       pieces: m[1] === "Retour" ? -pieces : pieces,
     });
   }
