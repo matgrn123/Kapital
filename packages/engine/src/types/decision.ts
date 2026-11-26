@@ -38,7 +38,15 @@ export type ActionMarketing =
   | "publicite"
   | "image_marque"
   | "promotion"
-  | "relations_presse";
+  | "relations_presse"
+  // Nouvelles publicités : influenceurs (petit, moyen, gros compte, effet incertain),
+  // réseaux sociaux, affichage dans le métro, campagne confiée à une agence.
+  | "influenceur_nano"
+  | "influenceur_micro"
+  | "influenceur_macro"
+  | "reseaux_sociaux"
+  | "affichage_metro"
+  | "agence_publicite";
 
 export type DecisionActionMarketing = {
   readonly type: "action_marketing";

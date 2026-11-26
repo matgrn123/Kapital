@@ -28,6 +28,19 @@ import {
 import { CarteEtape } from "./CarteEtape";
 import { produitsEnStockBas } from "../../../lib/stock";
 import { chargerSituationStock } from "../stock/donnees";
+import { CarteBilanMois } from "./CarteBilanMois";
+import { CartePendantAbsence } from "./CartePendantAbsence";
+import { MarquerVu } from "../journal/MarquerVu";
+import { debriefDuMois } from "../../../lib/debrief";
+import {
+  COLONNES_EVENEMENTS,
+  nouveautes,
+  resumeAbsence,
+  ventesDepuis,
+  type LigneEvenementLue,
+  type NomsJournal,
+} from "../../../lib/journal";
+import type { DetailCloture } from "@kapital/server";
 
 // Tableau de bord (design V2, docs/maquette) : ce que voit un dirigeant chaque
 // matin. Tout vient de la base : grand livre, marque, stock, classement.
@@ -51,6 +64,29 @@ export default async function PageJeu() {
   if (!entreprise) return null;
 
   const situationStock = chargerSituationStock(supabase, entreprise.id);
+  // Journal : tout ce qui est lu à partir d'ici est « vu » jusqu'à cet instant. Lectures lancées
+  // en même temps que celles du tableau de bord, attendues plus bas ; une lecture en échec
+  // (journal pas encore installé) masque seulement les cartes du journal.
+  const vuJusqua = new Date().toISOString();
+  const lectureJournal = Promise.all([
+    supabase.from("companies").select("derniere_visite_le").eq("id", entreprise.id).maybeSingle(),
+    supabase
+      .from("evenements")
+      .select(COLONNES_EVENEMENTS)
+      .eq("company_id", entreprise.id)
+      .order("cree_le", { ascending: false })
+      .limit(200),
+    supabase
+      .from("evenements")
+      .select(COLONNES_EVENEMENTS)
+      .eq("company_id", entreprise.id)
+      .eq("type", "cloture_mois")
+      .order("mois_jeu", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase.from("materials").select("id, nom, unite"),
+  ]);
+
   const [monde, grandLivre, marque, stocks, catalogue, produits, classement, progressions] = await Promise.all([
     supabase.from("worlds").select("mois_courant").limit(1).maybeSingle(),
     supabase
@@ -107,6 +143,32 @@ export default async function PageJeu() {
   const evolution =
     caMoisPrecedent > 0 ? Math.round(((caMois - caMoisPrecedent) / caMoisPrecedent) * 1000) / 10 : null;
 
+  // Journal : « Pendant ton absence » (seulement s'il s'est passé quelque chose) et bilan du mois.
+  const [visite, journal, derniereCloture, matieres] = await lectureJournal;
+  const derniereVisite = (visite.data?.derniere_visite_le as string | null | undefined) ?? null;
+  const nomsJournal: NomsJournal = {
+    produits: nomsProduits,
+    matieres: Object.fromEntries(
+      ((matieres.data ?? []) as Array<{ id: string; nom: string; unite: string }>).map((m) => [m.id, { nom: m.nom, unite: m.unite }]),
+    ),
+  };
+  const nouveaux = nouveautes((journal.data ?? []) as LigneEvenementLue[], derniereVisite);
+  const clotureLue = (derniereCloture.data ?? null) as LigneEvenementLue | null;
+  const debrief = clotureLue?.detail ? debriefDuMois(clotureLue.detail as unknown as DetailCloture, nomsProduits) : null;
+  const urgent = signaux.find((s) => s.ton === "critique" || s.ton === "alerte");
+  const absence =
+    derniereVisite !== null && nouveaux.length > 0
+      ? {
+          resume: resumeAbsence(nouveaux, ventesDepuis(lignes, derniereVisite), nomsJournal),
+          urgent: urgent ? { texte: urgent.texte, ton: urgent.ton as "alerte" | "critique" } : null,
+          conseil: urgent?.lien
+            ? { texte: urgent.texte, href: urgent.lien, libelle: "Y aller" }
+            : debrief
+              ? { texte: debrief.essayer, href: debrief.lien.href, libelle: debrief.lien.libelle }
+              : null,
+        }
+      : null;
+
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -121,6 +183,16 @@ export default async function PageJeu() {
         </div>
         <BoutonLien href="/vue-3d">← Le village</BoutonLien>
       </header>
+
+      <MarquerVu jusqua={vuJusqua} />
+      {(absence || debrief) && (
+        <div
+          className={`grid items-start gap-4 ${absence && debrief ? "xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]" : ""}`}
+        >
+          {absence && <CartePendantAbsence depuis={derniereVisite!} {...absence} />}
+          {debrief && clotureLue && <CarteBilanMois mois={clotureLue.mois_jeu} debrief={debrief} />}
+        </div>
+      )}
 
       {nouveauJoueur && (
         <Carte titre="Pour démarrer" surTitre="Premiers pas">

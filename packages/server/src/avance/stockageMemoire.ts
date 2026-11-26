@@ -18,6 +18,7 @@ import {
   type ResultatLotAEnregistrer,
   type StockageMonde,
 } from "./port.js";
+import type { EvenementJournal } from "../evenements/types.js";
 
 /** Passe par du JSON, comme la vraie base : ce qui n'est pas sérialisable est perdu. */
 function viaJson<T>(valeur: T): T {
@@ -57,6 +58,10 @@ export class StockageMemoire implements StockageMonde {
   /** Fait « attendre » chaque chargement, pour entrecroiser deux traitements simultanés. */
   cederLaMain = false;
   nbAppliquerPas = 0;
+  /** Journal : événements enregistrés, dans l'ordre ; une clé n'existe qu'une fois par société. */
+  readonly evenements: { companyId: string; evenement: EvenementJournal }[] = [];
+  /** Pannes simulées de l'enregistrement du journal. */
+  pannesJournal = 0;
 
   constructor(monde: { id: string; moisCourant: number; debutReelMs: number | null }) {
     this.monde = { ...monde };
@@ -184,5 +189,21 @@ export class StockageMemoire implements StockageMonde {
     for (const ecriture of lot.ecritures) this.ecritures.push({ companyId, ecriture: viaJson(ecriture) });
     const livrees = new Set([...lot.commandesMatiereLivrees, ...lot.ordresFaconnierLivres]);
     for (const l of this.livraisons.get(companyId) ?? []) if (livrees.has(l.id)) l.statut = "livree";
+  }
+
+  async enregistrerEvenements(companyId: string, evenements: readonly EvenementJournal[]): Promise<void> {
+    if (this.pannesJournal > 0) {
+      this.pannesJournal -= 1;
+      throw new Error("panne simulée du journal");
+    }
+    // Comme la contrainte unique (company_id, cle) de la table evenements.
+    for (const evenement of evenements) {
+      if (this.evenements.some((e) => e.companyId === companyId && e.evenement.cle === evenement.cle)) continue;
+      this.evenements.push({ companyId, evenement: viaJson(evenement) });
+    }
+  }
+
+  evenementsDe(companyId: string): readonly EvenementJournal[] {
+    return this.evenements.filter((e) => e.companyId === companyId).map((e) => e.evenement);
   }
 }

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { pourcentageJauge } from "../../components/ui/calculs";
 import { dateDeJeu, ventesParJour } from "../../lib/cadre";
 import { creerClientNavigateur } from "../../lib/supabase/client";
+import { EVENEMENT_JOURNAL_VU } from "./journal/MarquerVu";
 
 // Barre du haut (design V2, docs/maquette) : ce qu'un joueur regarde sans
 // arrêt. Aucun chiffre n'est inventé : trésorerie, ventes et marque sont lues
@@ -160,6 +161,30 @@ export function BarreJeu({
     };
   }, [companyId, chemin, mois, tresorerieInitiale]);
 
+  // Cloche : nombre d'événements du journal arrivés depuis la dernière visite (table evenements).
+  const [nouveautes, setNouveautes] = useState<number | null>(null);
+  useEffect(() => {
+    let actif = true;
+    const supabase = creerClientNavigateur();
+    const compter = async () => {
+      const visite = await supabase.from("companies").select("derniere_visite_le").eq("id", companyId).maybeSingle();
+      if (visite.error) return; // journal pas encore installé : pas de cloche chiffrée
+      let requete = supabase.from("evenements").select("id", { count: "exact", head: true }).eq("company_id", companyId);
+      const depuis = visite.data?.derniere_visite_le as string | null | undefined;
+      if (depuis) requete = requete.gt("cree_le", depuis);
+      const { count, error } = await requete;
+      if (actif && !error) setNouveautes(count ?? 0);
+    };
+    void compter();
+    const t = setInterval(compter, RAFRAICHIR_MS);
+    window.addEventListener(EVENEMENT_JOURNAL_VU, compter);
+    return () => {
+      actif = false;
+      clearInterval(t);
+      window.removeEventListener(EVENEMENT_JOURNAL_VU, compter);
+    };
+  }, [companyId, chemin]);
+
   useEffect(() => {
     setMaintenant(Date.now());
     const t = setInterval(() => setMaintenant(Date.now()), 15_000);
@@ -204,6 +229,26 @@ export function BarreJeu({
           {etat.desirabilite === null ? "…" : Math.round(etat.desirabilite)}
         </Vignette>
       </div>
+
+      <Link
+        href="/journal"
+        className="relative grid h-10 w-10 place-items-center rounded-[9px] border border-line bg-surface text-ink transition hover:border-accent"
+        aria-label={
+          nouveautes && nouveautes > 0
+            ? `Journal : ${nouveautes} nouveauté${nouveautes > 1 ? "s" : ""} depuis ta dernière visite`
+            : "Journal : ce qui s'est passé dans ta société"
+        }
+        title="Journal : ce qui s'est passé dans ta société"
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 15 6 9M10.3 20.5a2 2 0 0 0 3.4 0" />
+        </svg>
+        {nouveautes !== null && nouveautes > 0 && (
+          <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-[20px] place-items-center rounded-full bg-bad px-1 text-[0.68rem] font-bold tabular-nums text-white">
+            {nouveautes > 99 ? "99+" : nouveautes}
+          </span>
+        )}
+      </Link>
 
       <div
         className="rounded-[9px] border border-accent bg-accent px-3.5 py-2 font-semibold text-on-accent"
