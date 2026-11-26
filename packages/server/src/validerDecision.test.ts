@@ -318,6 +318,39 @@ describe("action_marketing", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe("montant_invalide");
   });
+
+  it("refuse un influenceur sous le montant minimum, avec un message clair", () => {
+    const min = chargerParametresV1()["marketing_montant_min_influenceur_macro"]!.valeur;
+    const r = validerDecision(ctxDefault(), {
+      type: "action_marketing",
+      action: "influenceur_macro",
+      montant: centimes(min - 100),
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe("montant_minimum");
+      expect(r.message).toMatch(/budget minimum/);
+    }
+    expect(
+      validerDecision(ctxDefault(), { type: "action_marketing", action: "influenceur_macro", montant: centimes(min) }).ok,
+    ).toBe(true);
+  });
+
+  it("refuse l'affichage dans le métro avant l'étape prévue, l'accepte ensuite", () => {
+    const p = chargerParametresV1();
+    const etape = p["marketing_etape_min_affichage_metro"]!.valeur as 0 | 1 | 2 | 3;
+    const montant = centimes(p["marketing_montant_min_affichage_metro"]!.valeur);
+    const avant = validerDecision(ctxDefault(entreprise({ etape: (etape - 1) as 0 | 1 | 2 | 3 })), {
+      type: "action_marketing",
+      action: "affichage_metro",
+      montant,
+    });
+    expect(avant.ok).toBe(false);
+    if (!avant.ok) expect(avant.code).toBe("etape_insuffisante");
+    expect(
+      validerDecision(ctxDefault(entreprise({ etape })), { type: "action_marketing", action: "affichage_metro", montant }).ok,
+    ).toBe(true);
+  });
 });
 
 describe("embauche", () => {

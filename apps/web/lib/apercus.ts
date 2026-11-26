@@ -16,8 +16,13 @@ import {
   enregistrerVenteRevendeur,
   ErreurCommande,
   ErreurFaconnier,
+  ACTIONS_MARKETING,
   fluxMarque,
+  fourchetteAlea,
   graine,
+  honorairesMarketing,
+  verifierActionMarketing,
+  type ActionMarketing,
   idEntreprise,
   idFaconnier,
   idFournisseur,
@@ -426,11 +431,23 @@ export function apercuFaconnier(e: {
 
 /* --------------------------------------------------------------- Publicité */
 
-export type TypeActionMarketing = "publicite" | "image_marque" | "promotion" | "relations_presse";
+export type TypeActionMarketing = ActionMarketing;
+
+type Jauges = { readonly notoriete: number; readonly desirabilite: number };
 
 export type ApercuMarketing = {
   readonly ok: true;
-  readonly apres: { readonly notoriete: number; readonly desirabilite: number };
+  /** Marque après l'action, à l'effet moyen (aléa = 1). */
+  readonly apres: Jauges;
+  /** Marque après l'action dans le pire et le meilleur cas de l'aléa (égales à `apres` sans aléa). */
+  readonly apresMin: Jauges;
+  readonly apresMax: Jauges;
+  /** Fourchette de l'aléa : {1, 1} pour une action sans aléa. */
+  readonly alea: { readonly min: number; readonly max: number };
+  /** Agence : honoraires prélevés sur le budget (centimes), 0 sinon. */
+  readonly honoraires: number;
+  /** Réseaux sociaux : nombre d'affichages achetés, au coût pour mille des paramètres. */
+  readonly affichages: number | null;
   readonly tresorerieApres: number;
   readonly ecriture: LigneEcriture[];
 };
@@ -453,47 +470,92 @@ export function ecritureMarketing(montant: number): LigneEcriture[] {
   return versLignes(derniere(gl));
 }
 
+/** Marque juste après l'action (la route l'applique tout de suite, sans décroissance : durée 0). */
+function marqueApres(marque: Jauges, action: ActionMarketing, montant: number, alea: number, c: CoefficientsMarketing): Jauges {
+  return fluxMarque(marque, 0, [{ action, montant: centimes(montant), alea }], c);
+}
+
 export function apercuMarketing(e: {
   action: TypeActionMarketing;
   montant: number;
   tresorerie: number;
   marque: { notoriete: number; desirabilite: number };
   coefficients: CoefficientsMarketing;
+  /** Étape de la société (étape effective) : l'affichage dans le métro en dépend. */
+  etape: number;
 }): ApercuMarketing | Refus {
   if (!entier(e.montant)) return { ok: false, message: "Indique un montant positif." };
+  // Mêmes règles que la route et le serveur : montant minimum de l'action, étape.
+  const regles = verifierActionMarketing({ action: e.action, montant: e.montant, etape: e.etape, coefficients: e.coefficients });
+  if (!regles.ok) return { ok: false, message: regles.message };
   if (e.montant > e.tresorerie) {
     return {
       ok: false,
       message: `Trésorerie insuffisante : il te manque ${formaterEuros(e.montant - e.tresorerie)} €.`,
     };
   }
-  // La route applique l'effet tout de suite, sans décroissance : durée 0.
-  const apres = fluxMarque(e.marque, 0, [{ action: e.action, montant: centimes(e.montant) }], e.coefficients);
+  const alea = fourchetteAlea(e.action, e.coefficients);
+  const cpm = e.coefficients.actions[e.action].coutPourMilleAffichages;
   return {
     ok: true,
-    apres,
+    apres: marqueApres(e.marque, e.action, e.montant, 1, e.coefficients),
+    apresMin: marqueApres(e.marque, e.action, e.montant, alea.min, e.coefficients),
+    apresMax: marqueApres(e.marque, e.action, e.montant, alea.max, e.coefficients),
+    alea,
+    honoraires: honorairesMarketing(e.action, centimes(e.montant), e.coefficients),
+    affichages: cpm ? Math.floor((e.montant / cpm) * 1000) : null,
     tresorerieApres: e.tresorerie - e.montant,
     ecriture: ecritureMarketing(e.montant),
   };
 }
 
-/** Écart attendu sur chaque jauge pour les quatre actions, au budget donné (moteur : fluxMarque). */
+export type EffetTuileMarketing = {
+  readonly notoriete: number;
+  readonly desirabilite: number;
+  /** Influenceur : écarts dans le pire et le meilleur cas de l'aléa, [min, max]. */
+  readonly fourchette?: {
+    readonly notoriete: readonly [number, number];
+    readonly desirabilite: readonly [number, number];
+  };
+  /** Le budget est sous le minimum de l'action (l'effet affiché est celui du minimum). */
+  readonly sousMinimum?: true;
+};
+
+/**
+ * Écart attendu sur chaque jauge pour chaque action, au budget donné (moteur : fluxMarque).
+ * Sous le minimum d'une action, l'écart est celui du minimum, et la tuile le signale.
+ */
 export function effetsMarketing(e: {
   montant: number;
   marque: { notoriete: number; desirabilite: number };
   coefficients: CoefficientsMarketing;
-}): Record<TypeActionMarketing, { notoriete: number; desirabilite: number }> {
-  const types: TypeActionMarketing[] = ["publicite", "image_marque", "promotion", "relations_presse"];
-  const sortie = {} as Record<TypeActionMarketing, { notoriete: number; desirabilite: number }>;
-  for (const action of types) {
+}): Record<TypeActionMarketing, EffetTuileMarketing> {
+  const sortie = {} as Record<TypeActionMarketing, EffetTuileMarketing>;
+  for (const action of ACTIONS_MARKETING) {
     if (!entier(e.montant)) {
       sortie[action] = { notoriete: 0, desirabilite: 0 };
       continue;
     }
-    const apres = fluxMarque(e.marque, 0, [{ action, montant: centimes(e.montant) }], e.coefficients);
+    const minimum = e.coefficients.actions[action].montantMinimum;
+    const montant = Math.max(e.montant, minimum);
+    const ecart = (alea: number) => {
+      const apres = marqueApres(e.marque, action, montant, alea, e.coefficients);
+      return { notoriete: apres.notoriete - e.marque.notoriete, desirabilite: apres.desirabilite - e.marque.desirabilite };
+    };
+    const f = fourchetteAlea(action, e.coefficients);
+    const bas = ecart(f.min);
+    const haut = ecart(f.max);
     sortie[action] = {
-      notoriete: apres.notoriete - e.marque.notoriete,
-      desirabilite: apres.desirabilite - e.marque.desirabilite,
+      ...ecart(1),
+      ...(f.min < f.max
+        ? {
+            fourchette: {
+              notoriete: [bas.notoriete, haut.notoriete] as const,
+              desirabilite: [bas.desirabilite, haut.desirabilite] as const,
+            },
+          }
+        : {}),
+      ...(e.montant < minimum ? { sousMinimum: true as const } : {}),
     };
   }
   return sortie;
