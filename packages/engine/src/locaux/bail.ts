@@ -3,6 +3,7 @@ import type { EcritureComptable } from "../comptabilite/types.js";
 import type { Bail } from "../types/entreprise.js";
 import { centimes, type Centimes, type MoisJeu } from "../types/primitifs.js";
 import { suffixeLocal } from "./achat.js";
+import { auProrata, moisEntier, type PartDuMois } from "../moteur/prorata.js";
 
 // AE-5 : bail d'un local. Fonctions pures ; les montants du local (loyer, charges) viennent
 // du catalogue des bâtiments, le dépôt et le préavis des paramètres sourcés (bail_*).
@@ -75,7 +76,11 @@ export function ecritureSignatureBail(
   };
 }
 
-/** Loyer (613) puis charges (614), payés par la banque ; un montant nul ne donne pas d'écriture. */
+/**
+ * Loyer (613) puis charges (614), payés par la banque ; un montant nul ne donne pas d'écriture.
+ * Lot T4 : `part` ramène le mois de la signature aux jours restants (moteur/prorata) ; absente,
+ * le mois entier.
+ */
 export function ecrituresMensuellesBail(
   idEntreprise: string,
   mois: MoisJeu,
@@ -83,27 +88,32 @@ export function ecrituresMensuellesBail(
   chargesMensuelles: Centimes,
   /** 3D-7 : identifiant du local, ajouté à l'identifiant des écritures (absent = un seul local). */
   idLocal?: string,
+  part?: PartDuMois,
 ): EcritureComptable[] {
   const ecritures: EcritureComptable[] = [];
-  if (loyerMensuel > 0) {
+  const prorata = part !== undefined && !moisEntier(part);
+  const loyer = part === undefined ? loyerMensuel : auProrata(loyerMensuel, part);
+  const charges = part === undefined ? chargesMensuelles : auProrata(chargesMensuelles, part);
+  const precision = prorata ? ` (${part.jours} jours sur ${part.joursDuMois})` : "";
+  if (loyer > 0) {
     ecritures.push({
       id: `loyer_${mois}_${idEntreprise}${suffixeLocal(idLocal)}`,
       mois,
-      libelle: "Loyer atelier",
+      libelle: `Loyer atelier${precision}`,
       lignes: [
-        { compte: "613", sens: "debit", montant: loyerMensuel },
-        { compte: "512", sens: "credit", montant: loyerMensuel },
+        { compte: "613", sens: "debit", montant: loyer },
+        { compte: "512", sens: "credit", montant: loyer },
       ],
     });
   }
-  if (chargesMensuelles > 0) {
+  if (charges > 0) {
     ecritures.push({
       id: `charges_locatives_${mois}_${idEntreprise}${suffixeLocal(idLocal)}`,
       mois,
-      libelle: "Charges locatives atelier",
+      libelle: `Charges locatives atelier${precision}`,
       lignes: [
-        { compte: "614", sens: "debit", montant: chargesMensuelles },
-        { compte: "512", sens: "credit", montant: chargesMensuelles },
+        { compte: "614", sens: "debit", montant: charges },
+        { compte: "512", sens: "credit", montant: charges },
       ],
     });
   }

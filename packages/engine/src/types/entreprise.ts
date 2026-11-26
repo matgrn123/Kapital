@@ -44,6 +44,8 @@ export type Salarie = {
    * Heure du jeu de l'embauche (ms depuis le 1er janvier 1970, comme `heureJeuMs`). L'expérience
    * qui fixe le rendement est comptée en jours depuis cet instant (`experienceEnJours`). Absente
    * (banc d'essai, tests) : embauché au début du mois, `experienceMois` mois complets plus tôt.
+   * Lot T4 : le premier mois, salaire et cotisations sont payés au prorata des jours restants
+   * (moteur/prorata), et l'artisan ne produit qu'à partir de cet instant.
    */
   readonly embaucheMs?: number;
 };
@@ -55,6 +57,12 @@ export type Bail = {
   /** Charges locatives mensuelles (compte 614). */
   readonly chargesMensuelles: Centimes;
   readonly moisSignature: MoisJeu;
+  /**
+   * Lot T4 : instant de la signature (heure du jeu, ms ; workshops.cree_le en base). Le premier
+   * mois, loyer, charges et énergie sont payés au prorata des jours restants (moteur/prorata).
+   * Absent (banc d'essai, anciens tests) : mois entier.
+   */
+  readonly signatureMs?: number;
   /** Dernier mois du bail (fin du préavis) ; null tant qu'aucun congé n'est donné. */
   readonly moisFin: MoisJeu | null;
 };
@@ -109,6 +117,11 @@ export type PointDeVente = {
   /** Dépôt versé à la signature (compte 275). */
   readonly depotGarantie: Centimes;
   readonly moisSignature: MoisJeu;
+  /**
+   * Lot T4 : instant de la signature (heure du jeu, ms ; points_de_vente.cree_le en base). Le
+   * premier mois, loyer et charges sont payés au prorata des jours restants. Absent : mois entier.
+   */
+  readonly signatureMs?: number;
   /** Mois qui contient l'instant d'ouverture : l'amortissement des agencements commence ce mois-là. */
   readonly moisOuverture: MoisJeu;
   /**

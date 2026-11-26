@@ -12,6 +12,7 @@ import {
   coefficientsSalairesDepuisParametres,
   cotisationsPatronales,
   enregistrerPaieMensuelle,
+  tauxCotisations,
   ecriturePaiementPaie,
 } from "../salaires/calculs.js";
 import {
@@ -42,6 +43,7 @@ import type {
 } from "./donneesMois.js";
 import { agregatsDe, sommeAgregats } from "./agregats.js";
 import { incrementerAnciennete, netMouvements512, sommeTvaCollectee } from "./flux.js";
+import { auProrata, moisEntier, partDuMoisDepuis } from "./prorata.js";
 
 function lireParametre(params: Parametres, cle: string): number {
   const v = params[cle]?.valeur;
@@ -112,8 +114,10 @@ export function cloturerMois(
   let ent = { ...entreprise };
   let gl: GrandLivre = planComptableV1();
   const ecrituresCloture: EcritureComptable[] = [];
-  const loyerAteliersDuMois = ent.ateliers.reduce((s, a) => s + a.loyerMensuel, 0);
-  const nbAteliersLoues = ent.ateliers.filter((a) => a.loyerMensuel > 0).length;
+  // Loyers des ateliers réellement passés ce mois (au prorata le mois de la signature).
+  let loyerAteliersDuMois = 0;
+  let nbAteliersLoues = 0;
+  let loyersAuProrata = 0;
 
   function enr(ecriture: EcritureComptable): void {
     gl = enregistrer(gl, ecriture);
@@ -136,22 +140,36 @@ export function cloturerMois(
   // Salaires
   const coeffsSalaires = coefficientsSalairesDepuisParametres(params);
   let totalSalairesBruts = 0;
+  let salairesAuProrata = 0;
 
   for (const salarie of ent.salaries) {
     if (salarie.id === undefined) continue;
-    const cotisations = cotisationsPatronales({
+    const entreesTaux = {
       salaireBrutMensuel: salarie.salaireBrutMensuel,
       smicMensuelBrut: coeffsSalaires.smicMensuelBrut,
       tauxCotisationsSmic: coeffsSalaires.tauxCotisationsSmic,
       tauxCotisationsPleines: coeffsSalaires.tauxCotisationsPleines,
       seuilCotisationsPleinesEnSmic: coeffsSalaires.seuilCotisationsPleinesEnSmic,
-    });
+    };
+    // Lot T4 : le mois de l'embauche, salaire et cotisations au prorata des jours restants. Le
+    // taux de cotisations se lit sur le salaire MENSUEL (le niveau par rapport au SMIC ne baisse
+    // pas parce que le mois est entamé) ; chaque montant est arrondi une seule fois.
+    const part = partDuMoisDepuis(mois, salarie.embaucheMs);
+    const entier = moisEntier(part);
+    const salaireBrut = entier ? salarie.salaireBrutMensuel : auProrata(salarie.salaireBrutMensuel, part);
+    const cotisations = entier
+      ? cotisationsPatronales(entreesTaux)
+      : auProrata(salarie.salaireBrutMensuel * tauxCotisations(entreesTaux), part);
+    // Embauché après la fin du mois clôturé (clôture rattrapée après coup) : rien à payer.
+    if (salaireBrut <= 0) continue;
+    if (!entier) salairesAuProrata += 1;
     // Enregistrement comptable 641+645 / 421+431
     gl = enregistrerPaieMensuelle(gl, {
       idEcriture: `salaire_${mois}_${salarie.id}`,
       mois,
-      salaireBrutMensuel: salarie.salaireBrutMensuel,
+      salaireBrutMensuel: salaireBrut,
       cotisationsPatronales: cotisations,
+      ...(entier ? {} : { libelle: `Paie (${part.jours} jours sur ${part.joursDuMois}, embauche en cours de mois)` }),
     });
     ecrituresCloture.push(gl.ecritures[gl.ecritures.length - 1]!);
 
@@ -161,12 +179,12 @@ export function cloturerMois(
         idEcriture: `salaire_pmt_${mois}_${salarie.id}`,
         mois,
         libelle: `Paiement salaire ${salarie.id}`,
-        salaireBrutMensuel: salarie.salaireBrutMensuel,
+        salaireBrutMensuel: salaireBrut,
         cotisationsPatronales: cotisations,
       }),
     );
 
-    totalSalairesBruts += salarie.salaireBrutMensuel;
+    totalSalairesBruts += salaireBrut;
   }
 
   // Ateliers : loyer, énergie, amortissement. 3D-7 : chaque local paie les siens ; ses écritures
@@ -177,6 +195,9 @@ export function cloturerMois(
   const postesFournis = lireParametre(params, "bail_machines_a_la_signature");
   const ateliersApres = ent.ateliers.map((atelier) => {
     const suffixe = suffixeLocal(atelier.id);
+    // Lot T4 : le mois de la signature du bail, loyer, charges et énergie au prorata des jours
+    // restants. Local acheté, ou bail sans date de signature : mois entier.
+    const part = partDuMoisDepuis(mois, atelier.bail?.signatureMs);
 
     // Loyer (613) et charges locatives (614) ; un atelier d'avant AE-5 n'a pas de charges.
     for (const ecriture of ecrituresMensuellesBail(
@@ -185,8 +206,14 @@ export function cloturerMois(
       atelier.loyerMensuel,
       atelier.bail?.chargesMensuelles ?? centimes(0),
       atelier.id,
+      part,
     )) {
       enr(ecriture);
+      if (ecriture.id.startsWith("loyer_")) {
+        loyerAteliersDuMois += ecriture.lignes[0]!.montant;
+        nbAteliersLoues += 1;
+        if (!moisEntier(part)) loyersAuProrata += 1;
+      }
     }
 
     // Propriétaire (AE-6) : entretien du local (614) et amortissement de la construction (681 / 2813)
@@ -199,7 +226,7 @@ export function cloturerMois(
 
     // 3D-3 : énergie par poste posé (paramètre energie_kwh_par_poste_mois × prix du kWh).
     const postesPoses = effetsPlan(atelier.modules).postesEquipes;
-    const energieCentimes = centimes(Math.round(postesPoses * kwhParPoste * prixElecParKwh));
+    const energieCentimes = auProrata(postesPoses * kwhParPoste * prixElecParKwh, part);
     if (energieCentimes > 0) {
       enr({
         id: `energie_${mois}_${ent.id}${suffixe}`,
@@ -382,7 +409,11 @@ export function cloturerMois(
   if (totalSalairesBruts > 0) {
     explications.push({
       cle: "salaires",
-      message: `Salaires bruts : ${eurosTexte(totalSalairesBruts)}`,
+      message:
+        `Salaires bruts : ${eurosTexte(totalSalairesBruts)}` +
+        (salairesAuProrata > 0
+          ? ` (dont ${salairesAuProrata} embauche${salairesAuProrata > 1 ? "s" : ""} du mois, payée${salairesAuProrata > 1 ? "s" : ""} au prorata des jours)`
+          : ""),
     });
   }
 
@@ -390,9 +421,10 @@ export function cloturerMois(
     explications.push({
       cle: "loyer",
       message:
-        nbAteliersLoues > 1
+        (nbAteliersLoues > 1
           ? `Loyers des ateliers (${nbAteliersLoues} locaux) : ${eurosTexte(centimes(loyerAteliersDuMois))}`
-          : `Loyer atelier : ${eurosTexte(centimes(loyerAteliersDuMois))}`,
+          : `Loyer atelier : ${eurosTexte(centimes(loyerAteliersDuMois))}`) +
+        (loyersAuProrata > 0 ? " (bail signé ce mois-ci : au prorata des jours)" : ""),
     });
   }
 

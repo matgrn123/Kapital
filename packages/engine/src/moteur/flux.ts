@@ -15,7 +15,7 @@ import {
 } from "../boutique/boutique.js";
 import { coefficientsMarketingDepuisParametres, fluxMarque } from "../marketing/index.js";
 import type { DepenseMarketing } from "../marketing/types.js";
-import type { Entreprise, LigneStockFini, LigneStockMatiere } from "../types/entreprise.js";
+import type { Entreprise, LigneStockFini, LigneStockMatiere, Salarie } from "../types/entreprise.js";
 import type { Monde } from "../types/monde.js";
 import {
   centimes,
@@ -192,6 +192,11 @@ export function planProductionDuMois(
   params: Parametres,
   /** Instant (heure du jeu, ms) où se lit l'expérience des artisans. */
   instantMs: number,
+  /**
+   * Lot T4 : part de la période vécue où chaque artisan était présent (de 0 à 1). Un artisan
+   * embauché en cours de période ne compte que pour sa part. Absente : 1 pour tous.
+   */
+  presence?: (salarie: Salarie) => number,
 ): readonly LignePlanProduction[] {
   if (ent.ateliers.length === 0) return [];
   // AE-7 : seuls les artisans qui occupent un poste équipé produisent et comptent dans le
@@ -210,10 +215,15 @@ export function planProductionDuMois(
   // Expérience en jours depuis l'embauche, apprentissage en ~2 semaines (horloge réelle). Moyenne
   // des rendements (et non rendement de l'expérience moyenne) : avec un tau de 14 jours, un ancien
   // ne doit pas faire passer un débutant du jour au rendement maximal.
+  // Lot T4 : chaque artisan pèse sa part de présence (rendement moyen pondéré de même).
+  const poids = artisans.map((s) => (presence === undefined ? 1 : presence(s)));
+  const artisansPresents = poids.reduce((sum, p) => sum + p, 0);
+  if (artisansPresents <= 0) return [];
   const rendementEffectif =
-    artisans.reduce((sum, s) => sum + rendement(experienceEnJours(s, instantMs), rMin, rMax, tau), 0) / nbArtisans;
+    artisans.reduce((sum, s, i) => sum + poids[i]! * rendement(experienceEnJours(s, instantMs), rMin, rMax, tau), 0) /
+    artisansPresents;
   let capaciteRestante = capaciteMinutes(
-    nbArtisans,
+    artisansPresents,
     postesEquipes,
     heuresMensuelles,
     rendementEffectif,
@@ -383,7 +393,16 @@ export function avancerFlux(
   // L'expérience des artisans se lit au début de ce flux (début du pas, ou du mois pris d'un bloc).
   const debutMois = debutDuMoisMs(mois);
   const instantFlux = debutMois + ((finDuMoisMs(mois) - debutMois) * pasDebut) / pasParMois;
-  for (const ligne of planProductionDuMois(ent, params, instantFlux)) {
+  // Lot T4 : un artisan ne produit qu'à partir de son embauche. La période vécue va du démarrage
+  // de l'entreprise dans le mois à la fin de ce flux ; l'artisan y compte pour la part où il était
+  // là. Sans date d'embauche (banc d'essai), il est là tout le mois.
+  const debutVecuMs = debutMois + Math.floor(((finDuMoisMs(mois) - debutMois) * cumulAvant.pasDemarrage) / pasParMois);
+  const dureeVecueMs = finFluxMs - debutVecuMs;
+  const presence = (s: Salarie): number =>
+    s.embaucheMs === undefined || dureeVecueMs <= 0
+      ? 1
+      : Math.min(1, Math.max(0, (finFluxMs - Math.max(s.embaucheMs, debutVecuMs)) / dureeVecueMs));
+  for (const ligne of planProductionDuMois(ent, params, instantFlux, presence)) {
     const dejaProduit = produitParProduit[ligne.produit] ?? 0;
     const piecesAProduire = Math.floor((ligne.pieces * pasVecus) / pasParMois) - dejaProduit;
     if (piecesAProduire <= 0) continue;
