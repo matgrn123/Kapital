@@ -11,20 +11,47 @@ import {
   type BesoinEnFondsDeRoulement,
   type EcritureComptable,
 } from "@kapital/engine";
+import { formaterEuros } from "./formatage";
+
+/** Pas des curseurs de prix de l'écran Vente, en centimes : chaque cran tombe sur un prix rond. */
+export const PAS_PRIX_CENTIMES = 10;
 
 /**
  * Bornes du curseur de prix public TTC : du prix sans perte (coût de revient
  * plus TVA) au double du plus haut entre ce plancher et le prix actuel. Le prix
- * actuel reste toujours dans les bornes.
+ * actuel reste toujours dans les bornes. Avec un pas, le minimum est arrondi au
+ * pas en dessous et le maximum au pas au-dessus : un curseur avance par crans
+ * depuis son minimum, sans quoi tous ses crans tomberaient sur des prix comme 19,93 €.
  */
-export function bornesPrix(e: { coutRevient: number | null; prixActuel: number; tauxTva: number }): {
+export function bornesPrix(e: { coutRevient: number | null; prixActuel: number; tauxTva: number; pas?: number }): {
   min: number;
   max: number;
 } {
   const plancher = e.coutRevient === null ? 0 : Math.round(e.coutRevient * (1 + e.tauxTva));
   const min = Math.min(plancher, e.prixActuel);
   const max = 2 * Math.max(plancher, e.prixActuel);
-  return { min, max };
+  const pas = e.pas && e.pas > 0 ? e.pas : 1;
+  return { min: Math.floor(min / pas) * pas, max: Math.ceil(max / pas) * pas };
+}
+
+/**
+ * Textes de coût d'un produit qu'on ajoute au catalogue. Le premier produit arrive avec
+ * la série de lancement, payée au coût de l'usine (calcul du serveur, coutUsineParPiece) :
+ * c'est ce coût-là qu'on annonce d'abord ; le façonnier le moins cher vient ensuite, à part.
+ */
+export function coutsProduitAAjouter(e: {
+  serie: { quantite: number; coutParPiece: number } | null;
+  coutFaconnier: number | null;
+}): { principal: string | null; ensuite: string | null } {
+  const facon = e.coutFaconnier === null ? null : `${formaterEuros(e.coutFaconnier)} €`;
+  if (e.serie) {
+    const quantite = e.serie.quantite.toLocaleString("fr-FR");
+    return {
+      principal: `Série de lancement : ${quantite} pièces à ${formaterEuros(e.serie.coutParPiece)} € la pièce`,
+      ensuite: facon === null ? null : `Ensuite dès ${facon} chez un façonnier`,
+    };
+  }
+  return { principal: facon === null ? null : `Coût de revient dès ${facon} la pièce chez un façonnier`, ensuite: null };
 }
 
 const COMPTES_BFR = new Set(["31", "35", "411", "401"]);

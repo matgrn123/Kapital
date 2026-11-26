@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { besoinFondsRoulementDepuisLignes, bornesPrix, coutRevientEstimeSansStock } from "./vente";
+import { besoinFondsRoulementDepuisLignes, bornesPrix, coutRevientEstimeSansStock, coutsProduitAAjouter } from "./vente";
 
 const l = (id: string, compte: string, sens: "debit" | "credit", montant: number) => ({
   ecriture_id: id,
@@ -22,6 +22,38 @@ describe("bornesPrix", () => {
   });
   it("sans coût connu, part de zéro", () => {
     expect(bornesPrix({ coutRevient: null, prixActuel: 1500, tauxTva: 0.2 })).toEqual({ min: 0, max: 3000 });
+  });
+  it("avec un pas, arrondit les bornes au pas pour que chaque cran tombe sur un prix rond", () => {
+    // coût 763, TVA 20 % : plancher 915,6 → 916 ; arrondi au pas de 10 centimes en dessous.
+    const b = bornesPrix({ coutRevient: 763, prixActuel: 1993, tauxTva: 0.2, pas: 10 });
+    expect(b).toEqual({ min: 910, max: 3990 });
+    expect(b.min % 10).toBe(0);
+    expect(b.max % 10).toBe(0);
+  });
+  it("avec un pas, garde le prix actuel dans les bornes", () => {
+    const b = bornesPrix({ coutRevient: 1000, prixActuel: 1197, tauxTva: 0.2, pas: 10 });
+    expect(b.min).toBeLessThanOrEqual(1197);
+    expect(b.max).toBeGreaterThanOrEqual(1197);
+    expect(b).toEqual({ min: 1190, max: 2400 });
+  });
+});
+
+describe("coutsProduitAAjouter", () => {
+  const espaces = (t: string | null) => (t ?? "").replace(/\s/g, " ");
+  it("premier produit : annonce le coût de la série de lancement, puis le façonnier", () => {
+    const c = coutsProduitAAjouter({ serie: { quantite: 100, coutParPiece: 763 }, coutFaconnier: 620 });
+    expect(espaces(c.principal)).toBe("Série de lancement : 100 pièces à 7,63 € la pièce");
+    expect(espaces(c.ensuite)).toBe("Ensuite dès 6,20 € chez un façonnier");
+  });
+  it("produits suivants : pas de série, seulement le façonnier", () => {
+    const c = coutsProduitAAjouter({ serie: null, coutFaconnier: 620 });
+    expect(espaces(c.principal)).toBe("Coût de revient dès 6,20 € la pièce chez un façonnier");
+    expect(c.ensuite).toBeNull();
+  });
+  it("sans façonnier pour ce produit, rien à annoncer après la série", () => {
+    const c = coutsProduitAAjouter({ serie: { quantite: 100, coutParPiece: 763 }, coutFaconnier: null });
+    expect(c.ensuite).toBeNull();
+    expect(coutsProduitAAjouter({ serie: null, coutFaconnier: null })).toEqual({ principal: null, ensuite: null });
   });
 });
 

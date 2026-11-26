@@ -24,7 +24,14 @@ const GAMMES: ReadonlyArray<{ id: Gamme; titre: string; phrase: string }> = [
   },
 ];
 
-export function FormulaireSociete({ capitalAffiche }: { capitalAffiche: string }) {
+export function FormulaireSociete({
+  capitalAffiche,
+  serieLancementPieces,
+}: {
+  capitalAffiche: string;
+  /** Nombre de pièces de la série de lancement (paramètre serie_lancement_pieces). */
+  serieLancementPieces: number;
+}) {
   const router = useRouter();
   const [nom, setNom] = useState("");
   const [gamme, setGamme] = useState<Gamme>("milieu");
@@ -36,7 +43,7 @@ export function FormulaireSociete({ capitalAffiche }: { capitalAffiche: string }
     setErreur(null);
     const nomNet = nom.trim();
     if (nomNet.length === 0) {
-      setErreur("Donnez un nom à votre marque.");
+      setErreur("Donne un nom à ta marque.");
       return;
     }
     setEnCours(true);
@@ -103,8 +110,14 @@ export function FormulaireSociete({ capitalAffiche }: { capitalAffiche: string }
           <span className="chiffre">{capitalAffiche}</span> €
         </p>
         <p className="mt-1 text-xs text-[color:var(--color-g-500)]">
-          Cet argent est placé sur le compte de votre société au départ. Vous commencez sans atelier :
-          vous pourrez faire fabriquer chez des façonniers.
+          Cet argent est versé sur le compte de ta société au départ. Tu commences sans atelier, mais pas
+          les mains vides : ton premier produit arrive avec une série de lancement de{" "}
+          {serieLancementPieces.toLocaleString("fr-FR")} pièces prêtes à vendre, payées sur ce capital au
+          prix de l&apos;usine.
+        </p>
+        <p className="mt-1 text-xs text-[color:var(--color-g-500)]">
+          Pour la suite, tu fais fabriquer chez des façonniers (moins cher, mais il faut attendre) ou
+          chez le grossiste local, qui livre le jour même, plus cher.
         </p>
       </div>
 

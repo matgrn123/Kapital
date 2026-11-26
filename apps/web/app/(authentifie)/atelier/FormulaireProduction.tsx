@@ -325,11 +325,13 @@ export function FormulaireProduction({
       </div>
 
       <Curseur
-        libelle="Quantité (pièces)"
+        libelle="Quantité"
         valeur={quantiteBornee}
         min={bornes.min}
         max={bornes.max}
         onChange={setQuantiteN}
+        saisie="nombre"
+        unite="pièces"
         aide={
           lieu === "atelier"
             ? rienPossible
