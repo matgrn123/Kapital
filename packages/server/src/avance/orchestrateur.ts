@@ -25,6 +25,8 @@ import {
   type ResultatLotAEnregistrer,
   type StockageMonde,
 } from "./port.js";
+import { evenementsDuPas } from "../evenements/evenementsDuPas.js";
+import type { EvenementJournal } from "../evenements/types.js";
 
 const MS_PAR_MINUTE = 60_000;
 
@@ -244,6 +246,7 @@ async function traiterLot(
   let entreprise: Entreprise = etat.entreprise;
   const ecritures: EcritureComptable[] = [];
   let moisDecouvertConsecutifs: number | null = null;
+  const evenements: EvenementJournal[] = [];
 
   for (let k = 0; k < nb; k++) {
     const pasAbsolu = premierPas + k;
@@ -268,6 +271,16 @@ async function traiterLot(
       moisFin,
       index,
     );
+    // Journal : ce que ce pas a changé (livraisons, rupture, découvert, clôture…).
+    evenements.push(
+      ...evenementsDuPas(entreprise, r.entrepriseApres, r, {
+        flux,
+        cumulAvant: cumul,
+        mois: moisFin,
+        pasAbsolu,
+        instantMs: debutDuPasEnMs(config, debutReelMs, pasAbsolu + 1),
+      }),
+    );
     entreprise = r.entrepriseApres;
     cumul = r.cumul;
     ecritures.push(...r.ecrituresDuPas);
@@ -291,4 +304,15 @@ async function traiterLot(
     ordresFaconnierLivres: livraisons.faconniers.map((l) => l.id),
     cumul,
   } satisfies ResultatLotAEnregistrer);
+
+  // Après le pas, jamais avant : un pas refusé (déjà traité, panne) n'écrit rien au journal.
+  // Le journal ne fait que raconter : s'il échoue, le pas reste enregistré et l'argent juste.
+  if (evenements.length > 0) {
+    try {
+      await stockage.enregistrerEvenements(companyId, evenements);
+    } catch (erreur) {
+      const message = erreur instanceof Error ? erreur.message : String(erreur);
+      console.error(`[avance] journal ${companyId} : ${message}`);
+    }
+  }
 }
