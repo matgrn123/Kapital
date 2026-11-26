@@ -12,6 +12,16 @@ export function prixHtDepuisTtc(prixTtc: Centimes, tauxTva: number): Centimes {
   return centimes(Math.round(prixTtc / (1 + tauxTva)));
 }
 
+/** Prix TTC d'un prix HT, arrondi au centime (ex. 30 € HT à 20 % → 36 € TTC). */
+export function prixTtcDepuisHt(prixHt: Centimes, tauxTva: number): Centimes {
+  return centimes(prixHt + tvaSurPrixHt(prixHt, tauxTva));
+}
+
+/** TVA due sur un montant HT, arrondie au centime. */
+export function tvaSurPrixHt(montantHt: Centimes, tauxTva: number): Centimes {
+  return centimes(Math.round(montantHt * tauxTva));
+}
+
 export function tvaSurPrixTtc(prixTtc: Centimes, tauxTva: number): Centimes {
   return centimes(prixTtc - prixHtDepuisTtc(prixTtc, tauxTva));
 }
@@ -61,15 +71,20 @@ export function enregistrerVenteRevendeur(
   if (e.quantite <= 0) {
     throw new Error("quantité doit être strictement positive");
   }
+  // Le prix saisi est hors taxes. La facture au revendeur : HT + TVA (calculée sur le total
+  // HT, arrondie au centime). Il la paie plus tard : la créance 411 porte le TTC.
   const totalHt = centimes(e.prixGrosHtUnitaire * e.quantite);
+  const totalTva = tvaSurPrixHt(totalHt, e.tauxTva);
+  const totalTtc = centimes(totalHt + totalTva);
   const totalCout = e.coutRevientTotal ?? centimes(e.coutRevientUnitaire * e.quantite);
   return enregistrer(gl, {
     id: e.idEcriture,
     mois: e.mois,
     libelle: `Vente revendeur ${e.quantite} ${e.produit}`,
     lignes: [
-      { compte: "411", sens: "debit", montant: totalHt },
+      { compte: "411", sens: "debit", montant: totalTtc },
       { compte: "707", sens: "credit", montant: totalHt },
+      ...(totalTva > 0 ? [{ compte: "44571", sens: "credit" as const, montant: totalTva }] : []),
       { compte: "7135", sens: "debit", montant: totalCout },
       { compte: "35", sens: "credit", montant: totalCout },
     ],

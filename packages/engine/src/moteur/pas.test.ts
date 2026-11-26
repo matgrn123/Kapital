@@ -616,3 +616,71 @@ describe("simulerPas — reprise et garde-fous", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Vente aux revendeurs : prix saisi hors taxes, plus la TVA
+// ---------------------------------------------------------------------------
+
+describe("simulerPas — vente revendeur au prix HT saisi, plus la TVA", () => {
+  // 10 pièces en stock, aucune production, vente directe fermée (prix 0) : la demande
+  // des revendeurs (plusieurs centaines de pièces) écoule exactement les 10 pièces à 30 € HT.
+  const depart = entrepriseDeTest({
+    salaries: [],
+    ateliers: [],
+    prets: [],
+    stocksMatiere: [],
+    stocksFinis: [{ produit: PRODUIT, quantite: 10, valeurTotale: centimes(15_000) }],
+    catalogue: [
+      {
+        produit: PRODUIT,
+        qualiteVisee: 60,
+        prix: { vente_directe: centimes(0), revendeur: centimes(3000) },
+        productionMensuelleCible: 0,
+      },
+    ],
+  });
+  const m1 = jouerUnMois(depart, { mois: moisJeu(1) });
+  const ventes = m1.ecrituresDuMois.filter((e) => e.libelle.startsWith("Vente revendeur"));
+  const soldesVentes = soldesParCompte(ventes);
+
+  it("30,00 € HT × 10 pièces : 707 = 300,00 €, 44571 = 60,00 €, 411 = 360,00 €", () => {
+    expect(piecesDansLibelles(ventes, "Vente revendeur").reduce((a, b) => a + b, 0)).toBe(10);
+    expect(-(soldesVentes["707"] ?? 0)).toBe(30_000);
+    expect(-(soldesVentes["44571"] ?? 0)).toBe(6_000);
+    expect(soldesVentes["411"]).toBe(36_000);
+    // Coût de revient au coût moyen : 10 × 15 € sortis du stock (7135 / 35)
+    expect(soldesVentes["7135"]).toBe(15_000);
+    expect(soldesVentes["35"]).toBe(-15_000);
+  });
+
+  it("le chiffre d'affaires HT compté pour les étapes est le prix saisi, sans retirer de TVA", () => {
+    expect(m1.cloture.entrepriseApres.cumulsEtape?.chiffreAffairesHt).toBe(30_000);
+  });
+
+  it("la TVA collectée sur la vente revendeur est déclarée à la clôture du mois (44571 → 44551)", () => {
+    const declaration = m1.ecrituresDuMois.find((e) => e.id.startsWith("tva_declaration_"));
+    expect(declaration?.lignes).toContainEqual({ compte: "44551", sens: "credit", montant: 6_000 });
+  });
+
+  it("le revendeur paie 360,00 € TTC au premier pas du mois M+2 (512 / 411), et 411 revient à zéro", () => {
+    // Comme le serveur (chargerCreances) : solde 411 de chaque écriture de vente du mois 1.
+    const creances = ventes
+      .map((e) => ({
+        ecritureId: e.id,
+        montant: centimes(e.lignes.filter((l) => l.compte === "411").reduce((s, l) => s + l.montant, 0)),
+      }))
+      .filter((c) => c.montant > 0);
+    const m2 = jouerUnMois(m1.cloture.entrepriseApres, { mois: moisJeu(2) });
+    const m3 = jouerUnMois(m2.cloture.entrepriseApres, {
+      mois: moisJeu(3),
+      fluxDuPas: (i) => (i === 0 ? { ...FLUX_VIDE, creancesAEncaisser: creances } : FLUX_VIDE),
+    });
+    const encaissements = m3.ecrituresParPas[0]!.filter((e) => e.id.startsWith("encaissement_"));
+    expect(soldesParCompte(encaissements)).toEqual({ "512": 36_000, "411": -36_000 });
+    const tout = [...m1.ecrituresDuMois, ...m2.ecrituresDuMois, ...m3.ecrituresDuMois];
+    expect(soldesParCompte(tout)["411"]).toBe(0);
+    let gl = planComptableV1();
+    for (const e of tout) gl = enregistrer(gl, e);
+    expect(enEquilibre(gl)).toBe(true);
+  });
+});

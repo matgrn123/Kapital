@@ -34,6 +34,7 @@ export type EntreesEcritureVenteRevendeur = {
   readonly mois: MoisJeu;
   readonly produit: IdProduit;
   readonly quantite: number;
+  /** Prix de gros saisi par le joueur : hors taxes. Le revendeur paie ce prix plus la TVA. */
   readonly prixGrosHtUnitaire: Centimes;
   readonly coutRevientUnitaire: Centimes;
   /**
@@ -41,6 +42,8 @@ export type EntreesEcritureVenteRevendeur = {
    * Le moteur le fournit pour que le compte 35 suive exactement la valeur de son stock.
    */
   readonly coutRevientTotal?: Centimes;
+  /** Taux de TVA collectée sur la facture (paramètre `tva_standard`). */
+  readonly tauxTva: number;
 };
 
 export type EntreesEcritureRetour = {

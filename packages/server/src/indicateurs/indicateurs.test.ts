@@ -37,7 +37,8 @@ const ENTREPRISE: Entreprise = {
     {
       produit: TSHIRT,
       qualiteVisee: 60,
-      prix: { vente_directe: centimes(6000), revendeur: centimes(3600) },
+      // Prix revendeur saisi hors taxes : 30 € HT.
+      prix: { vente_directe: centimes(6000), revendeur: centimes(3000) },
       productionMensuelleCible: 100,
     },
   ],
