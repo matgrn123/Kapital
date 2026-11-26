@@ -40,6 +40,16 @@ describe("ecritureOuverture", () => {
   it("vaut null sans apport", () => {
     expect(ecritureOuverture(grandLivre.slice(2))).toBeNull();
   });
+  it("donne le mois réel de l'écriture (novembre 2026), pas « mois 0 »", () => {
+    const novembre = grandLivre.map((x) => ({ ...x, mois_jeu: 24322 }));
+    expect(ecritureOuverture(novembre)?.mois).toBe(24322);
+    expect(ecritureOuverture(novembre)?.etiquette).toBe("novembre 2026");
+  });
+  it("n'affiche pas de mois quand il est inconnu", () => {
+    const sansMois = grandLivre.map(({ mois_jeu: _m, ...x }) => x);
+    expect(ecritureOuverture(sansMois)?.mois).toBeNull();
+    expect(ecritureOuverture(sansMois)?.etiquette).toBeUndefined();
+  });
 });
 
 describe("etapesDuJeu", () => {

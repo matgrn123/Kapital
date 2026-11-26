@@ -182,8 +182,8 @@ export default async function PageMagasin() {
                 {etapeReelle >= etapeRequise
                   ? "Étape atteinte : elle ne redescend jamais, même si ta trésorerie ou ta notoriété baissent."
                   : conditionsRemplies
-                    ? "Tout est rempli : l'étape sera constatée à la fin du mois de jeu."
-                    : "Les trois conditions sont vérifiées à la fin de chaque mois de jeu, toutes en même temps."}
+                    ? "Tout est rempli : l'étape sera constatée à la fin du mois."
+                    : "Les trois conditions sont vérifiées à la fin de chaque mois, toutes en même temps."}
               </p>
               {devActif && (
                 <Note>

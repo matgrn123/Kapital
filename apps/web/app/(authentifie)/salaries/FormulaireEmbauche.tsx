@@ -61,7 +61,7 @@ export function FormulaireEmbauche({
     const r = await appelerAction("/api/actions/embaucher", { poste, salaireBrutMensuelCentimes: brut });
     setEnCours(null);
     if (!r.ok) return setErreur(r.message);
-    setSucces("Salarié embauché. Son premier salaire tombera à la fin du mois de jeu.");
+    setSucces("Salarié embauché. Son premier salaire tombera à la fin du mois.");
     router.refresh();
   }
 

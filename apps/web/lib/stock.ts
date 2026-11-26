@@ -54,43 +54,64 @@ export function mouvementsDeVente(
 export type Rythme = {
   /** Pièces vendues (retours déduits) dans la fenêtre observée. */
   readonly piecesFenetre: number;
-  /** Durée observée, en pas : au plus un mois de jeu, au moins un pas. */
+  /** Durée réellement observée, en pas : au plus un mois, au moins un pas. */
   readonly pasObserves: number;
-  /** Rythme ramené à un mois de jeu (toujours fini, jamais négatif). */
-  readonly piecesParMois: number;
+  /**
+   * Vrai quand on observe le produit depuis moins d'un jour : le rythme est alors ramené à un jour
+   * plein (100 pièces vendues en une minute font 100 pièces par jour, pas 144 000).
+   */
+  readonly moinsDUnJour: boolean;
+  /** Pièces vendues par jour (toujours fini, jamais négatif). */
+  readonly piecesParJour: number;
 };
 
 /**
- * Rythme de vente récent d'un produit : ventes nettes du dernier mois de jeu, ramenées à un mois.
- * Si le produit est au catalogue depuis moins d'un mois, on ne compte que le temps écoulé depuis.
+ * Rythme de vente récent d'un produit : ventes nettes du dernier mois, ramenées à un jour.
+ * Si le produit est au catalogue depuis moins d'un mois, on ne compte que le temps écoulé depuis,
+ * mais jamais moins d'un jour : extrapoler quelques minutes de ventes donnerait des rythmes absurdes.
  */
 export function rythmeDeVente(
   mouvements: readonly MouvementVente[],
   produit: string,
-  o: { readonly pasCourant: number; readonly pasParMois: number; readonly pasDebutVente: number | null },
+  o: {
+    readonly pasCourant: number;
+    readonly pasParMois: number;
+    readonly pasParJour: number;
+    readonly pasDebutVente: number | null;
+  },
 ): Rythme {
   const debutFenetre = o.pasCourant - o.pasParMois;
   const debut = o.pasDebutVente === null ? debutFenetre : Math.max(debutFenetre, o.pasDebutVente);
-  const pasObserves = Math.max(1, o.pasCourant - debut);
+  const ecoules = Math.max(0, o.pasCourant - debut);
   let pieces = 0;
   for (const m of mouvements) if (m.produit === produit && m.pas >= debutFenetre && m.pas < o.pasCourant) pieces += m.pieces;
   const piecesFenetre = Math.max(0, pieces);
-  const piecesParMois = o.pasParMois > 0 ? (piecesFenetre * o.pasParMois) / pasObserves : 0;
-  return { piecesFenetre, pasObserves, piecesParMois: Number.isFinite(piecesParMois) ? piecesParMois : 0 };
+  const pasParJour = o.pasParJour > 0 ? o.pasParJour : 0;
+  const diviseur = Math.max(1, pasParJour, ecoules);
+  const piecesParJour = pasParJour > 0 ? (piecesFenetre * pasParJour) / diviseur : 0;
+  return {
+    piecesFenetre,
+    pasObserves: Math.max(1, ecoules),
+    moinsDUnJour: ecoules < pasParJour,
+    piecesParJour: Number.isFinite(piecesParJour) ? piecesParJour : 0,
+  };
 }
 
-/** Jours de jeu que le stock tiendra au rythme actuel : 0 sans stock, null sans vente (incalculable). */
-export function joursDeStock(stock: number, piecesParMois: number, joursParMois: number): number | null {
+/** Jours que le stock tiendra au rythme actuel : 0 sans stock, null sans vente (incalculable). */
+export function joursDeStock(stock: number, piecesParJour: number): number | null {
   if (!(stock > 0)) return 0;
-  if (!(piecesParMois > 0) || !Number.isFinite(piecesParMois) || !(joursParMois > 0)) return null;
-  const jours = (stock * joursParMois) / piecesParMois;
+  if (!(piecesParJour > 0) || !Number.isFinite(piecesParJour)) return null;
+  const jours = stock / piecesParJour;
   return Number.isFinite(jours) ? jours : null;
 }
 
 export type Temps = {
+  /** Pas du mois en cours (28 à 31 jours). */
   readonly pasParMois: number;
+  /** Pas dans une journée (24 h). */
+  readonly pasParJour: number;
+  /** Longueur de la jauge des jours de stock : un mois. */
   readonly joursParMois: number;
-  readonly minutesReellesParMois: number;
 };
 
 /** « 12 jours », « moins d'un jour », « plus d'un an » ; « — » quand c'est incalculable. */
@@ -103,10 +124,23 @@ export function libelleJours(jours: number | null, joursParMois: number): string
   return `${n} jour${n > 1 ? "s" : ""}`;
 }
 
-export function libelleRythme(piecesParMois: number): string {
-  if (!(piecesParMois > 0)) return "aucune vente";
-  if (piecesParMois < 1) return "moins d'une pièce / mois";
-  return `${Math.round(piecesParMois).toLocaleString("fr-FR")} pièces / mois`;
+function nombreDePieces(n: number): string {
+  return `${n.toLocaleString("fr-FR")} pièce${n > 1 ? "s" : ""}`;
+}
+
+/** « 100 pièces par jour », « environ 3 pièces par semaine » ; « aucune vente » à zéro. */
+export function libelleRythme(piecesParJour: number): string {
+  if (!(piecesParJour > 0) || !Number.isFinite(piecesParJour)) return "aucune vente";
+  if (piecesParJour >= 1) return `${nombreDePieces(Math.round(piecesParJour))} par jour`;
+  const parSemaine = Math.round(piecesParJour * 7);
+  if (parSemaine >= 1) return `environ ${nombreDePieces(parSemaine)} par semaine`;
+  return "moins d'une pièce par semaine";
+}
+
+/** Historique de moins d'un jour : « 100 pièces depuis jeu. 11 h 31 » (le moment où l'on a commencé à compter). */
+export function libelleVenduDepuis(piecesVendues: number, depuis: string): string {
+  if (!(piecesVendues > 0)) return `aucune vente depuis ${depuis}`;
+  return `${nombreDePieces(Math.round(piecesVendues))} depuis ${depuis}`;
 }
 
 export type Canal = "vente_directe" | "revendeur" | "boutique";
@@ -119,7 +153,7 @@ export type CanalEnVente = {
 
 /**
  * rupture : plus une pièce ; bas : moins de jours que le seuil d'alerte ; dort : du stock et aucune
- * vente depuis un mois de jeu entier ; nouveau : au catalogue depuis moins d'un mois, pas encore de vente.
+ * vente depuis un mois entier ; nouveau : au catalogue depuis moins d'un mois, pas encore de vente.
  */
 export type StatutStock = "rupture" | "bas" | "ok" | "nouveau" | "dort";
 
@@ -131,7 +165,15 @@ export type LigneStock = {
   readonly enRoute: number;
   /** Atelier + boutique : ce qui peut se vendre aujourd'hui. */
   readonly disponible: number;
-  readonly piecesParMois: number;
+  /** Pièces vendues par jour, sur la période observée (au moins un jour). */
+  readonly piecesParJour: number;
+  /** Pièces vendues (retours déduits) sur la période observée. */
+  readonly piecesObservees: number;
+  /**
+   * Début de l'observation (instant du jeu, ms) quand le produit est en vente depuis moins
+   * d'un jour : l'écran dit alors « 100 pièces depuis jeu. 11 h 31 ». Null sinon.
+   */
+  readonly depuisMs: number | null;
   readonly jours: number | null;
   readonly statut: StatutStock;
   readonly canaux: readonly CanalEnVente[];
@@ -148,6 +190,8 @@ export type ProduitStock = {
   readonly prixBoutique: number | null;
   /** Pas où le produit est arrivé au catalogue ; null si inconnu. */
   readonly pasDebutVente: number | null;
+  /** Instant du jeu (ms) où le produit est arrivé au catalogue ; null ou absent si inconnu. */
+  readonly debutVenteMs?: number | null;
 };
 
 export type EntreeStock = Temps & {
@@ -160,7 +204,7 @@ export type EntreeStock = Temps & {
   readonly mouvements: readonly MouvementVente[];
   /** Dernier pas traité par le moteur pour la société. */
   readonly pasCourant: number;
-  /** Seuil de l'alerte « stock bas », en jours de jeu (paramètre alerte_stock_bas_jours). */
+  /** Seuil de l'alerte « stock bas », en jours (paramètre alerte_stock_bas_jours). */
   readonly seuilJours: number;
 };
 
@@ -181,8 +225,13 @@ export function lignesStock(e: EntreeStock): LigneStock[] {
     const atelier = Math.max(0, e.stockAtelier[p.id] ?? 0);
     const boutique = Math.max(0, e.stockBoutique[p.id] ?? 0);
     const disponible = atelier + boutique;
-    const r = rythmeDeVente(e.mouvements, p.id, { pasCourant: e.pasCourant, pasParMois: e.pasParMois, pasDebutVente: p.pasDebutVente });
-    const jours = joursDeStock(disponible, r.piecesParMois, e.joursParMois);
+    const r = rythmeDeVente(e.mouvements, p.id, {
+      pasCourant: e.pasCourant,
+      pasParMois: e.pasParMois,
+      pasParJour: e.pasParJour,
+      pasDebutVente: p.pasDebutVente,
+    });
+    const jours = joursDeStock(disponible, r.piecesParJour);
     let statut: StatutStock;
     if (disponible === 0) statut = "rupture";
     else if (jours === null) statut = r.pasObserves >= e.pasParMois ? "dort" : "nouveau";
@@ -194,7 +243,9 @@ export function lignesStock(e: EntreeStock): LigneStock[] {
       boutique,
       enRoute: Math.max(0, e.enRoute[p.id] ?? 0),
       disponible,
-      piecesParMois: r.piecesParMois,
+      piecesParJour: r.piecesParJour,
+      piecesObservees: r.piecesFenetre,
+      depuisMs: r.moinsDUnJour ? (p.debutVenteMs ?? null) : null,
       jours,
       statut,
       canaux: canauxEnVente(p, e.boutiqueOuverte),

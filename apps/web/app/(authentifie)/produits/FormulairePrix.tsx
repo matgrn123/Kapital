@@ -189,7 +189,7 @@ export function FormulairePrix({
             <EcritureComptable libelle="Vente en ligne d'une pièce" etiquette="aperçu" lignes={apercu.ecritureDirecte} />
             <EcritureComptable
               libelle="Vente d'une pièce à un revendeur"
-              etiquette={delaiRevendeur ? `payée dans ${delaiRevendeur} mois de jeu` : "payée plus tard"}
+              etiquette={delaiRevendeur ? `payée dans ${delaiRevendeur} mois` : "payée plus tard"}
               lignes={apercu.ecritureRevendeur}
             />
           </div>

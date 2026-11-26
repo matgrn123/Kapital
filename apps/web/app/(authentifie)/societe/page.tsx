@@ -28,10 +28,11 @@ export default async function PageSociete() {
 
   const { data: grandLivre } = await supabase
     .from("ledger_entries")
-    .select("ecriture_id, compte, sens, montant_centimes, libelle")
+    .select("ecriture_id, mois_jeu, compte, sens, montant_centimes, libelle")
     .eq("company_id", entreprise.id);
   const lignes = (grandLivre ?? []) as Array<{
     ecriture_id: string;
+    mois_jeu: number;
     compte: string;
     sens: "debit" | "credit";
     montant_centimes: number;
@@ -65,7 +66,7 @@ export default async function PageSociete() {
         </Carte>
         <Carte surTitre="Grand livre" titre="L'écriture d'ouverture">
           {ouverture ? (
-            <EcritureComptable libelle={ouverture.libelle} etiquette="mois 0" lignes={ouverture.lignes} />
+            <EcritureComptable libelle={ouverture.libelle} etiquette={ouverture.etiquette} lignes={ouverture.lignes} />
           ) : (
             <Vide>L&apos;apport de capital n&apos;apparaît pas encore dans ton grand livre.</Vide>
           )}
@@ -103,7 +104,7 @@ export default async function PageSociete() {
               </li>
             ))}
           </ol>
-          <p className="mt-2 text-[0.84rem] text-muted">L&apos;étape est constatée à la fin de chaque mois de jeu ; elle ne redescend jamais.</p>
+          <p className="mt-2 text-[0.84rem] text-muted">L&apos;étape est constatée à la fin de chaque mois ; elle ne redescend jamais.</p>
         </Carte>
       </div>
 

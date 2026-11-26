@@ -99,13 +99,24 @@ export function bilanSimplifie(lignes: readonly LigneGrandLivre[]): Bilan {
   };
 }
 
-/** Chiffre d'affaires HT (compte 707) des `nombre` derniers mois jusqu'à `moisCourant`. */
+/** Mois de la première écriture du grand livre (l'apport de capital, à la création) ; null sans écriture. */
+export function premierMoisDuLivre(lignes: readonly Pick<LigneGrandLivre, "mois_jeu">[]): number | null {
+  let premier: number | null = null;
+  for (const l of lignes) if (premier === null || l.mois_jeu < premier) premier = l.mois_jeu;
+  return premier;
+}
+
+/**
+ * Chiffre d'affaires HT (compte 707) des `nombre` derniers mois jusqu'à `moisCourant`, sans
+ * remonter avant `depuisMois` (le mois de création de la société) : au moins le mois en cours.
+ */
 export function caParMois(
   lignes: readonly LigneGrandLivre[],
   moisCourant: number,
   nombre: number,
+  depuisMois = 0,
 ): Array<{ mois: number; valeur: number }> {
-  const debut = Math.max(0, moisCourant - nombre + 1);
+  const debut = Math.min(moisCourant, Math.max(0, depuisMois, moisCourant - nombre + 1));
   const r: Array<{ mois: number; valeur: number }> = [];
   for (let m = debut; m <= moisCourant; m++) r.push({ mois: m, valeur: 0 });
   for (const l of lignes) {

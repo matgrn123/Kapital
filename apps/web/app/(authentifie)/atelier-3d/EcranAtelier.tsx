@@ -253,7 +253,7 @@ export function EcranAtelier(p: ProprietesAtelier) {
       {p.planPrevu && (
         <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-line bg-thread-soft px-3 py-2">
           <p className="min-w-0 flex-1 text-[0.88rem] text-thread">
-            <b>Plan prévu</b> : {p.planPrevuQuand ? `il sera en place ${p.planPrevuQuand}` : "il s'appliquera à la fin du mois de jeu"}. D&apos;ici là, l&apos;atelier produit avec le plan en service
+            <b>Plan prévu</b> : {p.planPrevuQuand ? `il sera en place ${p.planPrevuQuand}` : "il s'appliquera à la fin du mois"}. D&apos;ici là, l&apos;atelier produit avec le plan en service
             {p.coutPlanPrevu > 0 ? ` ; les modules commandés (${euros(p.coutPlanPrevu)}) sont remboursés si tu l'annules.` : "."}
           </p>
           {p.workshopId && (

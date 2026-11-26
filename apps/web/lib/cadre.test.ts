@@ -15,6 +15,8 @@ import {
   instantDuJeu,
   joursDansLeMois,
   jourEcoule,
+  jourEtHeureLisible,
+  joursDeVente,
   libelleMois,
   libelleMoisCourt,
   moisCivil,
@@ -112,6 +114,12 @@ describe("dates lisibles (heure de Paris)", () => {
     expect(partiesParis(JEUDI_10H21)).toEqual({ annee: 2026, mois: 11, jour: 26, heure: 10, minute: 21, jourSemaine: "jeu." });
   });
 
+  it("donne le jour de la semaine et l'heure, pour un instant de moins d'un jour", () => {
+    expect(jourEtHeureLisible(JEUDI_10H21)).toBe("jeu. 10 h 21");
+    expect(jourEtHeureLisible("2026-11-25T22:05:00Z")).toBe("mer. 23 h 05");
+    expect(jourEtHeureLisible("pas une date")).toBe("date inconnue");
+  });
+
   it("ne plante pas sur une date illisible", () => {
     expect(dateHeureLisible("pas une date")).toBe("date inconnue");
     expect(dateLisible(Number.NaN)).toBe("date inconnue");
@@ -193,6 +201,28 @@ describe("ventes par jour", () => {
     expect(ventesParJour(1_000_00, 10)).toBe(10_000);
     expect(ventesParJour(250_00, 1)).toBe(250_00);
     expect(ventesParJour(250_00, 0)).toBe(250_00);
+  });
+
+  it("compte les jours depuis le début du mois, ou depuis la création de la société si elle est plus récente", () => {
+    const novembre = { moisEnCours: NOVEMBRE_2026, indexDansMois: 0, pasParMois: 43_200 };
+    // Du 1er novembre 0 h au jeudi 26, 10 h 21 : 25 jours et 10 h 21.
+    expect(joursDeVente(novembre, JEUDI_10H21, null)).toBeCloseTo(25 + (10 * 60 + 21) / (24 * 60));
+    expect(joursDeVente(novembre, JEUDI_10H21, Date.parse("2026-10-02T08:00:00Z"))).toBeCloseTo(25 + (10 * 60 + 21) / (24 * 60));
+    // Société créée le vendredi 20 à 10 h 21 : 6 jours pile.
+    expect(joursDeVente(novembre, JEUDI_10H21, JEUDI_10H21 - 6 * 24 * HEURE)).toBeCloseTo(6);
+  });
+
+  it("compte au moins un jour : 1 540 € vendus dans l'heure de la création font 1 540 € par jour", () => {
+    const novembre = { moisEnCours: NOVEMBRE_2026, indexDansMois: 0, pasParMois: 43_200 };
+    const jours = joursDeVente(novembre, JEUDI_10H21, JEUDI_10H21 - HEURE);
+    expect(jours).toBe(1);
+    expect(ventesParJour(1_540_00, jours)).toBe(1_540_00);
+    // Le 1er du mois à 0 h 30, sans société récente : un jour aussi.
+    expect(joursDeVente(novembre, debutDuMoisMs(NOVEMBRE_2026) + 30 * MIN, null)).toBe(1);
+  });
+
+  it("garde l'ancien découpage pour l'ancien compteur", () => {
+    expect(joursDeVente({ moisEnCours: 10, indexDansMois: 432, pasParMois: 1440 }, JEUDI_10H21, JEUDI_10H21)).toBe(10);
   });
 
   it("ne descend pas sous zéro (retours plus élevés que les ventes)", () => {

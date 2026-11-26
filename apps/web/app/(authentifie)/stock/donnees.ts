@@ -8,6 +8,7 @@ import {
   pasDansLeMois,
   positionDuPasAbsolu,
 } from "@kapital/engine";
+import { instantDuJeu } from "../../../lib/cadre";
 import { lignesStock, mouvementsDeVente, type LigneStock, type LigneVenteLivre, type Temps } from "../../../lib/stock";
 
 // Lecture en base de tout ce qu'il faut à l'écran Stock (et à l'alerte « stock bas » du tableau
@@ -21,6 +22,7 @@ export type SituationStock = {
 };
 
 const TAILLE_PAGE = 1000;
+const MINUTES_PAR_JOUR = 24 * 60;
 const PAGES_MAX = 50;
 
 /** Ventes et retours du mois en cours et du précédent (compte 707), page par page. */
@@ -49,7 +51,7 @@ export async function chargerSituationStock(supabase: SupabaseClient, companyId:
   const seuilJours = parametreObligatoire(params, "alerte_stock_bas_jours");
 
   const [{ data: societe }, { data: monde }] = await Promise.all([
-    supabase.from("companies").select("pas_traites").eq("id", companyId).maybeSingle(),
+    supabase.from("companies").select("pas_traites, cree_le").eq("id", companyId).maybeSingle(),
     supabase.from("worlds").select("mois_courant, debut_reel").limit(1).maybeSingle(),
   ]);
   const debutMs = monde?.debut_reel ? Date.parse(monde.debut_reel as string) : Number.NaN;
@@ -60,14 +62,21 @@ export async function chargerSituationStock(supabase: SupabaseClient, companyId:
   const moisCourant = positionDuPasAbsolu(config, pasCourant).mois;
   const temps: Temps = {
     pasParMois: pasDansLeMois(config, moisCourant),
+    pasParJour: MINUTES_PAR_JOUR / config.minutesReellesParPas,
     joursParMois: parametreObligatoire(params, "temps_jours_par_mois_jeu"),
-    minutesReellesParMois: config.minutesReellesParMoisJeu,
   };
   const pasDepuisInstant = (iso: string | null | undefined): number | null => {
     const ms = iso ? Date.parse(iso) : Number.NaN;
     if (!Number.isFinite(debutMs) || !Number.isFinite(ms) || ms < debutMs) return null;
     return horlogeDepuis(config, debutMs, ms).pasTermines;
   };
+  // Instant du jeu d'un instant réel (en recette, le jeu peut être en avance sur l'horloge réelle).
+  const instantJeuDepuis = (iso: string | null | undefined): number | null => {
+    const ms = iso ? Date.parse(iso) : Number.NaN;
+    return Number.isFinite(ms) ? instantDuJeu(ms, (monde?.debut_reel as string | null | undefined) ?? null) : null;
+  };
+  // Un produit sans date d'arrivée au catalogue est compté depuis la création de la société.
+  const creeLeSociete = (societe?.cree_le as string | null | undefined) ?? null;
 
   const [{ data: catalogue }, { data: produits }, { data: stocks }, { data: stocksBoutique }, { data: boutiques }, { data: ordres }, ventes] =
     await Promise.all([
@@ -115,7 +124,8 @@ export async function chargerSituationStock(supabase: SupabaseClient, companyId:
       prixDirect: Number(c.prix_vente_directe_centimes ?? 0),
       prixRevendeur: Number(c.prix_revendeur_centimes ?? 0),
       prixBoutique: c.prix_boutique_centimes == null ? null : Number(c.prix_boutique_centimes),
-      pasDebutVente: pasDepuisInstant(c.cree_le),
+      pasDebutVente: pasDepuisInstant(c.cree_le ?? creeLeSociete),
+      debutVenteMs: instantJeuDepuis(c.cree_le ?? creeLeSociete),
     })),
     stockAtelier: somme(
       ((stocks ?? []) as Array<{ product_id: string; quantite_pieces: number }>).map((s) => ({

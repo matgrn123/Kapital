@@ -22,6 +22,7 @@ import {
   bilanSimplifie,
   caParMois,
   dernieresEcritures,
+  premierMoisDuLivre,
   tresorerieFinDeMois,
   type LigneGrandLivre,
 } from "../../../lib/tableau";
@@ -111,7 +112,8 @@ export default async function PageJeu() {
   for (const p of (produits.data ?? []) as Array<{ id: string; nom: string }>) nomsProduits[p.id] = p.nom;
 
   const bilan = bilanSimplifie(lignes);
-  const historique = caParMois(lignes, moisCourant, 6);
+  // Pas de mois d'avant la création de la société : le graphique commence au mois de l'apport.
+  const historique = caParMois(lignes, moisCourant, 6, premierMoisDuLivre(lignes) ?? moisCourant);
   const caMois = historique.at(-1)?.valeur ?? 0;
   const caMoisPrecedent = historique.at(-2)?.valeur ?? 0;
   const ecritures = dernieresEcritures(lignes, 4);
@@ -270,7 +272,7 @@ export default async function PageJeu() {
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <Carte titre="Chiffre d'affaires par mois">
           <Graphique
-            titre="Chiffre d'affaires hors taxes des six derniers mois"
+            titre="Chiffre d'affaires hors taxes des derniers mois, depuis la création de la société"
             barres={historique.map((h) => ({ libelle: libelleMoisCourt(h.mois), valeur: h.valeur }))}
           />
           <p className="mt-2 text-[0.8rem] text-muted">

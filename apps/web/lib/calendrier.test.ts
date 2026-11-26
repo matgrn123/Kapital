@@ -4,7 +4,7 @@ import { indexDeMois } from "./cadre";
 import {
   collectionDuMois,
   configCollectionsDepuis,
-  friseDeLAnnee,
+  friseDesDouzeMois,
   nomCollection,
   saisonDuMois,
   type EntreesFrise,
@@ -13,7 +13,7 @@ import {
 // La frise montre la vraie année civile (heure de Paris) : novembre 2026 = index 24322.
 const JEUDI_26_NOV_2026 = Date.parse("2026-11-26T09:21:00Z");
 const MARS_2026 = Date.parse("2026-03-10T12:00:00Z");
-const VIDE: EntreesFrise = { maintenantJeuMs: JEUDI_26_NOV_2026, moisCreation: null, echeances: [], livraisons: [], finsDeBail: [] };
+const VIDE: EntreesFrise = { maintenantJeuMs: JEUDI_26_NOV_2026, echeances: [], livraisons: [], finsDeBail: [] };
 const CONFIG = { debutPE: 2, debutAH: 8 };
 const m = (annee: number, mois: number) => indexDeMois(annee, mois);
 
@@ -50,47 +50,65 @@ describe("saisons et collections", () => {
   });
 });
 
-describe("friseDeLAnnee", () => {
-  it("montre les 12 mois de l'année civile en cours, de janvier à décembre, avec leurs vrais jours", () => {
-    const f = friseDeLAnnee(VIDE, CONFIG);
-    expect(f.annee).toBe(2026);
-    expect(f.mois.map((x) => x.index)).toEqual(Array.from({ length: 12 }, (_, i) => m(2026, i + 1)));
-    expect(f.mois[0]!.nom).toBe("janvier");
-    expect(f.mois[1]!.jours).toBe(28);
-    expect(f.mois[11]!.nom).toBe("décembre");
+describe("friseDesDouzeMois", () => {
+  it("montre les 12 mois à venir à partir du mois en cours, avec leurs vrais jours et leur année", () => {
+    const f = friseDesDouzeMois(VIDE, CONFIG);
+    expect(f.mois.map((x) => x.index)).toEqual(Array.from({ length: 12 }, (_, i) => m(2026, 11) + i));
+    expect(f.mois[0]).toMatchObject({ nom: "novembre", annee: 2026, etat: "en_cours" });
+    expect(f.mois[1]).toMatchObject({ nom: "décembre", annee: 2026, etat: "a_venir" });
+    // L'année change en janvier.
+    expect(f.mois[2]).toMatchObject({ nom: "janvier", annee: 2027 });
+    expect(f.mois[3]!.jours).toBe(28); // février 2027
+    expect(f.mois[11]).toMatchObject({ nom: "octobre", annee: 2027 });
+    expect(f.periode).toBe("novembre 2026 à octobre 2027");
     expect(f.aujourdhui).toEqual({ mois: m(2026, 11), jour: 26 });
   });
 
-  it("distingue les mois passés, le mois en cours, les mois à venir et ceux d'avant la société", () => {
-    const f = friseDeLAnnee({ ...VIDE, maintenantJeuMs: MARS_2026, moisCreation: m(2026, 2) }, CONFIG);
-    expect(f.mois.slice(0, 4).map((x) => x.etat)).toEqual(["avant_la_societe", "passe", "en_cours", "a_venir"]);
+  it("n'affiche aucun mois passé : un seul mois en cours, les autres à venir", () => {
+    const f = friseDesDouzeMois(VIDE, CONFIG);
+    expect(f.mois.map((x) => x.etat)).toEqual(["en_cours", ...Array<string>(11).fill("a_venir")]);
+  });
+
+  it("va de janvier à décembre de la même année quand on est en janvier", () => {
+    const f = friseDesDouzeMois({ ...VIDE, maintenantJeuMs: Date.parse("2027-01-15T12:00:00Z") }, CONFIG);
+    expect(f.mois[0]).toMatchObject({ nom: "janvier", annee: 2027 });
+    expect(f.mois[11]).toMatchObject({ nom: "décembre", annee: 2027 });
+    expect(f.periode).toBe("janvier à décembre 2027");
+  });
+
+  it("donne des abréviations sans ambiguïté : juin et juillet ne se confondent pas", () => {
+    const f = friseDesDouzeMois({ ...VIDE, maintenantJeuMs: MARS_2026 }, CONFIG);
+    const abreges = f.mois.map((x) => x.abrege);
+    expect(abreges).toEqual(["mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc.", "janv.", "févr."]);
+    expect(new Set(abreges).size).toBe(12);
   });
 
   it("donne la saison et la collection de chaque mois", () => {
-    const f = friseDeLAnnee(VIDE, CONFIG);
-    expect(f.mois[0]).toMatchObject({ saison: "hiver", collection: { type: "AH", annee: 2025 } });
-    expect(f.mois[6]).toMatchObject({ saison: "ete", collection: { type: "PE", annee: 2026 } });
+    const f = friseDesDouzeMois(VIDE, CONFIG);
+    expect(f.mois[0]).toMatchObject({ saison: "automne", collection: { type: "AH", annee: 2026 } });
+    expect(f.mois[2]).toMatchObject({ saison: "hiver", collection: { type: "AH", annee: 2026 } }); // janvier 2027
+    expect(f.mois[3]).toMatchObject({ collection: { type: "PE", annee: 2027 } }); // février 2027
   });
 
   it("annonce chaque fin de mois, l'arrivée des collections et la clôture de l'exercice le 31 décembre", () => {
-    const f = friseDeLAnnee(VIDE, CONFIG);
+    const f = friseDesDouzeMois(VIDE, CONFIG);
     for (const x of f.mois) {
       const fin = x.evenements.find((e) => e.type === "fin_de_mois");
       expect(fin?.jour).toBe(x.jours);
     }
-    expect(f.mois[1]!.evenements.find((e) => e.type === "collection")).toMatchObject({
+    expect(f.mois[3]!.evenements.find((e) => e.type === "collection")).toMatchObject({
       jour: 1,
-      libelle: "Nouvelle collection printemps-été 2026",
+      libelle: "Nouvelle collection printemps-été 2027",
     });
-    expect(f.mois[7]!.evenements.some((e) => e.type === "collection")).toBe(true);
+    expect(f.mois[9]!.evenements.some((e) => e.type === "collection")).toBe(true); // août 2027
     expect(f.mois[0]!.evenements.some((e) => e.type === "collection")).toBe(false);
     const clotures = f.mois.filter((x) => x.evenements.some((e) => e.type === "cloture_exercice"));
-    expect(clotures.map((x) => x.nom)).toEqual(["décembre"]);
+    expect(clotures.map((x) => `${x.nom} ${x.annee}`)).toEqual(["décembre 2026"]);
     expect(clotures[0]!.evenements.find((e) => e.type === "cloture_exercice")?.jour).toBe(31);
   });
 
   it("place les échéances, les livraisons et les fins de bail à leur vrai jour, triées", () => {
-    const f = friseDeLAnnee(
+    const f = friseDesDouzeMois(
       {
         ...VIDE,
         echeances: [{ moisJeu: m(2026, 12), instantPrevu: null, mensualiteCentimes: 512_34 }],
@@ -102,7 +120,7 @@ describe("friseDeLAnnee", () => {
       },
       CONFIG,
     );
-    const decembre = f.mois[11]!;
+    const decembre = f.mois[1]!;
     expect(decembre.evenements.map((e) => [e.jour, e.type])).toEqual([
       [1, "fin_de_bail"],
       [4, "livraison"],
@@ -116,40 +134,43 @@ describe("friseDeLAnnee", () => {
   });
 
   it("place une échéance de l'ancien compteur d'après son instant prévu", () => {
-    const f = friseDeLAnnee(
+    const f = friseDesDouzeMois(
       { ...VIDE, echeances: [{ moisJeu: 12, instantPrevu: "2026-11-28T09:00:00Z", mensualiteCentimes: 100_00 }] },
       CONFIG,
     );
-    expect(f.mois[10]!.evenements.find((e) => e.type === "echeance_pret")?.jour).toBe(28);
+    expect(f.mois[0]!.evenements.find((e) => e.type === "echeance_pret")?.jour).toBe(28);
   });
 
-  it("met de côté ce qui tombe après décembre, et ce qui n'a pas encore de vraie date", () => {
-    const f = friseDeLAnnee(
+  it("met de côté ce qui tombe après les 12 mois, et ce qui n'a pas encore de vraie date", () => {
+    const f = friseDesDouzeMois(
       {
         ...VIDE,
         echeances: [
-          { moisJeu: m(2026, 12), instantPrevu: null, mensualiteCentimes: 100_00 },
-          { moisJeu: m(2027, 2), instantPrevu: null, mensualiteCentimes: 100_00 },
-          { moisJeu: m(2027, 1), instantPrevu: null, mensualiteCentimes: 100_00 },
+          { moisJeu: m(2027, 10), instantPrevu: null, mensualiteCentimes: 100_00 },
+          { moisJeu: m(2027, 12), instantPrevu: null, mensualiteCentimes: 100_00 },
+          { moisJeu: m(2027, 11), instantPrevu: null, mensualiteCentimes: 100_00 },
         ],
         finsDeBail: [{ mois: 14, libelle: "Fin du bail : atelier" }],
       },
       CONFIG,
     );
+    expect(f.mois[11]!.evenements.some((e) => e.type === "echeance_pret")).toBe(true);
     expect(f.plusTard).toEqual([
-      { quand: "31 janvier 2027", libelle: "Échéance de prêt : 100,00 €" },
-      { quand: "28 février 2027", libelle: "Échéance de prêt : 100,00 €" },
+      { quand: "30 novembre 2027", libelle: "Échéance de prêt : 100,00 €" },
+      { quand: "31 décembre 2027", libelle: "Échéance de prêt : 100,00 €" },
       { quand: "mois 14", libelle: "Fin du bail : atelier" },
     ]);
   });
 
-  it("garde une livraison en retard dans un mois passé de l'année, tant qu'elle n'est pas traitée", () => {
-    const f = friseDeLAnnee({ ...VIDE, livraisons: [{ instant: "2026-10-03T10:00:00Z", libelle: "Livraison en retard" }] }, CONFIG);
-    expect(f.mois[9]!.evenements.some((e) => e.type === "livraison")).toBe(true);
+  it("met à part une livraison en retard d'un mois passé, tant qu'elle n'est pas traitée", () => {
+    const f = friseDesDouzeMois({ ...VIDE, livraisons: [{ instant: "2026-10-03T10:00:00Z", libelle: "Livraison en retard" }] }, CONFIG);
+    expect(f.mois.flatMap((x) => x.evenements).some((e) => e.type === "livraison")).toBe(false);
+    expect(f.enRetard).toEqual([{ quand: "3 octobre 2026", libelle: "Livraison en retard" }]);
   });
 
   it("ignore une date illisible", () => {
-    const f = friseDeLAnnee({ ...VIDE, livraisons: [{ instant: "pas une date", libelle: "?" }] }, CONFIG);
+    const f = friseDesDouzeMois({ ...VIDE, livraisons: [{ instant: "pas une date", libelle: "?" }] }, CONFIG);
     expect(f.mois.flatMap((x) => x.evenements).some((e) => e.type === "livraison")).toBe(false);
+    expect(f.enRetard).toEqual([]);
   });
 });

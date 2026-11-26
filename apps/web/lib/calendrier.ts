@@ -1,6 +1,7 @@
-// Frise de l'année civile (page /calendrier). Aucune règle de jeu ici : on range dans les
-// vrais mois de l'année ce que la base sait déjà (échéances, livraisons, fins de bail),
-// les saisons et les collections de la mode. Fonction pure, testée.
+// Frise des 12 mois à venir (page /calendrier), à partir du mois en cours : elle glisse avec
+// le temps, l'année change en janvier. Aucune règle de jeu ici : on range dans les vrais mois
+// ce que la base sait déjà (échéances, livraisons, fins de bail), les saisons et les
+// collections de la mode. Fonction pure, testée.
 
 import { chargerParametresV1, type Parametres } from "@kapital/content";
 import {
@@ -10,7 +11,9 @@ import {
   libelleMois,
   moisCivil,
   NOMS_MOIS,
+  NOMS_MOIS_COURTS,
   partiesParis,
+  periodeMois,
   positionDeLInstant,
 } from "./cadre";
 import { formaterEuros } from "./formatage";
@@ -94,12 +97,16 @@ export type EvenementFrise = {
   readonly libelle: string;
 };
 
-export type EtatMois = "avant_la_societe" | "passe" | "en_cours" | "a_venir";
+export type EtatMois = "en_cours" | "a_venir";
 
 export type MoisFrise = {
   /** Index du mois (année × 12 + mois civil − 1). */
   readonly index: number;
+  readonly annee: number;
+  /** « juin » */
   readonly nom: string;
+  /** Abréviation sans ambiguïté : « juin », « juil. », « sept. ». */
+  readonly abrege: string;
   /** Nombre de jours du mois (28 à 31). */
   readonly jours: number;
   readonly saison: Saison;
@@ -109,10 +116,8 @@ export type MoisFrise = {
 };
 
 export type EntreesFrise = {
-  /** Instant du jeu (lib/cadre › instantDuJeu) : il fixe l'année affichée et le mois en cours. */
+  /** Instant du jeu (lib/cadre › instantDuJeu) : il fixe le mois en cours, premier mois de la frise. */
   readonly maintenantJeuMs: number;
-  /** Mois de création de la société (index) : les mois d'avant sont grisés. */
-  readonly moisCreation: number | null;
   /** Échéances à venir : payées à la fin de leur mois (mois_jeu), ou à leur instant prévu pour l'ancien compteur. */
   readonly echeances: readonly {
     readonly moisJeu: number | null;
@@ -125,14 +130,20 @@ export type EntreesFrise = {
   readonly finsDeBail: readonly { readonly mois: number; readonly libelle: string }[];
 };
 
-export type ElementPlusTard = { readonly quand: string; readonly libelle: string };
+export type ElementDate = { readonly quand: string; readonly libelle: string };
+
+/** Nombre de mois montrés par la frise, mois en cours compris. */
+export const MOIS_DANS_LA_FRISE = 12;
 
 export type Frise = {
-  readonly annee: number;
+  /** « novembre 2026 à octobre 2027 ». */
+  readonly periode: string;
   readonly aujourdhui: { readonly mois: number; readonly jour: number };
   readonly mois: readonly MoisFrise[];
-  /** Ce qui tombe après décembre, puis ce qui n'a pas encore de vraie date, dans l'ordre. */
-  readonly plusTard: readonly ElementPlusTard[];
+  /** Ce qui était prévu avant le mois en cours et n'a pas encore eu lieu (livraison en retard…). */
+  readonly enRetard: readonly ElementDate[];
+  /** Ce qui tombe après le dernier mois de la frise, puis ce qui n'a pas encore de vraie date, dans l'ordre. */
+  readonly plusTard: readonly ElementDate[];
 };
 
 // Ordre d'affichage d'événements tombant le même jour.
@@ -182,18 +193,21 @@ function trier(a: EvenementDate, b: EvenementDate): number {
   return a.mois - b.mois || a.jour - b.jour || ORDRE[a.type] - ORDRE[b.type];
 }
 
-export function friseDeLAnnee(entrees: EntreesFrise, config: ConfigCollections = configV1()): Frise {
+function quandLisible(d: EvenementDate): string {
+  return `${d.jour === 1 ? "1er" : d.jour} ${libelleMois(d.mois)}`;
+}
+
+export function friseDesDouzeMois(entrees: EntreesFrise, config: ConfigCollections = configV1()): Frise {
   const auj = partiesParis(entrees.maintenantJeuMs);
   const moisCourant = indexDeMois(auj.annee, auj.mois);
-  const premier = indexDeMois(auj.annee, 1);
-  const dernier = indexDeMois(auj.annee, 12);
+  const dernier = moisCourant + MOIS_DANS_LA_FRISE - 1;
   const { dates, sansDate } = evenementsDates(entrees);
 
-  const mois: MoisFrise[] = NOMS_MOIS.map((nom, i) => {
-    const index = premier + i;
-    const civil = i + 1;
-    const jours = joursDansLeMois(auj.annee, civil);
-    const collection = collectionDuMois(auj.annee, civil, config);
+  const mois: MoisFrise[] = Array.from({ length: MOIS_DANS_LA_FRISE }, (_, i) => {
+    const index = moisCourant + i;
+    const { annee, mois: civil } = moisCivil(index)!;
+    const jours = joursDansLeMois(annee, civil);
+    const collection = collectionDuMois(annee, civil, config);
     const evenements: EvenementFrise[] = dates
       .filter((d) => d.mois === index)
       .map(({ type, jour, libelle }) => ({ type, jour, libelle }));
@@ -210,24 +224,36 @@ export function friseDeLAnnee(entrees: EntreesFrise, config: ConfigCollections =
     }
     evenements.push({ type: "fin_de_mois", jour: jours, libelle: "Fin du mois : salaires, loyers et échéances" });
     evenements.sort((a, b) => a.jour - b.jour || ORDRE[a.type] - ORDRE[b.type]);
-    const etat: EtatMois =
-      entrees.moisCreation !== null && estIndexCalendaire(entrees.moisCreation) && index < entrees.moisCreation
-        ? "avant_la_societe"
-        : index < moisCourant
-          ? "passe"
-          : index === moisCourant
-            ? "en_cours"
-            : "a_venir";
-    return { index, nom, jours, saison: saisonDuMois(civil), collection, etat, evenements };
+    return {
+      index,
+      annee,
+      nom: NOMS_MOIS[civil - 1]!,
+      abrege: NOMS_MOIS_COURTS[civil - 1]!,
+      jours,
+      saison: saisonDuMois(civil),
+      collection,
+      etat: i === 0 ? "en_cours" : "a_venir",
+      evenements,
+    };
   });
 
-  const plusTard: ElementPlusTard[] = [
+  const enRetard: ElementDate[] = dates
+    .filter((d) => d.mois < moisCourant)
+    .sort(trier)
+    .map((d) => ({ quand: quandLisible(d), libelle: d.libelle }));
+  const plusTard: ElementDate[] = [
     ...dates
       .filter((d) => d.mois > dernier)
       .sort(trier)
-      .map((d) => ({ quand: `${d.jour === 1 ? "1er" : d.jour} ${libelleMois(d.mois)}`, libelle: d.libelle })),
+      .map((d) => ({ quand: quandLisible(d), libelle: d.libelle })),
     ...sansDate.sort(trier).map((d) => ({ quand: libelleMois(d.mois), libelle: d.libelle })),
   ];
 
-  return { annee: auj.annee, aujourdhui: { mois: moisCourant, jour: auj.jour }, mois, plusTard };
+  return {
+    periode: periodeMois(moisCourant, dernier) ?? libelleMois(moisCourant),
+    aujourdhui: { mois: moisCourant, jour: auj.jour },
+    mois,
+    enRetard,
+    plusTard,
+  };
 }

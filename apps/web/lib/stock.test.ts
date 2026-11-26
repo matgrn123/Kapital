@@ -3,6 +3,7 @@ import {
   joursDeStock,
   libelleJours,
   libelleRythme,
+  libelleVenduDepuis,
   lignesStock,
   mouvementsDeVente,
   produitsEnStockBas,
@@ -10,10 +11,12 @@ import {
   type EntreeStock,
 } from "./stock";
 
-// Un mois de jeu = 1 440 pas (un pas par minute réelle), 30 jours par mois :
-// un jour de jeu = 48 pas = 48 minutes réelles.
+// Horloge réelle : un pas par minute, un jour = 1 440 pas, un mois de 30 jours = 43 200 pas.
+// Les tests de mouvementsDeVente gardent un petit mois fictif de 1 440 pas.
 const PAS_PAR_MOIS = 1440;
-const TEMPS = { pasParMois: PAS_PAR_MOIS, joursParMois: 30, minutesReellesParMois: 1440 };
+const JOUR = 1440;
+const MOIS = 30 * JOUR;
+const TEMPS = { pasParMois: MOIS, pasParJour: JOUR, joursParMois: 30 };
 
 function vente(mois: number, index: number, libelle: string, compte = "707") {
   return { ecriture_id: `vente_${mois}_societe_x_p${index}`, mois_jeu: mois, libelle, compte };
@@ -48,73 +51,71 @@ describe("mouvementsDeVente", () => {
 });
 
 describe("rythmeDeVente", () => {
+  const COURANT = 100 * JOUR;
   const mouvements = [
-    { produit: "p", pas: 1000, pieces: 50 }, // hors fenêtre (plus d'un mois avant)
-    { produit: "p", pas: 3000, pieces: 30 },
-    { produit: "p", pas: 3500, pieces: 20 },
-    { produit: "p", pas: 3600, pieces: -2 }, // retour
-    { produit: "autre", pas: 3500, pieces: 99 },
+    { produit: "p", pas: COURANT - MOIS - 10, pieces: 50 }, // hors fenêtre (plus d'un mois avant)
+    { produit: "p", pas: COURANT - 20 * JOUR, pieces: 30 },
+    { produit: "p", pas: COURANT - 5 * JOUR, pieces: 32 },
+    { produit: "p", pas: COURANT - JOUR, pieces: -2 }, // retour
+    { produit: "autre", pas: COURANT - 5 * JOUR, pieces: 99 },
   ];
+  const base = { pasCourant: COURANT, pasParMois: MOIS, pasParJour: JOUR, pasDebutVente: null };
 
-  it("compte les ventes nettes du dernier mois de jeu et les ramène à un mois", () => {
-    const r = rythmeDeVente(mouvements, "p", { pasCourant: 4000, pasParMois: PAS_PAR_MOIS, pasDebutVente: null });
-    expect(r.piecesFenetre).toBe(48);
-    expect(r.pasObserves).toBe(PAS_PAR_MOIS);
-    expect(r.piecesParMois).toBe(48);
+  it("compte les ventes nettes du dernier mois et les ramène à un jour", () => {
+    const r = rythmeDeVente(mouvements, "p", base);
+    expect(r.piecesFenetre).toBe(60);
+    expect(r.pasObserves).toBe(MOIS);
+    expect(r.moinsDUnJour).toBe(false);
+    expect(r.piecesParJour).toBe(2);
   });
 
   it("ne compte que le temps écoulé depuis l'arrivée du produit au catalogue", () => {
-    const r = rythmeDeVente(mouvements, "p", { pasCourant: 4000, pasParMois: PAS_PAR_MOIS, pasDebutVente: 2800 });
-    expect(r.pasObserves).toBe(1200);
-    expect(r.piecesParMois).toBeCloseTo((48 * PAS_PAR_MOIS) / 1200);
+    const r = rythmeDeVente(mouvements, "p", { ...base, pasDebutVente: COURANT - 20 * JOUR });
+    expect(r.pasObserves).toBe(20 * JOUR);
+    expect(r.piecesParJour).toBe(3);
   });
 
-  it("reste fini quand tout se vend en un seul pas", () => {
-    const r = rythmeDeVente([{ produit: "p", pas: 99, pieces: 100 }], "p", {
-      pasCourant: 100,
-      pasParMois: PAS_PAR_MOIS,
-      pasDebutVente: 99,
-    });
+  it("100 pièces vendues en une minute font 100 pièces par jour, pas 144 000 : on observe au moins un jour", () => {
+    const r = rythmeDeVente([{ produit: "p", pas: COURANT - 1, pieces: 100 }], "p", { ...base, pasDebutVente: COURANT - 1 });
     expect(r.pasObserves).toBe(1);
-    expect(r.piecesParMois).toBe(100 * PAS_PAR_MOIS);
-    expect(Number.isFinite(r.piecesParMois)).toBe(true);
+    expect(r.moinsDUnJour).toBe(true);
+    expect(r.piecesParJour).toBe(100);
+  });
+
+  it("au-delà d'un jour, divise par la durée réellement observée", () => {
+    const r = rythmeDeVente([{ produit: "p", pas: COURANT - 10, pieces: 90 }], "p", { ...base, pasDebutVente: COURANT - 3 * JOUR });
+    expect(r.moinsDUnJour).toBe(false);
+    expect(r.piecesParJour).toBe(30);
   });
 
   it("vaut 0 sans vente, et jamais moins de 0 si les retours dépassent les ventes", () => {
-    expect(rythmeDeVente([], "p", { pasCourant: 4000, pasParMois: PAS_PAR_MOIS, pasDebutVente: null }).piecesParMois).toBe(0);
-    const r = rythmeDeVente([{ produit: "p", pas: 3990, pieces: -3 }], "p", {
-      pasCourant: 4000,
-      pasParMois: PAS_PAR_MOIS,
-      pasDebutVente: null,
-    });
-    expect(r.piecesParMois).toBe(0);
+    expect(rythmeDeVente([], "p", base).piecesParJour).toBe(0);
+    const r = rythmeDeVente([{ produit: "p", pas: COURANT - 10, pieces: -3 }], "p", base);
+    expect(r.piecesParJour).toBe(0);
   });
 
   it("ne divise jamais par zéro, même avec une horloge incohérente", () => {
-    const r = rythmeDeVente([{ produit: "p", pas: 10, pieces: 5 }], "p", {
-      pasCourant: 10,
-      pasParMois: PAS_PAR_MOIS,
-      pasDebutVente: 50,
-    });
+    const r = rythmeDeVente([{ produit: "p", pas: 10, pieces: 5 }], "p", { pasCourant: 10, pasParMois: MOIS, pasParJour: JOUR, pasDebutVente: 50 });
     expect(r.pasObserves).toBe(1);
-    expect(Number.isFinite(r.piecesParMois)).toBe(true);
+    expect(Number.isFinite(r.piecesParJour)).toBe(true);
+    const sansJour = rythmeDeVente([{ produit: "p", pas: 5, pieces: 5 }], "p", { pasCourant: 10, pasParMois: MOIS, pasParJour: 0, pasDebutVente: null });
+    expect(sansJour.piecesParJour).toBe(0);
   });
 });
 
 describe("joursDeStock", () => {
-  it("divise le stock par les ventes d'un jour de jeu", () => {
-    expect(joursDeStock(60, 90, 30)).toBe(20);
+  it("divise le stock par les ventes d'un jour", () => {
+    expect(joursDeStock(60, 3)).toBe(20);
   });
   it("vaut 0 sans stock, et null (incalculable) sans vente : jamais Infinity ni NaN", () => {
-    expect(joursDeStock(0, 90, 30)).toBe(0);
-    expect(joursDeStock(0, 0, 30)).toBe(0);
-    expect(joursDeStock(10, 0, 30)).toBeNull();
-    expect(joursDeStock(10, Number.NaN, 30)).toBeNull();
-    expect(joursDeStock(10, Number.POSITIVE_INFINITY, 30)).toBeNull();
+    expect(joursDeStock(0, 3)).toBe(0);
+    expect(joursDeStock(0, 0)).toBe(0);
+    expect(joursDeStock(10, 0)).toBeNull();
+    expect(joursDeStock(10, Number.NaN)).toBeNull();
+    expect(joursDeStock(10, Number.POSITIVE_INFINITY)).toBeNull();
   });
-  it("reste un petit nombre quand le rythme est très élevé", () => {
-    const j = joursDeStock(50, 144_000, 30);
-    expect(j).toBeCloseTo(50 / 4800);
+  it("reste cohérent avec le rythme affiché : 50 pièces à 100 par jour tiennent une demi-journée", () => {
+    expect(joursDeStock(50, 100)).toBe(0.5);
   });
 });
 
@@ -127,10 +128,19 @@ describe("textes", () => {
     expect(libelleJours(12.9, 30)).toBe("12 jours");
     expect(libelleJours(400, 30)).toBe("plus d'un an");
   });
-  it("libelleRythme, lisible quand le rythme est énorme ou nul", () => {
+  it("libelleRythme parle en pièces par jour, ou par semaine quand c'est moins d'une par jour", () => {
     expect(libelleRythme(0)).toBe("aucune vente");
-    expect(libelleRythme(0.4)).toBe("moins d'une pièce / mois");
-    expect(libelleRythme(144_000)).toBe("144 000 pièces / mois");
+    expect(libelleRythme(Number.NaN)).toBe("aucune vente");
+    expect(libelleRythme(100)).toBe("100 pièces par jour");
+    expect(libelleRythme(1.2)).toBe("1 pièce par jour");
+    expect(libelleRythme(1440)).toBe(`${(1440).toLocaleString("fr-FR")} pièces par jour`);
+    expect(libelleRythme(0.45)).toBe("environ 3 pièces par semaine");
+    expect(libelleRythme(0.01)).toBe("moins d'une pièce par semaine");
+  });
+  it("libelleVenduDepuis, pour un historique de moins d'un jour", () => {
+    expect(libelleVenduDepuis(100, "jeu. 11 h 31")).toBe("100 pièces depuis jeu. 11 h 31");
+    expect(libelleVenduDepuis(1, "jeu. 11 h 31")).toBe("1 pièce depuis jeu. 11 h 31");
+    expect(libelleVenduDepuis(0, "jeu. 11 h 31")).toBe("aucune vente depuis jeu. 11 h 31");
   });
 });
 
@@ -145,10 +155,10 @@ function entree(sur: Partial<EntreeStock> = {}): EntreeStock {
     enRoute: { prod_tshirt: 75 },
     boutiqueOuverte: false,
     mouvements: [
-      { produit: "prod_tshirt", pas: 3000, pieces: 90 },
-      { produit: "prod_chemise", pas: 3000, pieces: 30 },
+      { produit: "prod_tshirt", pas: 100 * JOUR - 10 * JOUR, pieces: 90 },
+      { produit: "prod_chemise", pas: 100 * JOUR - 10 * JOUR, pieces: 30 },
     ],
-    pasCourant: 4000,
+    pasCourant: 100 * JOUR,
     ...TEMPS,
     seuilJours: 15,
     ...sur,
@@ -165,7 +175,9 @@ describe("lignesStock", () => {
       boutique: 0,
       enRoute: 75,
       disponible: 20,
-      piecesParMois: 90,
+      piecesParJour: 3,
+      piecesObservees: 90,
+      depuisMs: null,
       jours: 20 / 3,
       statut: "bas",
     });
@@ -212,7 +224,7 @@ describe("lignesStock", () => {
     const l = lignesStock(
       entree({
         mouvements: [],
-        produits: [{ id: "prod_tshirt", nom: "T-shirt", prixDirect: 2500, prixRevendeur: 0, prixBoutique: null, pasDebutVente: 3990 }],
+        produits: [{ id: "prod_tshirt", nom: "T-shirt", prixDirect: 2500, prixRevendeur: 0, prixBoutique: null, pasDebutVente: 100 * JOUR - 10 }],
       }),
     );
     expect(l[0]!.statut).toBe("nouveau");
@@ -222,11 +234,26 @@ describe("lignesStock", () => {
     const l = lignesStock(
       entree({
         stockAtelier: { prod_tshirt: 0, prod_chemise: 0 },
-        mouvements: [{ produit: "prod_tshirt", pas: 3999, pieces: 100 }],
-        produits: [{ id: "prod_tshirt", nom: "T-shirt", prixDirect: 2500, prixRevendeur: 0, prixBoutique: null, pasDebutVente: 3999 }],
+        mouvements: [{ produit: "prod_tshirt", pas: 100 * JOUR - 1, pieces: 100 }],
+        produits: [{ id: "prod_tshirt", nom: "T-shirt", prixDirect: 2500, prixRevendeur: 0, prixBoutique: null, pasDebutVente: 100 * JOUR - 1 }],
       }),
     );
-    expect(l[0]).toMatchObject({ statut: "rupture", jours: 0, piecesParMois: 100 * PAS_PAR_MOIS });
+    expect(l[0]).toMatchObject({ statut: "rupture", jours: 0, piecesParJour: 100 });
+  });
+
+  it("donne l'instant du début de l'observation quand le produit est en vente depuis moins d'un jour", () => {
+    const debutVenteMs = Date.parse("2026-11-26T10:31:00Z");
+    const l = lignesStock(
+      entree({
+        stockAtelier: { prod_tshirt: 50 },
+        mouvements: [{ produit: "prod_tshirt", pas: 100 * JOUR - 30, pieces: 100 }],
+        produits: [
+          { id: "prod_tshirt", nom: "T-shirt", prixDirect: 2500, prixRevendeur: 0, prixBoutique: null, pasDebutVente: 100 * JOUR - 60, debutVenteMs },
+        ],
+      }),
+    );
+    // 100 pièces en une heure : 100 par jour (plancher d'un jour), 50 pièces tiennent une demi-journée.
+    expect(l[0]).toMatchObject({ piecesParJour: 100, piecesObservees: 100, depuisMs: debutVenteMs, jours: 0.5, statut: "bas" });
   });
 });
 
