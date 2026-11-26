@@ -6,7 +6,7 @@ import { localAffiche, salariesDuLocal } from "../../../lib/locaux";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { EcranAtelier } from "./EcranAtelier";
 import type { ModulePlace } from "./plan";
-import type { SalarieFiche } from "./salaries";
+import { experienceJoursDepuis, type SalarieFiche } from "./salaries";
 
 // Écran « L'atelier » (design V2, maquette V.atelier), dessiné en SVG isométrique.
 // placed_modules.x / y comptent les cases à partir de 1 (convention de validerPlanEtage).
@@ -99,6 +99,7 @@ export default async function PageAtelier({ searchParams }: { searchParams: Prom
   const parametres = chargerParametresV1();
 
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
+  const maintenantMs = Date.now();
   const tous: SalarieFiche[] = ((employes ?? []) as Employe[]).map((e) => {
     // Même calcul que la page des salariés : valeur de départ + mois passés dans l'entreprise.
     const service = Math.max(0, moisCourant - (e.mois_jeu_debut ?? 0));
@@ -106,6 +107,7 @@ export default async function PageAtelier({ searchParams }: { searchParams: Prom
       id: e.id,
       poste: e.poste,
       experienceMois: e.experience_mois_debut + service,
+      experienceJours: experienceJoursDepuis(e.cree_le, maintenantMs),
       ancienneteMois: e.anciennete_mois_debut + service,
       depuis: e.cree_le,
       salaireBrutCentimes: e.salaire_brut_mensuel_centimes,

@@ -20,11 +20,14 @@ import {
   piecesPermisesParLaMatiere,
 } from "./fabrication.js";
 import { avancerFlux, planProductionDuMois } from "./flux.js";
+import { debutDuMoisMs, indexDuMois } from "./temps.js";
 import { postesALaSignature } from "../atelier/effetsPlan.js";
 import { chargerModulesV1 } from "@kapital/content";
 
 const MODULES_CATALOGUE = chargerModulesV1();
 
+/** Instant où se lit l'expérience (heure du jeu) : 1er novembre 2026 à minuit, à Paris. */
+const INSTANT = debutDuMoisMs(indexDuMois(2026, 11));
 const PARAMS = chargerParametresV1();
 const CHUTE = PARAMS["taux_chute_matiere_defaut"]!.valeur;
 const MOIS = moisJeu(3);
@@ -139,10 +142,11 @@ describe("production atelier : bonne matière, nomenclature, temps standard", ()
     const ent = entreprise({
       catalogue: [{ ...entreprise().catalogue[0]!, productionMensuelleCible: 100_000 }],
     });
-    const plan = planProductionDuMois(ent, PARAMS);
+    const plan = planProductionDuMois(ent, PARAMS, INSTANT);
     const autre = planProductionDuMois(
       { ...ent, catalogue: [{ ...ent.catalogue[0]!, fabrication: { ...FICHE_TSHIRT, tempsStandardMinutes: 50 } }] },
       PARAMS,
+      INSTANT,
     );
     expect(plan[0]!.pieces).toBeGreaterThan(0);
     // Deux fois plus long par pièce : environ deux fois moins de pièces.
@@ -186,7 +190,7 @@ describe("production atelier : bonne matière, nomenclature, temps standard", ()
 
   it("produit sans nomenclature : erreur explicite", () => {
     const { fabrication: _f, ...sansFiche } = entreprise().catalogue[0]!;
-    expect(() => planProductionDuMois(entreprise({ catalogue: [sansFiche] }), PARAMS)).toThrow(/nomenclature/);
+    expect(() => planProductionDuMois(entreprise({ catalogue: [sansFiche] }), PARAMS, INSTANT)).toThrow(/nomenclature/);
   });
 });
 

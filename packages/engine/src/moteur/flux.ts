@@ -1,7 +1,7 @@
 import type { Parametres } from "@kapital/content";
 import { enregistrer, planComptableV1 } from "../comptabilite/index.js";
 import type { EcritureComptable, GrandLivre } from "../comptabilite/types.js";
-import { capaciteMinutes, rendement } from "../atelier/calculs.js";
+import { capaciteMinutes, experienceEnJours, rendement } from "../atelier/calculs.js";
 import { postesEquipesAteliers } from "../atelier/effetsPlan.js";
 import { artisansAuPoste } from "../personnel/postes.js";
 import { calculerVentesMois } from "../marche/ventesMois.js";
@@ -39,6 +39,7 @@ import {
   piecesPermisesParLaMatiere,
 } from "./fabrication.js";
 import type { CumulMois, DonneesFlux } from "./donneesMois.js";
+import { debutDuMoisMs, finDuMoisMs } from "./temps.js";
 
 // ---------------------------------------------------------------------------
 // Utilitaires partagés avec la clôture de fin de mois
@@ -185,7 +186,12 @@ type LignePlanProduction = { readonly produit: IdProduit; readonly pieces: numbe
  * selon le nombre d'artisans, l'expérience et le nombre de machines.
  * Un pas n'en fait qu'une part (voir `avancerFlux`).
  */
-export function planProductionDuMois(ent: Entreprise, params: Parametres): readonly LignePlanProduction[] {
+export function planProductionDuMois(
+  ent: Entreprise,
+  params: Parametres,
+  /** Instant (heure du jeu, ms) où se lit l'expérience des artisans. */
+  instantMs: number,
+): readonly LignePlanProduction[] {
   if (ent.ateliers.length === 0) return [];
   // AE-7 : seuls les artisans qui occupent un poste équipé produisent et comptent dans le
   // rendement (les plus expérimentés d'abord) ; embaucher sans poste libre ne change rien.
@@ -196,12 +202,15 @@ export function planProductionDuMois(ent: Entreprise, params: Parametres): reado
   const nbArtisans = artisans.length;
   if (nbArtisans === 0) return [];
 
-  const avgExperience = artisans.reduce((sum, s) => sum + s.experienceMois, 0) / nbArtisans;
   const rMin = parametreObligatoire(params, "rendement_atelier_min");
   const rMax = parametreObligatoire(params, "rendement_atelier_max");
-  const tau = parametreObligatoire(params, "rendement_tau_mois");
+  const tau = parametreObligatoire(params, "rendement_tau_jours");
   const heuresMensuelles = parametreObligatoire(params, "heures_mensuelles_legales");
-  const rendementEffectif = rendement(avgExperience, rMin, rMax, tau);
+  // Expérience en jours depuis l'embauche, apprentissage en ~2 semaines (horloge réelle). Moyenne
+  // des rendements (et non rendement de l'expérience moyenne) : avec un tau de 14 jours, un ancien
+  // ne doit pas faire passer un débutant du jour au rendement maximal.
+  const rendementEffectif =
+    artisans.reduce((sum, s) => sum + rendement(experienceEnJours(s, instantMs), rMin, rMax, tau), 0) / nbArtisans;
   let capaciteRestante = capaciteMinutes(
     nbArtisans,
     postesEquipes,
@@ -365,7 +374,10 @@ export function avancerFlux(
 
   // Production atelier : on produit la part du mois écoulée depuis le début du mois,
   // moins ce qui est déjà produit
-  for (const ligne of planProductionDuMois(ent, params)) {
+  // L'expérience des artisans se lit au début de ce flux (début du pas, ou du mois pris d'un bloc).
+  const debutMois = debutDuMoisMs(mois);
+  const instantFlux = debutMois + ((finDuMoisMs(mois) - debutMois) * pasDebut) / pasParMois;
+  for (const ligne of planProductionDuMois(ent, params, instantFlux)) {
     const dejaProduit = produitParProduit[ligne.produit] ?? 0;
     const piecesAProduire = Math.floor((ligne.pieces * pasVecus) / pasParMois) - dejaProduit;
     if (piecesAProduire <= 0) continue;

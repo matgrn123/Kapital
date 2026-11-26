@@ -3,11 +3,14 @@ import { describe, expect, it } from "vitest";
 import type { Entreprise, Salarie } from "../types/entreprise.js";
 import { centimes, idEntreprise, idMatiere, idProduit, idSalarie } from "../types/primitifs.js";
 import { planProductionDuMois } from "./flux.js";
+import { debutDuMoisMs, indexDuMois } from "./temps.js";
 import { postesALaSignature, resoudreModules } from "../atelier/effetsPlan.js";
 import { chargerModulesV1 } from "@kapital/content";
 
 const MODULES_CATALOGUE = chargerModulesV1();
 
+/** Instant où se lit l'expérience (heure du jeu) : 1er novembre 2026 à minuit, à Paris. */
+const INSTANT = debutDuMoisMs(indexDuMois(2026, 11));
 const PARAMS = chargerParametresV1();
 
 function salarie(id: string, experienceMois: number): Salarie {
@@ -52,7 +55,7 @@ function entreprise(salaries: readonly Salarie[], machines: number): Entreprise 
   };
 }
 
-const total = (e: Entreprise) => planProductionDuMois(e, PARAMS).reduce((s, l) => s + l.pieces, 0);
+const total = (e: Entreprise) => planProductionDuMois(e, PARAMS, INSTANT).reduce((s, l) => s + l.pieces, 0);
 
 describe("AE-7 : embauche et production", () => {
   it("embaucher sans poste libre n'augmente pas la production", () => {

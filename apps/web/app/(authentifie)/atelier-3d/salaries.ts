@@ -81,6 +81,18 @@ export function placerSalaries(a: {
   return sortie;
 }
 
+const MS_PAR_JOUR = 86_400_000;
+
+/**
+ * Expérience en jours depuis l'embauche (employees.cree_le) à l'instant `maintenantMs` : c'est
+ * elle qui fixe le rendement (apprentissage en ~2 semaines, horloge réelle). 0 si la date manque.
+ */
+export function experienceJoursDepuis(creeLeIso: string | null | undefined, maintenantMs: number): number {
+  const embauche = creeLeIso ? Date.parse(creeLeIso) : Number.NaN;
+  if (!Number.isFinite(embauche)) return 0;
+  return Math.max(0, maintenantMs - embauche) / MS_PAR_JOUR;
+}
+
 const lire = (p: Parametres, cle: string): number => {
   const v = p[cle];
   if (!v) throw new Error(`Paramètre manquant : ${cle}`);
@@ -99,13 +111,13 @@ export type ChiffresFiche = {
 export function chiffresFiche(s: SalarieFiche, parametres: Parametres): ChiffresFiche {
   const rMin = lire(parametres, "rendement_atelier_min");
   const rMax = lire(parametres, "rendement_atelier_max");
-  const tau = lire(parametres, "rendement_tau_mois");
+  const tau = lire(parametres, "rendement_tau_jours");
   return {
     coutEmployeurCentimes: coutEmployeur({
       ...coefficientsSalairesDepuisParametres(parametres),
       salaireBrutMensuel: centimes(s.salaireBrutCentimes),
     }),
-    rendement: rendement(Math.max(0, s.experienceMois), rMin, rMax, tau),
+    rendement: rendement(Math.max(0, s.experienceJours), rMin, rMax, tau),
     rendementDebutant: rMin,
     rendementMax: rMax,
   };

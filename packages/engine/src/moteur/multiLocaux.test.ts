@@ -10,6 +10,7 @@ import { centimes, idEntreprise, idMatiere, idPret, idProduit, idSalarie, moisJe
 import { cloturerMois } from "./cloture.js";
 import { cumulVide } from "./donneesMois.js";
 import { planProductionDuMois } from "./flux.js";
+import { debutDuMoisMs, indexDuMois } from "./temps.js";
 
 // 3D-7 : plusieurs locaux par société. Chaque local paie son loyer (ou son amortissement), la
 // capacité est la somme des postes posés, et la fin d'un bail ne libère que ce local.
@@ -213,7 +214,7 @@ describe("3D-7 : la capacité de production additionne les postes de tous les lo
     },
   ];
   const equipe = [salarie("a"), salarie("b"), salarie("c"), salarie("d")];
-  const total = (e: Entreprise) => planProductionDuMois(e, PARAMS).reduce((s, l) => s + l.pieces, 0);
+  const total = (e: Entreprise) => planProductionDuMois(e, PARAMS, debutDuMoisMs(indexDuMois(2026, 11))).reduce((s, l) => s + l.pieces, 0);
 
   it("2 locaux de 2 postes = 1 local de 4 postes ; plus qu'un seul local de 2 postes", () => {
     const deuxLocaux = entreprise([localLoue("wA", 2), localLoue("wB", 2)], { salaries: equipe, catalogue });

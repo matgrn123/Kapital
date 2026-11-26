@@ -41,12 +41,6 @@
     "source": "docs/cahier-des-charges-v1.md section 6.2 (rendement)",
     "date": "2026-11-01"
   },
-  "rendement_tau_mois": {
-    "valeur": 6,
-    "unite": "mois",
-    "source": "docs/cahier-des-charges-v1.md section 6.2 (tau d'apprentissage)",
-    "date": "2026-11-01"
-  },
   "taux_chute_matiere_defaut": {
     "valeur": 0.15,
     "unite": "ratio",
@@ -459,6 +453,30 @@
     "valeur": 30,
     "unite": "minutes_reelles",
     "source": "décision de Mathieu du 26/11/2026 (horloge réelle : le grossiste local livre en 30 minutes réelles)",
+    "date": "2026-11-26"
+  },
+  "rendement_tau_jours": {
+    "valeur": 14,
+    "unite": "jours",
+    "source": "décision de Mathieu du 26/11/2026 (horloge réelle) : apprentissage des salariés en ~2 semaines, expérience comptée depuis l'embauche ; remplace rendement_tau_mois = 6 (docs/cahier-des-charges-v1.md section 6.2, tau d'apprentissage)",
+    "date": "2026-11-26"
+  },
+  "mission_tenir_jours": {
+    "valeur": 7,
+    "unite": "jours",
+    "source": "décision de Mathieu du 26/11/2026 (horloge réelle) : la mission « Tenir six mois » devient « Tenir 7 jours » sans découvert depuis la création",
+    "date": "2026-11-26"
+  },
+  "mission_croissance_periode_jours": {
+    "valeur": 7,
+    "unite": "jours",
+    "source": "décision de Mathieu du 26/11/2026 (horloge réelle) : « Doubler le chiffre d'affaires » compare des semaines (périodes de 7 jours comptées depuis la création) au lieu de mois",
+    "date": "2026-11-26"
+  },
+  "mission_boutique_jours": {
+    "valeur": 7,
+    "unite": "jours",
+    "source": "proposition du lot T5 (horloge réelle, 26/11/2026), à valider par Mathieu : « Ouvrir ma boutique sans découvert » se juge sur les 7 jours qui suivent la signature du bail (24 h de travaux puis les premières ventes), au lieu de « jusqu'à la fin du premier mois d'ouverture »",
     "date": "2026-11-26"
   },
   "calendrier_mois_debut_collection_pe": {

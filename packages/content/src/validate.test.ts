@@ -119,7 +119,7 @@ describe("parametres-v1.json (le vrai fichier)", () => {
       "heures_mensuelles_legales",
       "rendement_atelier_min",
       "rendement_atelier_max",
-      "rendement_tau_mois",
+      "rendement_tau_jours",
       "taux_chute_matiere_defaut",
       "taux_retour_vente_en_ligne",
       "cout_traitement_retour",

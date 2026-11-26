@@ -40,6 +40,12 @@ export type Salarie = {
   readonly salaireBrutMensuel: Centimes;
   readonly ancienneteMois: number;
   readonly experienceMois: number;
+  /**
+   * Heure du jeu de l'embauche (ms depuis le 1er janvier 1970, comme `heureJeuMs`). L'expérience
+   * qui fixe le rendement est comptée en jours depuis cet instant (`experienceEnJours`). Absente
+   * (banc d'essai, tests) : embauché au début du mois, `experienceMois` mois complets plus tôt.
+   */
+  readonly embaucheMs?: number;
 };
 
 /** Bail d'un local (AE-5) : dépôt de garantie, charges, mois de fin quand le congé est donné. */
