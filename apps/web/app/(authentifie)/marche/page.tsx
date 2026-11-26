@@ -1,5 +1,6 @@
 import { creerClientServeur } from "../../../lib/supabase/server";
-import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
+import { dateHeureLisible } from "../../../lib/cadre";
+import { formaterEuros } from "../../../lib/formatage";
 import { libelleGamme, libelleLisible, nomLisibleSociete } from "../../../lib/lisible";
 import { Carte, Puce } from "../../../components/ui";
 import { EnTete, TableauRang, Vide } from "../../../components/ui/formulaire";
@@ -204,7 +205,7 @@ export default async function PageMarche() {
               cle: v.id,
               moi: v.company_id === entreprise.id,
               cellules: [
-                <span key="d" className="text-[0.78rem] text-muted">{formaterDateHeure(v.cree_le)}</span>,
+                <span key="d" className="text-[0.78rem] text-muted">{dateHeureLisible(v.cree_le)}</span>,
                 v.nom_entreprise,
                 libelleLisible(v.libelle, nomsProduits),
                 `${formaterEuros(v.montant_centimes)} €`,

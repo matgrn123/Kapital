@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Bouton, CLASSE_SAISIE, Champ, EcritureComptable, Ligne, Message, Note, Options, Puce } from "../../../components/ui";
 import { lireEuros } from "../../../lib/apercu-lot4";
+import { enMois, libelleMois } from "../../../lib/cadre";
 import { formaterEuros } from "../../../lib/formatage";
 import { appelerAction } from "../_partage/reponses";
 import type { OffreEmplacement } from "./donnees";
@@ -46,7 +47,7 @@ export function ChoixEmplacement({
     const r = await appelerAction("/api/actions/ouvrir-boutique", { batimentId: a.batimentId });
     setEnCours(false);
     if (!r.ok) return setErreur(r.message);
-    setSucces(`Bail signé. Les travaux commencent : la boutique ouvrira au mois ${a.moisOuverture}.`);
+    setSucces(`Bail signé. Les travaux commencent : la boutique ouvrira ${enMois(a.moisOuverture)}.`);
     router.refresh();
   }
 
@@ -79,7 +80,7 @@ export function ChoixEmplacement({
             {euros(tresorerie - a.totalALaSignature)}
           </Ligne>
           <Ligne libelle="Ouverture après les travaux">
-            mois {a.moisOuverture} ({a.dureeTravauxMois} mois de travaux)
+            {libelleMois(a.moisOuverture)} ({a.dureeTravauxMois} mois de travaux)
           </Ligne>
         </div>
         <div className="flex flex-col">

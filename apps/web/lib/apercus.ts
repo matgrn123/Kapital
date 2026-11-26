@@ -576,15 +576,9 @@ export function bornesQuantite(e: { minimum: number; plafonds: readonly number[]
 
 /* ------------------------------------------------------------------ Délais */
 
-/** « 2 mois de jeu (2 jours réels) », d'après le ratio des paramètres. */
-export function texteDelai(mois: number, params: Parametres): string {
-  const minutes = mois * valeurParam(params, "temps_minutes_reelles_par_mois_jeu");
-  const heures = minutes / 60;
-  const reel =
-    heures >= 24
-      ? `${(heures / 24).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} jour${heures / 24 >= 2 ? "s" : ""} réel${heures / 24 >= 2 ? "s" : ""}`
-      : `${Math.round(heures)} h réelles`;
-  return `${mois} mois de jeu (${reel})`;
+/** « livré en 1 mois » : l'horloge du jeu est l'horloge réelle, un mois de jeu est un vrai mois. */
+export function texteDelai(mois: number): string {
+  return `livré en ${mois} mois`;
 }
 
 /* ---------------------------------------------------------- Atelier propre */

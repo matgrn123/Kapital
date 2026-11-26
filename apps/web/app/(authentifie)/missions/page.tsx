@@ -4,7 +4,8 @@ import { BoutonLien, Carte, EncadreNotion, EnTete, Jauge, Puce, TableauRang, Vid
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { nomLisibleSociete } from "../../../lib/lisible";
 import { chargerProgressionMissions } from "../../../lib/missions";
-import { formaterDateHeure, formaterEuros } from "../../../lib/formatage";
+import { dateHeureLisible } from "../../../lib/cadre";
+import { formaterEuros } from "../../../lib/formatage";
 
 type LigneClassement = {
   company_id: string;
@@ -130,7 +131,7 @@ export default async function PageMissions() {
 
       <Carte
         titre="Classement du village"
-        action={dernierCalcul ? <Puce>Calculé le {formaterDateHeure(dernierCalcul)}</Puce> : undefined}
+        action={dernierCalcul ? <Puce>Calculé le {dateHeureLisible(dernierCalcul)}</Puce> : undefined}
       >
         {classement.length === 0 ? (
           <Vide>Aucune entreprise active pour l&apos;instant.</Vide>

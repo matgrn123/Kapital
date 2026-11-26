@@ -84,11 +84,11 @@ export function FormulaireCommande({
     if (prem) setMaterialId(prem.material_id);
   }
 
-  /** « 4,20 € le mètre · 1 mois de jeu » : le moins cher du catalogue de ce fournisseur, et son délai. */
+  /** « 4,20 € le mètre · livré en 1 mois » : le moins cher du catalogue de ce fournisseur, et son délai. */
   function prixLigne(id: string): string {
     const f = fournisseurs.find((x) => x.id === id);
     const lignes = catalogue.filter((l) => l.supplier_id === id);
-    const delai = f ? texteDelai(f.delai_mois, params) : "";
+    const delai = f ? texteDelai(f.delai_mois) : "";
     if (lignes.length === 0) return delai;
     const moinsChere = lignes.reduce((a, b) => (b.prix_centimes < a.prix_centimes ? b : a));
     return `${lignes.length > 1 ? "dès " : ""}${prixParUnite(moinsChere.prix_centimes, uniteDe(moinsChere.material_id))} · ${delai}`;
@@ -194,7 +194,7 @@ export function FormulaireCommande({
               valeur={`${formaterEuros(ligne.prix_centimes)} €`}
               detail={`${articleUnite(uniteMat)}, figé à la commande`}
             />
-            <Resultat libelle="Livraison" valeur={`${apercu.delaiMois} mois`} detail={texteDelai(apercu.delaiMois, params)} />
+            <Resultat libelle="Livraison" valeur={`${apercu.delaiMois} mois`} detail="délai du fournisseur" />
           </div>
           <Ligne libelle="Sortie de trésorerie aujourd'hui">0,00 €</Ligne>
           <Note>

@@ -1,6 +1,7 @@
 import { reglesPretV1 } from "@kapital/server";
 import { Carte, EncadreNotion, EnTete, FilRouge, Ligne } from "../../../components/ui";
-import { formaterDate, formaterEuros } from "../../../lib/formatage";
+import { dateLisible, estIndexCalendaire, finDuMoisLisible } from "../../../lib/cadre";
+import { formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { lireEstrAnnuel } from "../_partage/estr";
 import { lireVerrou } from "../_partage/verrou";
@@ -27,6 +28,7 @@ type Echeance = {
   interets_centimes: number;
   amortissement_centimes: number;
   instant_prevu: string;
+  mois_jeu: number | null;
 };
 
 const OBJETS: Record<string, string> = {
@@ -55,12 +57,13 @@ export default async function PageBanque() {
   ]);
   const pretActifs = ((prets ?? []) as Loan[]).filter((p) => p.statut === "actif");
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
+  const maintenant = Date.now();
 
   let echeances: Echeance[] = [];
   if (pretActifs.length > 0) {
     const { data } = await supabase
       .from("loan_schedules")
-      .select("loan_id, numero, mensualite_centimes, interets_centimes, amortissement_centimes, instant_prevu")
+      .select("loan_id, numero, mensualite_centimes, interets_centimes, amortissement_centimes, instant_prevu, mois_jeu")
       .in("loan_id", pretActifs.map((p) => p.id))
       .eq("statut", "a_venir")
       .order("instant_prevu", { ascending: true })
@@ -128,7 +131,12 @@ export default async function PageBanque() {
                   <tbody>
                     {echeances.map((e) => (
                       <tr key={`${e.loan_id}_${e.numero}`} className="border-t border-line">
-                        <td className="py-1.5">{formaterDate(e.instant_prevu)}</td>
+                        <td className="py-1.5">
+                          {/* L'échéance est payée à la fin de son mois, à minuit. */}
+                          {e.mois_jeu !== null && estIndexCalendaire(e.mois_jeu)
+                            ? finDuMoisLisible(e.mois_jeu, maintenant)
+                            : dateLisible(e.instant_prevu)}
+                        </td>
                         <td className="py-1.5 text-right tabular-nums">{formaterEuros(e.mensualite_centimes)} €</td>
                         <td className="py-1.5 text-right tabular-nums text-muted">{formaterEuros(e.interets_centimes)} €</td>
                       </tr>

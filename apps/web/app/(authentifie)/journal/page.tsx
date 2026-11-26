@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { DetailCloture } from "@kapital/server";
 import { Alerte, Carte, EncadreNotion, Puce, SurTitre, Vide } from "../../../components/ui";
 import { debriefDuMois } from "../../../lib/debrief";
-import { formaterDateHeure } from "../../../lib/formatage";
+import { dateHeureLisible, titreMois } from "../../../lib/cadre";
 import {
   COLONNES_EVENEMENTS,
   evenementAffiche,
@@ -76,7 +76,7 @@ export default async function PageJournal() {
         <Vide>Le journal n&apos;est pas encore disponible. Reviens dans quelques minutes.</Vide>
       ) : mois.length === 0 ? (
         <Vide>
-          Rien pour l&apos;instant. Les livraisons, les ruptures de stock et la clôture de chaque mois de jeu
+          Rien pour l&apos;instant. Les livraisons, les ruptures de stock et la clôture de chaque mois
           s&apos;inscriront ici au fil du temps.
         </Vide>
       ) : (
@@ -86,7 +86,7 @@ export default async function PageJournal() {
               const cloture = clotures.get(g.mois);
               const debrief = cloture ? debriefDuMois(cloture.detail as unknown as DetailCloture, nomsProduits) : null;
               return (
-                <Carte key={g.mois} surTitre={debrief ? "Mois clos" : "Mois en cours"} titre={`Mois ${g.mois}`}>
+                <Carte key={g.mois} surTitre={debrief ? "Mois clos" : "Mois en cours"} titre={titreMois(g.mois)}>
                   {debrief && (
                     <div className="mb-3 flex flex-col gap-1 rounded-[10px] bg-accent-soft px-3 py-2.5 text-[0.86rem]">
                       <SurTitre className="text-accent">Bilan du mois</SurTitre>
@@ -111,7 +111,7 @@ export default async function PageJournal() {
                                 {e.lien.libelle}
                               </Link>
                             )}
-                            <span className="text-[0.75rem] text-muted">{formaterDateHeure(e.quand)}</span>
+                            <span className="text-[0.75rem] text-muted">{dateHeureLisible(e.quand)}</span>
                             {nouveaux.has(e.id) && <Puce ton="accent">Nouveau</Puce>}
                           </span>
                         </Alerte>
@@ -126,7 +126,7 @@ export default async function PageJournal() {
             )}
           </div>
           <EncadreNotion titre="La clôture du mois">
-            Chaque fin de mois de jeu, la société paie ce qui tombe à échéance : salaires, loyers, échéances de prêt,
+            Chaque fin de mois, à minuit, la société paie ce qui tombe à échéance : salaires, loyers, échéances de prêt,
             TVA du mois précédent. Le résultat du mois compare ce que tu as vendu à ce que tu as consommé ; la
             trésorerie, elle, suit l&apos;argent réellement sorti du compte. Les deux ne bougent pas toujours ensemble.
           </EncadreNotion>

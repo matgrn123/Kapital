@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BoutonLien, Carte, EncadreNotion, EnTete, Jauge, Kpi, Puce, Vide } from "../../../components/ui";
 import { formaterEuros } from "../../../lib/formatage";
-import { dureeReelleLisible, libelleJours, libelleRythme, type LigneStock, type StatutStock } from "../../../lib/stock";
+import { libelleJours, libelleRythme, type LigneStock, type StatutStock } from "../../../lib/stock";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { chargerSituationStock } from "./donnees";
 
@@ -29,20 +29,15 @@ function Chiffre({ libelle, valeur, detail }: { libelle: string; valeur: React.R
 function LigneProduit({
   l,
   joursParMois,
-  minutesReellesParMois,
-  pasParMois,
   seuilJours,
   boutiqueOuverte,
 }: {
   l: LigneStock;
   joursParMois: number;
-  minutesReellesParMois: number;
-  pasParMois: number;
   seuilJours: number;
   boutiqueOuverte: boolean;
 }) {
   const s = STATUT[l.statut];
-  const reel = dureeReelleLisible(l.jours, { joursParMois, minutesReellesParMois, pasParMois });
   const texteJours =
     l.statut === "rupture"
       ? "rupture : plus rien à vendre"
@@ -50,7 +45,7 @@ function LigneProduit({
       ? l.statut === "dort"
         ? "aucune vente depuis un mois"
         : "pas encore de vente"
-      : `${libelleJours(l.jours, joursParMois)}${reel ? ` (${reel})` : ""}`;
+      : libelleJours(l.jours, joursParMois);
   return (
     <section className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -151,8 +146,6 @@ export default async function PageStock() {
                   key={l.id}
                   l={l}
                   joursParMois={temps.joursParMois}
-                  minutesReellesParMois={temps.minutesReellesParMois}
-                  pasParMois={temps.pasParMois}
                   seuilJours={seuilJours}
                   boutiqueOuverte={boutiqueOuverte}
                 />
@@ -165,8 +158,7 @@ export default async function PageStock() {
           <EncadreNotion titre="Les jours de stock">
             Jours de stock = pièces prêtes à vendre ÷ pièces vendues par jour. C&apos;est le temps qu&apos;il te reste avant
             la rupture si rien n&apos;arrive. Compare-le au délai de ta production : s&apos;il est plus court, relance-la
-            maintenant. Ici, un jour de jeu dure {Math.round(temps.minutesReellesParMois / temps.joursParMois)} minutes
-            réelles.
+            maintenant. Ici, un jour de jeu est un vrai jour.
           </EncadreNotion>
           <EncadreNotion titre="La rupture">
             Sans stock, les clients qui voulaient ton produit repartent les mains vides : la vente est perdue, elle ne se

@@ -12,6 +12,7 @@ import { reglesPretV1 } from "@kapital/server";
 import { BandeauEtape, BoutonLien, Carte, EncadreNotion, EnTete, Etapes, Faits, FilRouge, Puce, Succes } from "../../../components/ui";
 import { messageSignature, PARAM_SIGNATURE } from "../../../lib/locaux";
 import { apercuBail } from "../../../lib/apercu-lot4";
+import { enMois } from "../../../lib/cadre";
 import { formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { COLONNES_MODULES_POSES, postesPoses, type AvecModulesPoses } from "../../../lib/api-helpers";
@@ -212,7 +213,7 @@ export default async function PageLocaux({
                 <div>
                   {local.mois_fin !== null ? (
                     <p className="text-[0.9rem]">
-                      Congé donné : le bail prend fin au mois de jeu {local.mois_fin}
+                      Congé donné : le bail prend fin {enMois(local.mois_fin)}
                       {local.mois_fin > moisCourant ? ` (dans ${local.mois_fin - moisCourant} mois)` : ""}. Le loyer reste
                       dû jusque-là, puis le dépôt de garantie t&apos;est rendu.
                     </p>

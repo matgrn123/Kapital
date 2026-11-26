@@ -6,6 +6,7 @@ import {
 } from "@kapital/server";
 import type { Indicateurs } from "@kapital/engine";
 import { chargerContexte, estErreurAction } from "../../../lib/api-helpers";
+import { enMois, libelleMois } from "../../../lib/cadre";
 import { formaterEuros } from "../../../lib/formatage";
 import { Carte, Kpi } from "../../../components/ui";
 import { Alerte, EnTete, Message, Tableau, Vide } from "../../../components/ui/formulaire";
@@ -108,7 +109,7 @@ export default async function PageIndicateurs() {
       <Section titre="Trésorerie des 3 prochains mois" explication="Une prévision de ton compte en banque si tes ventes gardent leur rythme actuel ; elle ne compte pas tes futurs achats de matière ni la TVA.">
         {previsionnel.premierMoisDecouvert !== null && (
           <Alerte ton="critique">
-            Attention : ta trésorerie prévue passe sous zéro au mois de jeu {previsionnel.premierMoisDecouvert}. Pense à
+            Attention : ta trésorerie prévue passe sous zéro {enMois(previsionnel.premierMoisDecouvert)}. Pense à
             réduire tes dépenses ou à emprunter.
           </Alerte>
         )}
@@ -116,9 +117,9 @@ export default async function PageIndicateurs() {
           Trésorerie de départ : <b className="tabular-nums">{eur(previsionnel.tresorerieDepart)}</b>
         </p>
         <TableauTexte
-          entetes={["Mois de jeu", "Ventes directes", "Revendeurs", "Salaires", "Loyer", "Prêts", "Fournisseurs", "Flux net", "Trésorerie fin de mois"]}
+          entetes={["Mois", "Ventes directes", "Revendeurs", "Salaires", "Loyer", "Prêts", "Fournisseurs", "Flux net", "Trésorerie fin de mois"]}
           lignes={previsionnel.mois.map((m) => [
-            String(m.mois),
+            libelleMois(m.mois),
             eur(m.encaissementsDirects),
             eur(m.encaissementsRevendeurs),
             eur(-m.salaires),

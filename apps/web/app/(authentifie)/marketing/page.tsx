@@ -2,7 +2,8 @@ import { chargerParametresV1 } from "@kapital/content";
 import { coefficientsMarketingDepuisParametres, etapeEffective, type EtapeEntreprise } from "@kapital/engine";
 import { Carte, EncadreNotion, EnTete, FilRouge, Jauge, Tableau, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
-import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
+import { dateHeureLisible } from "../../../lib/cadre";
+import { formaterEuros } from "../../../lib/formatage";
 import { ActionsMarketing } from "./ActionsMarketing";
 import { ACTIONS } from "./actions";
 
@@ -91,7 +92,7 @@ export default async function PageMarketing() {
                           : `×${Number(a.alea).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                       </td>
                     )}
-                    <td className="text-muted">{formaterDateHeure(a.instant)}</td>
+                    <td className="text-muted">{dateHeureLisible(a.instant)}</td>
                   </tr>
                 ))}
               </Tableau>

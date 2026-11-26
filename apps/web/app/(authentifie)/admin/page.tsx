@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { libelleMois } from "../../../lib/cadre";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { BoutonAvancerMonde } from "./BoutonAvancerMonde";
 import { BoutonApprovisionnerAdmin } from "./BoutonApprovisionnerAdmin";
@@ -62,7 +63,9 @@ export default async function PageAdmin() {
         <dl className="mt-3 grid grid-cols-3 gap-4 text-sm">
           <div>
             <dt className="text-xs text-[color:var(--color-g-500)]">Mois courant</dt>
-            <dd className="chiffre text-lg font-medium">{monde?.mois_courant ?? "—"}</dd>
+            <dd className="chiffre text-lg font-medium">
+              {monde?.mois_courant == null ? "—" : `${libelleMois(monde.mois_courant)} (${monde.mois_courant})`}
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-[color:var(--color-g-500)]">État</dt>
@@ -74,8 +77,8 @@ export default async function PageAdmin() {
       <section className="mt-6 rounded-md border border-[color:var(--color-g-200)] p-6">
         <h2 className="text-sm font-semibold">Mettre le monde à jour</h2>
         <p className="mt-2 text-sm text-[color:var(--color-g-700)]">
-          Le monde avance tout seul, au rythme d'un pas par minute réelle (un mois de
-          jeu par jour réel), pour tous les joueurs. Ce bouton fait rattraper
+          Le monde avance tout seul, à l'heure réelle (la date du jeu est la vraie
+          date, heure de Paris), pour tous les joueurs. Ce bouton fait rattraper
           immédiatement les pas manquants à toutes les entreprises ; il ne change
           pas l'heure du jeu. Pour suivre le monde en direct, ouvrir le{" "}
           <Link href="/admin/cockpit" className="underline">

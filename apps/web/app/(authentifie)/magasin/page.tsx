@@ -17,6 +17,7 @@ import {
 import { chargerPointsDeVenteSupabase } from "@kapital/server";
 import { BoutonLien, Carte, EncadreNotion, FilRouge, Jauge, Kpi, Puce } from "../../../components/ui";
 import { EnTete, Ligne, Note } from "../../../components/ui/formulaire";
+import { enMois, libelleMois } from "../../../lib/cadre";
 import { formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { conditionsBoutique } from "../societe/donnees";
@@ -279,16 +280,16 @@ export default async function PageMagasin() {
         titre={nom}
         action={
           ouverte ? (
-            <Puce ton="bon">Ouverte depuis le mois {boutique.moisOuverture}</Puce>
+            <Puce ton="bon">Ouverte depuis {libelleMois(boutique.moisOuverture)}</Puce>
           ) : (
-            <Puce ton="alerte">En travaux jusqu&apos;au mois {boutique.moisOuverture}</Puce>
+            <Puce ton="alerte">En travaux · ouverture {enMois(boutique.moisOuverture)}</Puce>
           )
         }
       >
         <p className="text-[0.88rem] text-muted">
           {ouverte
             ? "Les passants entrent, les vendeurs vendent ce qu'il y a en rayon. Le loyer, les charges et les salaires tombent à la fin de chaque mois."
-            : `Bail signé au mois ${boutique.moisSignature}. Pendant les travaux, le loyer court mais la boutique ne vend rien : prépare l'ouverture (vendeur, stock).`}
+            : `Bail signé ${enMois(boutique.moisSignature)}. Pendant les travaux, le loyer court mais la boutique ne vend rien : prépare l'ouverture (vendeur, stock).`}
         </p>
         <div className="mt-3">
           <BoutonLien href="/vue-3d" petit>
@@ -301,7 +302,7 @@ export default async function PageMagasin() {
         <Kpi
           libelle="Ventes du mois en boutique"
           valeur={`${ventes.pieces.toLocaleString("fr-FR")} pièces`}
-          detail={`${euros(ventes.chiffreAffairesHt)} de chiffre d'affaires HT · mois ${moisCourant}`}
+          detail={`${euros(ventes.chiffreAffairesHt)} de chiffre d'affaires HT · ${libelleMois(moisCourant)}`}
         />
         <Kpi
           libelle="Stock en boutique"

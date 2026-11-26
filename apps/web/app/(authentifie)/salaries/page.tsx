@@ -12,7 +12,8 @@ import {
 import { BandeauEtape, Carte, EcritureComptable, EncadreNotion, EnTete, FilRouge, Tableau } from "../../../components/ui";
 import { apercuLicenciement, apercuPaieEquipe } from "../../../lib/apercu-lot4";
 import { COLONNES_MODULES_POSES, postesPosesTousLocaux, type AvecModulesPoses } from "../../../lib/api-helpers";
-import { formaterDate, formaterEuros } from "../../../lib/formatage";
+import { dateLisible } from "../../../lib/cadre";
+import { formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { lireVerrou } from "../_partage/verrou";
 import { BoutonLicencier, FormulaireEmbauche } from "./FormulaireEmbauche";
@@ -136,7 +137,7 @@ export default async function PageSalaries() {
                     return (
                       <tr key={e.id} className="align-top">
                         <td>{POSTES[e.poste]}</td>
-                        <td className="text-muted">{formaterDate(e.cree_le)}</td>
+                        <td className="text-muted">{dateLisible(e.cree_le)}</td>
                         <td className="text-right">{formaterEuros(e.salaire_brut_mensuel_centimes)} €</td>
                         <td className="text-right">{formaterEuros(cout(e))} €</td>
                         <td className="text-right">
