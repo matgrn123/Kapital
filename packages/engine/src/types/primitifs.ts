@@ -5,13 +5,8 @@ export type Minutes = Branded<number, "minutes">;
 export type MoisJeu = Branded<number, "moisJeu">;
 export type Graine = Branded<number, "graine">;
 
-// Minutes réelles depuis la création du monde (ratio 24:1 → 1 mois jeu = 1440 min réelles)
-export type InstantJeu = Branded<number, "instantJeu">;
-
-// Durée en mois jeu (peut être fractionnaire)
-export type DureeMois = Branded<number, "dureeMois">;
-
-export const MINUTES_PAR_MOIS_JEU = 1440;
+// Le temps (heure du jeu, pas, mois calendaires) se manipule avec moteur/temps.ts :
+// un mois de jeu est un mois calendaire réel, de longueur variable.
 
 export function centimes(n: number): Centimes {
   if (!Number.isInteger(n)) {
@@ -39,31 +34,6 @@ export function graine(n: number): Graine {
     throw new Error(`Graine doit être un entier >= 0, reçu ${n}.`);
   }
   return n as Graine;
-}
-
-export function instantJeu(n: number): InstantJeu {
-  if (!Number.isFinite(n) || n < 0) {
-    throw new Error(`InstantJeu doit être un nombre fini >= 0, reçu ${n}.`);
-  }
-  return n as InstantJeu;
-}
-
-export function dureeMois(n: number): DureeMois {
-  if (!Number.isFinite(n) || n < 0) {
-    throw new Error(`DureeMois doit être un nombre fini >= 0, reçu ${n}.`);
-  }
-  return n as DureeMois;
-}
-
-export function dureeMoisEntre(debut: InstantJeu, fin: InstantJeu): DureeMois {
-  if (fin < debut) {
-    throw new Error(`fin (${fin}) doit être >= debut (${debut}).`);
-  }
-  return dureeMois((fin - debut) / MINUTES_PAR_MOIS_JEU);
-}
-
-export function moisCourantDepuisInstant(instant: InstantJeu): MoisJeu {
-  return moisJeu(Math.floor(instant / MINUTES_PAR_MOIS_JEU));
 }
 
 export type Id<Tag extends string> = Branded<string, `id_${Tag}`>;

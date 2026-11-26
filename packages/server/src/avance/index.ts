@@ -7,6 +7,7 @@ import { StockageSupabase } from "./stockageSupabase.js";
 
 export {
   avancerMondeJusquA,
+  ErreurMondeAncienCalendrier,
   type OptionsAvance,
   type ResultatAvanceEntreprise,
   type ResultatAvanceMonde,

@@ -31,7 +31,7 @@ describe("mouvementsDeVente", () => {
         { ecriture_id: "retour_3_societe_x_p4", mois_jeu: 3, libelle: "Retour 1 prod_tshirt", compte: "707" },
         { ecriture_id: "loyer_3", mois_jeu: 3, libelle: "Loyer atelier", compte: "613" },
       ],
-      PAS_PAR_MOIS,
+      (mois) => mois * PAS_PAR_MOIS,
     );
     expect(m).toEqual([
       { produit: "prod_tshirt", pas: 2 * PAS_PAR_MOIS + 10, pieces: 5 },
@@ -42,7 +42,7 @@ describe("mouvementsDeVente", () => {
   });
 
   it("place au début du mois une écriture sans numéro de pas", () => {
-    const m = mouvementsDeVente([{ ecriture_id: "vente_1_x", mois_jeu: 1, libelle: "Vente directe 4 prod_sac_toile" }], PAS_PAR_MOIS);
+    const m = mouvementsDeVente([{ ecriture_id: "vente_1_x", mois_jeu: 1, libelle: "Vente directe 4 prod_sac_toile" }], (mois) => mois * PAS_PAR_MOIS);
     expect(m).toEqual([{ produit: "prod_sac_toile", pas: PAS_PAR_MOIS, pieces: 4 }]);
   });
 });

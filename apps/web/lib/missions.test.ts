@@ -1,27 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { chargerParametresV1 } from "@kapital/content";
-import { configTempsDepuis, evaluerMissions } from "@kapital/engine";
+import { evaluerMissions, indexDuMois } from "@kapital/engine";
 import { calculerMetriques, moisDeCreation } from "./missions";
 
 const PARAMS = chargerParametresV1();
-const msParMois = configTempsDepuis(PARAMS).minutesReellesParMoisJeu * 60_000;
-const DEBUT = "2026-11-15T00:00:00.000Z";
-const instant = (mois: number) => new Date(Date.parse(DEBUT) + mois * msParMois).toISOString();
+// Horloge réelle : l'origine de l'horloge (worlds.debut_reel) est le 1er janvier 1970.
+const DEBUT = "1970-01-01T00:00:00.000Z";
+const CREATION = "2026-11-26T09:21:00.000Z"; // jeudi 26 novembre 2026, 10 h 21 à Paris
+const NOVEMBRE_2026 = indexDuMois(2026, 11);
 
 describe("moisDeCreation", () => {
-  it("donne le mois de jeu où la société a été créée", () => {
-    expect(moisDeCreation(PARAMS, DEBUT, instant(10.5))).toBe(10);
-    expect(moisDeCreation(PARAMS, DEBUT, DEBUT)).toBe(0);
+  it("donne le mois calendaire où la société a été créée", () => {
+    expect(moisDeCreation(PARAMS, DEBUT, CREATION)).toBe(NOVEMBRE_2026);
+    expect(moisDeCreation(PARAMS, DEBUT, "2026-11-30T23:00:00.000Z")).toBe(NOVEMBRE_2026 + 1); // 1er déc. 0 h à Paris
   });
   it("vaut 0 sans date de création ou de début du monde", () => {
-    expect(moisDeCreation(PARAMS, null, instant(3))).toBe(0);
+    expect(moisDeCreation(PARAMS, null, CREATION)).toBe(0);
     expect(moisDeCreation(PARAMS, DEBUT, null)).toBe(0);
   });
 });
 
 describe("mission « Tenir six mois »", () => {
-  it("n'est pas réussie pour une société créée au mois 10 quand le monde est au mois 10", () => {
-    const m = calculerMetriques([], moisDeCreation(PARAMS, DEBUT, instant(10.5)), 10);
+  it("n'est pas réussie pour une société créée le mois même où le monde se trouve", () => {
+    const m = calculerMetriques([], moisDeCreation(PARAMS, DEBUT, CREATION), NOVEMBRE_2026);
     const mission2 = evaluerMissions(m).find((p) => p.id === "mission2")!;
     expect(mission2.etat).not.toBe("validee");
     expect(mission2.actuel).toBe(0);

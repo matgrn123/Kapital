@@ -241,7 +241,8 @@ export type ContexteFlux = {
   /**
    * Portion du mois couverte par ce flux, en nombre de pas entiers :
    * du pas `pasDebut` (inclus) au pas `pasFin` (exclu), sur `pasParMois` pas.
-   * Un mois pris d'un bloc : pasDebut 0, pasFin 1, pasParMois 1.
+   * `pasParMois` est le nombre de pas de CE mois (`pasDansLeMois` : un mois calendaire
+   * réel compte 28 à 31 jours). Un mois pris d'un bloc : pasDebut 0, pasFin 1, pasParMois 1.
    * Des entiers, pour que le dernier pas retombe exactement sur 1 mois.
    */
   readonly pasDebut: number;
@@ -579,18 +580,20 @@ export function avancerFlux(
         );
       }
     } else {
-      // Revendeur : pas de TVA sur les ventes en gros (HT direct)
+      // Revendeur : le prix saisi est hors taxes ; le revendeur paie ce prix plus la TVA
+      // (411 TTC / 707 HT + 44571 TVA), encaissé deux mois plus tard.
       gl = enregistrerVenteRevendeur(gl, {
         idEcriture: `vente_${mois}_${ent.id}_${vente.produit}_${vente.canal}${suffixeId}`,
         mois,
         produit: vente.produit,
         quantite: quantiteServie,
-        prixGrosHtUnitaire: prixHtDepuisTtc(vente.prixUnitaireCentimes, tvaStandard),
+        prixGrosHtUnitaire: vente.prixUnitaireCentimes,
         coutRevientUnitaire,
         coutRevientTotal,
+        tauxTva: tvaStandard,
       });
       derniereEcritureDuGl();
-      chiffreAffairesHt += prixHtDepuisTtc(vente.prixUnitaireCentimes, tvaStandard) * quantiteServie;
+      chiffreAffairesHt += vente.prixUnitaireCentimes * quantiteServie;
     }
   }
   ent = { ...ent, stocksFinis, ...(ent.pointsDeVente === undefined ? {} : { pointsDeVente }) };

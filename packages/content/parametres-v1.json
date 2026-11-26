@@ -701,6 +701,18 @@
     "source": "hypothèse de jeu, à valider par Mathieu (prime de risque totale plafonnée à 2 points)",
     "date": "2026-11-25"
   },
+  "agios_taux_annuel": {
+    "valeur": 0.15,
+    "unite": "ratio_annuel",
+    "source": "hypothèse de jeu validée par Mathieu le 26/11/2026 (valeur reprise de packages/engine/src/moteur/cloture.ts, où elle était écrite en dur) ; ordre de grandeur d'un découvert professionnel, sous le taux d'usure publié par la Banque de France (https://www.banque-france.fr/fr/statistiques/taux-et-cours/taux-dusure)",
+    "date": "2026-11-26"
+  },
+  "decouvert_mois_avant_difficulte": {
+    "valeur": 3,
+    "unite": "mois",
+    "source": "hypothèse de jeu (valeur reprise de packages/engine/src/moteur/cloture.ts, où elle était écrite en dur) : la société passe « en difficulté » après 3 fins de mois consécutives à découvert",
+    "date": "2026-11-26"
+  },
   "embauche_reserve_mois_cout_employeur": {
     "valeur": 2,
     "unite": "mois",

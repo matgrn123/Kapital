@@ -304,14 +304,18 @@ export function cloturerMois(
     });
   }
 
-  // Découvert et agios (sur la trésorerie de début de mois et tous les mouvements du mois)
-  const tresorerieFinAvantStatut =
-    cumul.tresorerieDebutMois + cumul.agregats.net512 + netMouvements512(ecrituresCloture);
+  // Découvert et agios. Point de départ : la trésorerie courante de l'entreprise, qui suit déjà la
+  // banque (512) au fil des pas ET des écritures passées par une route en cours de mois (publicité
+  // 623 / 512…, rechargée depuis la base à chaque lot). Repartir de cumul.tresorerieDebutMois + les
+  // seuls pas oublierait ces dernières. On y ajoute les mouvements de la clôture elle-même.
+  const tresorerieCourante = entreprise.tresorerie;
+  const tresorerieFinAvantStatut = tresorerieCourante + netMouvements512(ecrituresCloture);
 
   let moisDecouvertConsecutifsApres = donnees.moisDecouvertConsecutifs;
   if (tresorerieFinAvantStatut < 0) {
-    // Agios à 15 % annuel
-    const agios = centimes(Math.round((Math.abs(tresorerieFinAvantStatut) * 0.15) / 12));
+    // Agios : taux annuel du paramètre, ramené au mois.
+    const tauxAgios = lireParametre(params, "agios_taux_annuel");
+    const agios = centimes(Math.round((Math.abs(tresorerieFinAvantStatut) * tauxAgios) / 12));
     if (agios > 0) {
       enr({
         id: `agios_${mois}_${ent.id}`,
@@ -329,7 +333,7 @@ export function cloturerMois(
   }
 
   let nouveauStatut = ent.statut;
-  if (moisDecouvertConsecutifsApres >= 3) {
+  if (moisDecouvertConsecutifsApres >= lireParametre(params, "decouvert_mois_avant_difficulte")) {
     nouveauStatut = "en_difficulte";
   }
 
@@ -364,9 +368,7 @@ export function cloturerMois(
 
   // Explications
   const ventesPerdues = ventesPerduesDepuisCumul(cumul);
-  const tresorerieFin = centimes(
-    cumul.tresorerieDebutMois + cumul.agregats.net512 + netMouvements512(ecrituresCloture),
-  );
+  const tresorerieFin = centimes(tresorerieCourante + netMouvements512(ecrituresCloture));
   const variationTresorerie = centimes(tresorerieFin - cumul.tresorerieDebutMois);
   const signVariation = variationTresorerie >= 0 ? "+" : "";
 

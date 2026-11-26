@@ -2,6 +2,8 @@ import { chargerParametresV1 } from "@kapital/content";
 import {
   centimes,
   configTempsDepuis,
+  indexDuMois,
+  pasDansLeMois,
   cumulVide,
   idEntreprise,
   idProduit,
@@ -37,7 +39,8 @@ const ENTREPRISE: Entreprise = {
     {
       produit: TSHIRT,
       qualiteVisee: 60,
-      prix: { vente_directe: centimes(6000), revendeur: centimes(3600) },
+      // Prix revendeur saisi hors taxes : 30 € HT.
+      prix: { vente_directe: centimes(6000), revendeur: centimes(3000) },
       productionMensuelleCible: 100,
     },
   ],
@@ -70,9 +73,11 @@ describe("construireGrandLivre", () => {
 
 describe("lireIndicateursEntreprise", () => {
   it("lit l'état, les écritures et rend les indicateurs", async () => {
-    const pasParMois = configTempsDepuis(PARAMS).pasParMois;
+    // Février 2027 : 28 jours, les ventes sont ramenées à la longueur de CE mois.
+    const fevrier = indexDuMois(2027, 2);
+    const pasParMois = pasDansLeMois(configTempsDepuis(PARAMS), fevrier);
     const cumul = {
-      ...cumulVide(moisJeu(2), centimes(0)),
+      ...cumulVide(moisJeu(fevrier), centimes(0)),
       pasTraites: pasParMois / 2,
       serviParLigne: { "prod_tshirt|revendeur": 10 },
     };
@@ -81,13 +86,13 @@ describe("lireIndicateursEntreprise", () => {
       {
         chargerEtat: async (id, mois) => {
           expect(id).toBe("e1");
-          expect(mois).toBe(2);
+          expect(mois).toBe(fevrier);
           return etat;
         },
         chargerLignesGrandLivre: async () => LIGNES,
       },
       PARAMS,
-      { companyId: "e1", moisCourant: 2 },
+      { companyId: "e1", moisCourant: fevrier },
     );
     // 10 pièces à mi-mois -> 20 par mois, 30 € HT chacune
     expect(r.marges.parCanal.revendeur.pieces).toBe(20);

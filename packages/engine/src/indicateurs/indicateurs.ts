@@ -101,7 +101,8 @@ export function coutRevientDepuisStocks(e: Entreprise): Readonly<Record<string, 
 
 /**
  * Ventes servies depuis le début du mois, ramenées à un mois complet.
- * `pasParMois` vient de la configuration du temps ; l'arrondi est à l'entier le plus proche.
+ * `pasParMois` est le nombre de pas du mois du cumul (`pasDansLeMois(config, cumul.mois)` :
+ * les mois calendaires n'ont pas tous la même longueur) ; l'arrondi est à l'entier le plus proche.
  */
 export function ventesMensuellesDepuisCumul(
   cumul: CumulMois | null,
@@ -145,7 +146,7 @@ export type MargesParCanal = {
 /**
  * Marge brute par canal sur les ventes de référence. Même formules que le moteur :
  * vente directe = prix HT - coût de revient - perte moyenne sur retours ;
- * revendeur = prix de gros HT - coût de revient. Le compte 707 reste unique.
+ * revendeur = prix de gros HT (le prix saisi) - coût de revient. Le compte 707 reste unique.
  */
 export function margeParCanal(
   e: Entreprise,
@@ -169,7 +170,11 @@ export function margeParCanal(
       ignores.add(k.produit);
       continue;
     }
-    const prixHt = prixHtDepuisTtc(prixDuCanal(ligne, k.canal), p.tauxTva);
+    // Le prix revendeur est saisi hors taxes ; la vente directe et la boutique, TTC.
+    const prixHt =
+      k.canal === "revendeur"
+        ? prixDuCanal(ligne, k.canal)
+        : prixHtDepuisTtc(prixDuCanal(ligne, k.canal), p.tauxTva);
     // Boutique (AE-10) : prix HT − coût de revient, sans retour (comme le revendeur, mais au prix boutique TTC).
     const margeUnitaire =
       k.canal === "vente_directe"

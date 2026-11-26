@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { VueCockpit } from "@kapital/server";
+import type { DureeAvance, VueCockpit } from "@kapital/server";
 import { formaterEuros } from "../../../../lib/formatage";
 import { creerClientNavigateur } from "../../../../lib/supabase/client";
 import { BoutonAvancerMonde } from "../BoutonAvancerMonde";
@@ -24,6 +24,12 @@ type EtatDirect = "connexion" | "direct" | "hors ligne";
 
 const FREQUENCE_RAFRAICHISSEMENT_MS = 5_000;
 const VENTES_CONSERVEES = 100;
+/** Avances proposées (l'horloge du jeu est l'horloge réelle). */
+const LIBELLES_AVANCE: Record<DureeAvance, string> = {
+  heure: "+ 1 heure",
+  jour: "+ 1 jour",
+  fin_du_mois: "Jusqu'à la fin du mois",
+};
 
 function formaterDuree(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -114,7 +120,7 @@ export function Cockpit() {
     };
   }, []);
 
-  async function avancer(duree: "jour" | "semaine" | "mois") {
+  async function avancer(duree: DureeAvance) {
     setAvanceEnCours(true);
     setAvance(null);
     try {
@@ -129,7 +135,7 @@ export function Cockpit() {
         ok: data.ok === true,
         texte:
           data.ok === true
-            ? `Temps avancé d'un(e) ${duree} de jeu, le monde a rattrapé.`
+            ? `Temps avancé (${LIBELLES_AVANCE[duree]}), le monde a rattrapé.`
             : `Temps avancé, mais ${data.erreurs} entreprise(s) en erreur (voir le dernier passage).`,
       });
       void charger();
@@ -225,7 +231,7 @@ export function Cockpit() {
                 onChange={(e) => setCode(e.target.value)}
                 className="rounded-md border border-[color:var(--color-g-300)] px-3 py-2 text-sm"
               />
-              {(["jour", "semaine", "mois"] as const).map((d) => (
+              {(Object.keys(LIBELLES_AVANCE) as DureeAvance[]).map((d) => (
                 <button
                   key={d}
                   type="button"
@@ -233,7 +239,7 @@ export function Cockpit() {
                   onClick={() => void avancer(d)}
                   className="rounded-md border border-[color:var(--color-noir)] px-4 py-2 text-sm font-medium transition hover:bg-[color:var(--color-g-100)] disabled:opacity-50"
                 >
-                  {avanceEnCours ? "…" : `+ 1 ${d} de jeu`}
+                  {avanceEnCours ? "…" : LIBELLES_AVANCE[d]}
                 </button>
               ))}
             </div>

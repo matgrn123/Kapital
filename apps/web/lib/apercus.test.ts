@@ -31,14 +31,17 @@ describe("apercuVente", () => {
       { compte: "7135", debit: 900 },
       { compte: "35", credit: 900 },
     ]);
+    // Prix revendeur saisi HT (12 €) : le revendeur doit 12 € + 20 % de TVA = 14,40 € TTC.
     expect(r.ecritureRevendeur).toEqual([
-      { compte: "411", debit: 1200 },
+      { compte: "411", debit: 1440 },
       { compte: "707", credit: 1200 },
+      { compte: "44571", credit: 240 },
       { compte: "7135", debit: 900 },
       { compte: "35", credit: 900 },
     ]);
     expect(r.margeRevendeur).toBe(300);
     expect(equilibreEcriture(r.ecritureDirecte).equilibree).toBe(true);
+    expect(equilibreEcriture(r.ecritureRevendeur).equilibree).toBe(true);
   });
 
   it("refuse un prix nul ou un coût inconnu", () => {

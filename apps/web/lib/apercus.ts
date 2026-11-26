@@ -181,7 +181,7 @@ export type ApercuVente = {
   readonly tauxMargeRevendeur: number;
   /** Écriture d'une pièce vendue en direct, telle que le moteur la passe. */
   readonly ecritureDirecte: LigneEcriture[];
-  /** Écriture d'une pièce vendue à un revendeur (payée plus tard : compte 411). */
+  /** Écriture d'une pièce vendue à un revendeur, au prix HT saisi plus la TVA (payée plus tard : compte 411, TTC). */
   readonly ecritureRevendeur: LigneEcriture[];
 };
 
@@ -233,6 +233,7 @@ export function apercuVente(e: {
       quantite: 1,
       prixGrosHtUnitaire: centimes(e.prixGrosHt),
       coutRevientUnitaire: cout,
+      tauxTva,
     }),
   );
   return {

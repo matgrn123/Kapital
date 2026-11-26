@@ -1,5 +1,4 @@
 export * from "./rng.js";
-export * from "./simulate.js";
 export * from "./simulerMois.js";
 export * from "./temps.js";
 export * from "./pas.js";

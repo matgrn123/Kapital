@@ -87,12 +87,12 @@ function entreprise(o: Partial<Entreprise> = {}): Entreprise {
         moisDebut: moisJeu(0),
       },
     ],
-    // 60 € TTC en direct (50 € HT), 36 € "TTC" côté revendeur (30 € HT)
+    // 60 € TTC en direct (50 € HT) ; côté revendeur, le prix saisi est HT : 30 € HT
     catalogue: [
       {
         produit: TSHIRT,
         qualiteVisee: 60,
-        prix: { vente_directe: centimes(6000), revendeur: centimes(3600) },
+        prix: { vente_directe: centimes(6000), revendeur: centimes(3000) },
         productionMensuelleCible: 100,
       },
     ],
@@ -105,7 +105,7 @@ const VENTES = { "prod_tshirt|vente_directe": 10, "prod_tshirt|revendeur": 20 };
 const COUTS = { prod_tshirt: centimes(2000) };
 
 /** Grand livre : 512 = 1 000 000, 101 = 500 000, 164 = 600 000, stock fini 60 000,
- *  matières 30 000 à crédit (401), une vente revendeur de 20 pièces (créance 60 000). */
+ *  matières 30 000 à crédit (401), une vente revendeur de 20 pièces à 30 € HT (créance TTC 72 000, dont 12 000 de TVA). */
 function grandLivre(piecesRevendeur = 20, banque = 1_000_000): GrandLivre {
   let gl = planComptableV1();
   gl = enregistrer(gl, {
@@ -143,6 +143,7 @@ function grandLivre(piecesRevendeur = 20, banque = 1_000_000): GrandLivre {
     quantite: piecesRevendeur,
     prixGrosHtUnitaire: centimes(3000),
     coutRevientUnitaire: centimes(2000),
+    tauxTva: 0.2,
   });
 }
 
@@ -288,21 +289,21 @@ describe("point mort", () => {
 });
 
 describe("besoin en fonds de roulement", () => {
-  it("stocks 31 + 35 + créances 411 - dettes 401 = 90 000 + 60 000 - 30 000 = 120 000", () => {
-    // 35 : 100 000 - 40 000 (vendu) = 60 000 ; 31 : 30 000 ; 411 : 60 000 ; 401 : 30 000
+  it("stocks 31 + 35 + créances 411 (TTC) - dettes 401 = 90 000 + 72 000 - 30 000 = 132 000", () => {
+    // 35 : 100 000 - 40 000 (vendu) = 60 000 ; 31 : 30 000 ; 411 : 60 000 HT + 12 000 TVA ; 401 : 30 000
     expect(besoinEnFondsDeRoulement(grandLivre())).toEqual({
       stocks: 90_000,
-      creances: 60_000,
+      creances: 72_000,
       dettesFournisseurs: 30_000,
-      besoin: 120_000,
+      besoin: 132_000,
     });
   });
 
   it("doubler les ventes aux revendeurs augmente le besoin en fonds de roulement", () => {
     const avant = besoinEnFondsDeRoulement(grandLivre(20)).besoin;
     const apres = besoinEnFondsDeRoulement(grandLivre(40)).besoin;
-    // créances 120 000, stock fini 20 000 : 30 000 + 20 000 + 120 000 - 30 000 = 140 000
-    expect(apres).toBe(140_000);
+    // créances 144 000 TTC, stock fini 20 000 : 30 000 + 20 000 + 144 000 - 30 000 = 164 000
+    expect(apres).toBe(164_000);
     expect(apres).toBeGreaterThan(avant);
   });
 });
@@ -342,38 +343,39 @@ describe("prévisionnel de trésorerie à 3 mois", () => {
     expect(prev.mois.map((m) => m.mois)).toEqual([3, 4, 5]);
 
     // Encaissements directs : 10 x 50 € x (1 - 10 %) = 450 € par mois.
-    // Créances existantes (600 €) : la moitié aux mois 3 et 4. Revendeurs du mois 3 : encaissés au mois 5.
+    // Créances existantes (720 € TTC au 411) : la moitié aux mois 3 et 4.
+    // Revendeurs du mois 3 : encaissés au mois 5, comptés hors TVA (600 €), comme le reste du prévisionnel.
     // Décaissements : salaire chargé 1 980 + loyer 500 + échéance de prêt 1 000 = 3 480 €,
     // plus les 300 € dus aux fournisseurs au premier mois.
     const [m0, m1, m2] = prev.mois;
     expect(m0).toMatchObject({
       encaissementsDirects: 45_000,
-      encaissementsRevendeurs: 30_000,
+      encaissementsRevendeurs: 36_000,
       salaires: 198_000,
       loyer: 50_000,
       echeancesPrets: 100_000,
       dettesFournisseurs: 30_000,
-      fluxNet: -303_000,
-      tresorerieFin: 697_000,
+      fluxNet: -297_000,
+      tresorerieFin: 703_000,
     });
     expect(m1).toMatchObject({
-      encaissementsRevendeurs: 30_000,
+      encaissementsRevendeurs: 36_000,
       dettesFournisseurs: 0,
-      fluxNet: -273_000,
-      tresorerieFin: 424_000,
+      fluxNet: -267_000,
+      tresorerieFin: 436_000,
     });
     expect(m2).toMatchObject({
       encaissementsRevendeurs: 60_000,
       fluxNet: -243_000,
-      tresorerieFin: 181_000,
+      tresorerieFin: 193_000,
     });
     expect(prev.premierMoisDecouvert).toBeNull();
   });
 
   it("annonce le premier mois de découvert prévu", () => {
     const prev = previsionnelTresorerie(grandLivre(20, 800_000), e, marges, moisJeu(3), P);
-    // 800 000 - 303 000 = 497 000 ; - 273 000 = 224 000 ; - 243 000 = -19 000
-    expect(prev.mois.map((m) => m.tresorerieFin)).toEqual([497_000, 224_000, -19_000]);
+    // 800 000 - 297 000 = 503 000 ; - 267 000 = 236 000 ; - 243 000 = -7 000
+    expect(prev.mois.map((m) => m.tresorerieFin)).toEqual([503_000, 236_000, -7_000]);
     expect(prev.premierMoisDecouvert).toBe(5);
   });
 
@@ -399,7 +401,7 @@ describe("calculerIndicateurs", () => {
     });
     expect(r.marges.total.margeBrute).toBe(49_000);
     expect(r.pointMort.chargesFixes.total).toBe(248_000 + 0);
-    expect(r.besoinEnFondsDeRoulement.besoin).toBe(120_000);
+    expect(r.besoinEnFondsDeRoulement.besoin).toBe(132_000);
     expect(r.previsionnel.mois).toHaveLength(3);
     expect(r.endettement.dettesFinancieres).toBe(600_000);
     expect(JSON.stringify(gl)).toBe(avant);

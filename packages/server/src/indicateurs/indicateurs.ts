@@ -4,6 +4,7 @@ import {
   calculerIndicateurs,
   centimes,
   configTempsDepuis,
+  pasDansLeMois,
   enEquilibre,
   grandLivreVide,
   moisJeu,
@@ -87,7 +88,8 @@ export async function lireIndicateursEntreprise(
     source.chargerEtat(p.companyId, p.moisCourant),
     source.chargerLignesGrandLivre(p.companyId),
   ]);
-  const { pasParMois } = configTempsDepuis(params);
+  // Les ventes du mois en cours sont ramenées à la longueur de CE mois (28 à 31 jours).
+  const pasParMois = pasDansLeMois(configTempsDepuis(params), etat.cumul?.mois ?? p.moisCourant);
   return calculerIndicateurs({
     entreprise: etat.entreprise,
     grandLivre: construireGrandLivre(lignes),

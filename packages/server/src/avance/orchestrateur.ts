@@ -4,6 +4,7 @@ import {
   configTempsDepuis,
   cumulDemarrantAuPas,
   debutDuPasEnMs,
+  estMoisCalendaire,
   graine,
   moisJeu,
   pasAbsoluDepuisInstantReel,
@@ -28,14 +29,22 @@ import {
 import { evenementsDuPas } from "../evenements/evenementsDuPas.js";
 import type { EvenementJournal } from "../evenements/types.js";
 
-const MS_PAR_MINUTE = 60_000;
+/** Minutes dans le plus long mois calendaire (31 jours) : sert aux plafonds par défaut. */
+const MINUTES_PAR_MOIS_LONG = 31 * 24 * 60;
+const MINUTES_PAR_JOUR = 24 * 60;
 
 export type OptionsAvance = {
   /**
    * Plafond de pas traités par entreprise et par appel : le reste est rattrapé
-   * à l'appel suivant (par défaut 3 mois de jeu).
+   * à l'appel suivant (par défaut 3 mois de 31 jours : 3 × 44 640 pas d'une minute).
    */
   readonly maxPasParEntreprise?: number;
+  /**
+   * Taille maximale d'un lot (pas calculés en mémoire puis enregistrés d'un bloc).
+   * Par défaut une journée (1 440 pas d'une minute) : la même taille maximale qu'avec
+   * l'ancien mois d'un jour, pour garder des enregistrements de taille raisonnable.
+   */
+  readonly maxPasParLot?: number;
   /** Nombre d'entreprises traitées en parallèle (par défaut 5). */
   readonly concurrence?: number;
 };
@@ -92,10 +101,23 @@ async function enParallele<T, R>(
   return resultats;
 }
 
+/** Le monde est encore sur l'ancien compteur de mois (avant la migration 0043). */
+export class ErreurMondeAncienCalendrier extends Error {
+  constructor(moisCourant: number) {
+    super(
+      `Monde sur l'ancien calendrier (mois_courant = ${moisCourant}) : en attente de la migration 0043, rien n'est avancé.`,
+    );
+    this.name = "ErreurMondeAncienCalendrier";
+  }
+}
+
 /**
  * Fait avancer tout le monde jusqu'à l'instant `maintenantMs` (fourni par le
  * serveur, jamais par le navigateur) : chaque entreprise traite les pas qui lui
  * manquent, absents compris. Idempotent : rappelé au même instant, il ne fait rien.
+ *
+ * Un mois de jeu est un mois calendaire réel (28 à 31 jours, heure de Paris) :
+ * le nombre de pas de chaque mois se lit sur le calendrier.
  */
 export async function avancerMondeJusquA(
   stockage: StockageMonde,
@@ -107,20 +129,26 @@ export async function avancerMondeJusquA(
   const monde = await stockage.chargerMondeActif();
   if (!monde) throw new Error("Aucun monde actif");
 
-  // Ancien monde (clôture mensuelle) : l'horloge est calée pour garder le mois courant.
+  // Garde-fou de bascule : un monde dont le mois courant compte encore depuis 0 n'a pas
+  // reçu la migration 0043 (remise à zéro). On n'y écrit rien : ce code-ci peut être en
+  // ligne quelques instants avant la migration, et les prévisualisations partagent la base.
+  if (!estMoisCalendaire(monde.moisCourant)) throw new ErreurMondeAncienCalendrier(monde.moisCourant);
+
+  // Origine non fixée : l'horloge du jeu est l'horloge réelle (1er janvier 1970).
   let debutReelMs = monde.debutReelMs;
   let horlogeInitialisee = false;
   if (debutReelMs === null) {
-    debutReelMs = maintenantMs - monde.moisCourant * config.minutesReellesParMoisJeu * MS_PAR_MINUTE;
+    debutReelMs = 0;
     await stockage.definirDebutReel(monde.id, debutReelMs);
     horlogeInitialisee = true;
   }
 
   const pasCible = pasTerminesDepuis(config, debutReelMs, maintenantMs);
-  const maxPas = options.maxPasParEntreprise ?? 3 * config.pasParMois;
+  const maxPas = options.maxPasParEntreprise ?? (3 * MINUTES_PAR_MOIS_LONG) / config.minutesReellesParPas;
+  const maxPasParLot = options.maxPasParLot ?? MINUTES_PAR_JOUR / config.minutesReellesParPas;
   const entreprises = await stockage.listerEntreprises(monde.id);
 
-  const contexte: ContexteAvance = { stockage, params, config, debutReelMs, pasCible, maxPas };
+  const contexte: ContexteAvance = { stockage, params, config, debutReelMs, pasCible, maxPas, maxPasParLot };
   const resultats = await enParallele(entreprises, options.concurrence ?? 5, (e) =>
     avancerEntreprise(contexte, e),
   );
@@ -146,13 +174,14 @@ type ContexteAvance = {
   readonly debutReelMs: number;
   readonly pasCible: number;
   readonly maxPas: number;
+  readonly maxPasParLot: number;
 };
 
 async function avancerEntreprise(
   ctx: ContexteAvance,
   e: EntrepriseDuMonde,
 ): Promise<ResultatAvanceEntreprise> {
-  const { stockage, config, pasCible, maxPas } = ctx;
+  const { stockage, config, pasCible, maxPas, maxPasParLot } = ctx;
   try {
     // Nouvelle entreprise : elle démarre maintenant, sans rejouer d'historique.
     if (e.pasTraites === null) {
@@ -176,8 +205,8 @@ async function avancerEntreprise(
     while (courant < pasCible && faits < maxPas) {
       const position = positionDuPasAbsolu(config, courant);
       // Un lot ne dépasse jamais la fin du mois : la clôture lit des données déjà enregistrées.
-      const restantDansLeMois = config.pasParMois - position.indexDansMois;
-      const nb = Math.min(pasCible - courant, restantDansLeMois, maxPas - faits);
+      const restantDansLeMois = position.pasDansLeMois - position.indexDansMois;
+      const nb = Math.min(pasCible - courant, restantDansLeMois, maxPas - faits, maxPasParLot);
       await traiterLot(ctx, e.id, courant, nb);
       courant += nb;
       faits += nb;
@@ -212,10 +241,21 @@ async function traiterLot(
   // worlds.mois_courant (compté depuis 0). Les écritures de clôture portent le mois qui se termine.
   const moisFin = moisJeu(moisEnCours);
   const indexDernier = position.indexDansMois + nb - 1;
-  const cloture = indexDernier === config.pasParMois - 1;
+  const dernierIndexDuMois = position.pasDansLeMois - 1;
+  const cloture = indexDernier === dernierIndexDuMois;
 
   const etat = await stockage.chargerEtat(companyId, moisEnCours);
   let cumul = etat.cumul;
+  // Un état en avance sur ce lot : un autre traitement simultané est passé entre deux lots
+  // (les lots d'une journée rendent ce croisement possible au milieu d'un rattrapage).
+  if (
+    cumul !== null &&
+    (cumul.mois > moisFin || (cumul.mois === moisFin && cumul.pasTraites > position.indexDansMois))
+  ) {
+    throw new ErreurPasDejaTraite(
+      `pas_deja_traite: ${companyId} est déjà au pas ${cumul.pasTraites} du mois ${cumul.mois}`,
+    );
+  }
   if (cumul !== null && (cumul.mois !== moisFin || cumul.pasTraites !== position.indexDansMois)) {
     throw new Error(
       `État du mois incohérent pour ${companyId} : cumul du mois ${cumul.mois} à ${cumul.pasTraites} pas, attendu mois ${moisFin} à ${position.indexDansMois} pas.`,
@@ -264,7 +304,7 @@ async function traiterLot(
       entreprise,
       cumul,
       flux,
-      index === config.pasParMois - 1 ? donneesFin : null,
+      index === dernierIndexDuMois ? donneesFin : null,
       marketInputs,
       params,
       graine(pasAbsolu),

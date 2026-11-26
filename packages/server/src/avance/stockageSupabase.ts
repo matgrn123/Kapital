@@ -803,25 +803,41 @@ export class StockageSupabase implements StockageMonde {
               .range(de, a),
           )
         : [];
-    // IS : au dernier mois de l'exercice, résultat des mois déjà clos de cet exercice.
+    // IS : au dernier mois de l'exercice, résultat de l'exercice lu dans le grand livre, mois en
+    // cours compris, moins ce que les pas de ce mois ont déjà compté (cumul.agregats, que la
+    // clôture ajoute elle-même). Une écriture passée par une route pendant le mois (publicité 623,
+    // par exemple) entre ainsi dans la base de l'impôt, sans compter deux fois celles des pas.
     const dernierMoisExercice = (moisEnCours + 1) % 12 === 0;
     const debut = debutExercice(moisEnCours);
-    const lignesResultat =
-      dernierMoisExercice && moisPrecedent >= debut
-        ? await this.toutesLesLignes<{ compte: string; sens: string; montant_centimes: number }>(
-            "ledger exercice",
-            (de, a) =>
-              this.supabase
-                .from("ledger_entries")
-                .select("compte, sens, montant_centimes")
-                .eq("company_id", companyId)
-                .gte("mois_jeu", debut)
-                .lte("mois_jeu", moisPrecedent)
-                .or("compte.like.6%,compte.like.7%")
-                .order("id")
-                .range(de, a),
-          )
-        : [];
+    const lignesResultat = dernierMoisExercice
+      ? await this.toutesLesLignes<{ compte: string; sens: string; montant_centimes: number }>(
+          "ledger exercice",
+          (de, a) =>
+            this.supabase
+              .from("ledger_entries")
+              .select("compte, sens, montant_centimes")
+              .eq("company_id", companyId)
+              .gte("mois_jeu", debut)
+              .lte("mois_jeu", moisEnCours)
+              .or("compte.like.6%,compte.like.7%")
+              .order("id")
+              .range(de, a),
+        )
+      : [];
+    const etatDuMois = dernierMoisExercice
+      ? (verifier(
+          "etat_mois_entreprise (fin de mois)",
+          await this.supabase
+            .from("etat_mois_entreprise")
+            .select("cumul")
+            .eq("company_id", companyId)
+            .maybeSingle(),
+        ) as { cumul: CumulMois | null } | null)
+      : null;
+    // Un état d'un autre mois (resté d'un mois clos) ne compte pas : aucun pas de ce mois en base.
+    const cumulDuMois = etatDuMois?.cumul?.mois === moisEnCours ? etatDuMois.cumul : null;
+    const resultatDejaCompteParLesPas =
+      (cumulDuMois?.agregats?.produits ?? 0) - (cumulDuMois?.agregats?.charges ?? 0);
     const companyR = await this.supabase
       .from("companies")
       .select("mois_decouvert_consecutifs")
@@ -839,7 +855,7 @@ export class StockageSupabase implements StockageMonde {
               resultatDepuisLignes(
                 lignesResultat.map((l) => ({ compte: l.compte, sens: l.sens, montant: Number(l.montant_centimes) })),
                 planComptableV1().comptes,
-              ),
+              ) - resultatDejaCompteParLesPas,
             ),
           }
         : {}),
