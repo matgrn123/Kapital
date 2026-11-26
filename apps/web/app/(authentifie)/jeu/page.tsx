@@ -13,7 +13,8 @@ import {
   Puce,
   SurTitre,
 } from "../../../components/ui";
-import { formaterDateHeure, formaterEuros } from "../../../lib/formatage";
+import { dateHeureLisible, libelleMois, libelleMoisCourt, titreMois } from "../../../lib/cadre";
+import { formaterEuros } from "../../../lib/formatage";
 import { libelleGamme, libelleLisible, nomLisibleSociete } from "../../../lib/lisible";
 import { chargerProgressionMissions } from "../../../lib/missions";
 import { creerClientServeur } from "../../../lib/supabase/server";
@@ -174,7 +175,7 @@ export default async function PageJeu() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <SurTitre>
-            {entreprise.nom} · {libelleGamme(entreprise.gamme)} · mois {moisCourant}
+            {entreprise.nom} · {libelleGamme(entreprise.gamme)} · {libelleMois(moisCourant)}
           </SurTitre>
           <h1 className="text-[1.75rem] font-extrabold">Tableau de bord</h1>
           <p className="mt-1 max-w-[62ch] text-muted">
@@ -203,7 +204,7 @@ export default async function PageJeu() {
                 Tu reçois une série de lancement de {seriePieces} pièces prête à vendre.
               </>,
               <>
-                Le monde avance tout seul, d&apos;un pas par minute réelle (un jour réel = un mois de jeu). Les ventes
+                Le monde avance tout seul, à l&apos;heure réelle : la date du jeu est la vraie date. Les ventes
                 arrivent au fil du temps, sans rien à déclencher.
               </>,
               <>
@@ -268,14 +269,14 @@ export default async function PageJeu() {
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <Carte titre="Chiffre d'affaires par mois de jeu">
+        <Carte titre="Chiffre d'affaires par mois">
           <Graphique
             titre="Chiffre d'affaires hors taxes des six derniers mois"
-            barres={historique.map((h) => ({ libelle: `mois ${h.mois}`, valeur: h.valeur }))}
+            barres={historique.map((h) => ({ libelle: libelleMoisCourt(h.mois), valeur: h.valeur }))}
           />
           <p className="mt-2 text-[0.8rem] text-muted">
             {caMois > 0
-              ? `Mois ${moisCourant} : ${euros(caMois)} HT de ventes depuis le début du mois.`
+              ? `${titreMois(moisCourant)} : ${euros(caMois)} HT de ventes depuis le début du mois.`
               : "Pas encore de vente ce mois-ci : les ventes arrivent au fil du temps tant que tu as du stock et un prix."}
           </p>
         </Carte>
@@ -357,7 +358,7 @@ export default async function PageJeu() {
                 <EcritureComptable
                   key={e.id}
                   libelle={libelleLisible(e.libelle, nomsProduits)}
-                  etiquette={formaterDateHeure(e.cree_le)}
+                  etiquette={dateHeureLisible(e.cree_le)}
                   lignes={e.lignes}
                 />
               ))}

@@ -1,7 +1,8 @@
 import { chargerParametresV1 } from "@kapital/content";
 import { Carte, EncadreNotion, EnTete, Puce, Tableau, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
-import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
+import { versQuand } from "../../../lib/cadre";
+import { formaterEuros } from "../../../lib/formatage";
 import { quantiteMatiere, symboleUnite } from "../../../lib/formatage";
 import { FormulaireCommande } from "./FormulaireCommande";
 
@@ -31,6 +32,7 @@ type Commande = {
 
 export default async function PageAchats() {
   const supabase = await creerClientServeur();
+  const maintenant = Date.now();
 
   const { data: entreprises } = await supabase.from("companies").select("id, tresorerie_centimes").limit(1);
   const entreprise = entreprises?.[0];
@@ -100,7 +102,7 @@ export default async function PageAchats() {
                     <td className="text-right tabular-nums">
                       {formaterEuros(Math.round(c.prix_unitaire_centimes * Number(c.quantite)))} €
                     </td>
-                    <td className="text-muted">{formaterDateHeure(c.instant_livraison_prevue)}</td>
+                    <td className="text-muted">{versQuand(c.instant_livraison_prevue, maintenant)}</td>
                   </tr>
                 ))}
               </Tableau>

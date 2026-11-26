@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Alerte, BoutonLien, Carte, Faits } from "../../../components/ui";
-import { formaterDateHeure, formaterEuros } from "../../../lib/formatage";
+import { dateHeureLisible, libelleMois } from "../../../lib/cadre";
+import { formaterEuros } from "../../../lib/formatage";
 import type { ResumeAbsence } from "../../../lib/journal";
 
 // Carte « Pendant ton absence » (cahier des charges § 3, point 4) : ce qui s'est passé
@@ -26,7 +27,7 @@ export function CartePendantAbsence({
   lignes.push(["Livraisons reçues", String(resume.livraisons)]);
   if (resume.moisClos.length > 0) {
     lignes.push([
-      resume.moisClos.length > 1 ? `Charges payées (mois ${resume.moisClos.join(", ")})` : `Charges payées (mois ${resume.moisClos[0]})`,
+      `Charges payées (${resume.moisClos.map(libelleMois).join(", ")})`,
       `${formaterEuros(resume.chargesPayees)} €`,
     ]);
   }
@@ -34,7 +35,7 @@ export function CartePendantAbsence({
 
   return (
     <Carte
-      surTitre={`Depuis ta dernière visite, le ${formaterDateHeure(depuis)}`}
+      surTitre={`Depuis ta dernière visite, le ${dateHeureLisible(depuis)}`}
       titre="Pendant ton absence"
       action={
         <Link href="/journal" className="text-xs text-accent underline">

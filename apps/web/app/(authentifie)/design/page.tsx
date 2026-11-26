@@ -129,7 +129,7 @@ export default function PageDesign() {
       <EnTete surTitre="Composants d'écran" titre="En-tête avec action" action={<BoutonLien href="/jeu">← Village</BoutonLien>}>
         L&apos;en-tête peut porter une action à droite, comme dans la maquette.
       </EnTete>
-      <Bandeau droite="mois 10, jour 19 · 1 jour réel = 1 mois de jeu">Bandeau d&apos;information pleine largeur.</Bandeau>
+      <Bandeau droite="jeu. 26 nov. 2026, 10 h 21">Bandeau d&apos;information pleine largeur.</Bandeau>
       <div className="grid gap-4 md:grid-cols-3">
         <Carte titre="Faits et lignes">
           <Faits lignes={[["Capacité", "440 pièces/mois"], ["Stock", "205 pièces"], ["Équipe", "1 salarié"]]} />

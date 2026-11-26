@@ -3,6 +3,7 @@ import { chargerBatimentsV1 } from "@kapital/content";
 import { reglesPretV1 } from "@kapital/server";
 import { Bandeau, EnTete } from "../../../components/ui/formulaire";
 import { Puce } from "../../../components/ui";
+import { dateHeureLisible, instantDuJeu } from "../../../lib/cadre";
 import { formaterEuros } from "../../../lib/formatage";
 import { libelleGamme } from "../../../lib/lisible";
 import { creerClientServeur } from "../../../lib/supabase/server";
@@ -61,7 +62,7 @@ export default async function PageVillage() {
       supabase.from("suppliers").select("id, nom, pays, delai_mois, minimum_commande").order("nom"),
       supabase.from("faconniers").select("id, nom, pays, delai_mois, minimum_commande").order("nom"),
       supabase.from("classement_publique").select("company_id, nom, gamme, pseudo, valeur_centimes"),
-      supabase.from("worlds").select("mois_courant").eq("etat", "actif").limit(1).maybeSingle(),
+      supabase.from("worlds").select("mois_courant, debut_reel").eq("etat", "actif").limit(1).maybeSingle(),
       lireEstrAnnuel(supabase, reglesPretV1().estrDeSecoursAnnuel),
     ]);
 
@@ -69,7 +70,7 @@ export default async function PageVillage() {
 
   const stockFinis = ((stocks ?? []) as { quantite_pieces: number }[]).reduce((s, r) => s + Number(r.quantite_pieces), 0);
   const nbEmployes = employes?.length ?? 0;
-  const mois = (monde as { mois_courant?: number } | null)?.mois_courant;
+  const debutReel = (monde as { debut_reel?: string | null } | null)?.debut_reel ?? null;
 
   const fiches: FicheActeur[] = [
     {
@@ -188,7 +189,7 @@ export default async function PageVillage() {
   ];
 
   const acteurs: ActeurVillage[] = fiches.map((f) => ({ id: f.id, genre: f.genre }));
-  const date = mois === undefined || mois === null ? "Date de jeu inconnue" : `Mois ${mois} du jeu`;
+  const date = dateHeureLisible(instantDuJeu(Date.now(), debutReel));
 
   return (
     <div className="flex flex-col gap-4">
@@ -210,7 +211,7 @@ export default async function PageVillage() {
         Ta société vit ici, à côté de la banque, des fournisseurs, des façonniers et des concurrents. Clique sur un
         bâtiment pour l&apos;ouvrir.
       </EnTete>
-      <Bandeau droite={`${date} · 1 jour réel = 1 mois de jeu`}>
+      <Bandeau droite={`${date} · heure de Paris`}>
         <strong>Chaque bâtiment est un vrai acteur du jeu.</strong> Les chiffres viennent du moteur ; le plan est
         seulement décoratif.
       </Bandeau>

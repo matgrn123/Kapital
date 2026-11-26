@@ -317,7 +317,7 @@ export function FormulaireProduction({
                   p === null
                     ? "Ne fait pas ce produit"
                     : `${formaterEuros(p)} € la pièce${estGrossiste ? " (estimation)" : ""} · ${
-                        estGrossiste ? `environ ${delaiGrossisteMinutes} min` : texteDelai(f.delai_mois, params)
+                        estGrossiste ? `environ ${delaiGrossisteMinutes} min` : texteDelai(f.delai_mois)
                       }`
                 }
               >
@@ -359,7 +359,7 @@ export function FormulaireProduction({
             <Resultat
               libelle="Livraison"
               valeur={grossiste ? `${delaiGrossisteMinutes} min` : `${faconnier?.delai_mois ?? 0} mois`}
-              detail={grossiste ? "environ, en temps réel" : texteDelai(faconnier?.delai_mois ?? 0, params)}
+              detail={grossiste ? "environ, en temps réel" : "délai du façonnier"}
             />
           </div>
           <div className="grid gap-x-6 sm:grid-cols-2">

@@ -199,11 +199,9 @@ describe("apercuMarketing", () => {
 });
 
 describe("texteDelai", () => {
-  it("convertit les mois de jeu en temps réel avec le ratio des paramètres", () => {
-    const parMois = params["temps_minutes_reelles_par_mois_jeu"]!.valeur;
-    expect(parMois).toBe(1440);
-    expect(texteDelai(2, params)).toBe("2 mois de jeu (2 jours réels)");
-    expect(texteDelai(1, params)).toBe("1 mois de jeu (1 jour réel)");
+  it("annonce le délai en vrais mois (l'horloge du jeu est l'horloge réelle)", () => {
+    expect(texteDelai(2)).toBe("livré en 2 mois");
+    expect(texteDelai(1)).toBe("livré en 1 mois");
   });
 });
 

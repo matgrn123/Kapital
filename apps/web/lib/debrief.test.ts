@@ -37,6 +37,10 @@ describe("debriefDuMois : trois phrases", () => {
     expect(d.lien.href).toBe("/marketing");
   });
 
+  it("nomme le vrai mois avec l'horloge réelle (index 24322 = novembre 2026)", () => {
+    expect(debriefDuMois(cloture({ mois: 24322 })).quoi).toMatch(/^En novembre 2026, tu as vendu/);
+  });
+
   it("des ventes perdues : la rupture est la cause, la production le remède", () => {
     const d = debriefDuMois(
       cloture({

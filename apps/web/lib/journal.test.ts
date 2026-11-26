@@ -57,6 +57,9 @@ describe("evenementAffiche : une phrase par événement, sans identifiant techni
     const perte = evenementAffiche(ev("cloture_mois", { totalPaye: 436_702, resultat: -50_000, tresorerieFin: 10 }), NOMS);
     expect(perte.texte).toBe(`Mois 3 clos : ${eur(436_702)} payés (paie, loyers, échéances, TVA), perte de ${eur(50_000)}.`);
     expect(perte.ton).toBe("alerte");
+    // Avec l'horloge réelle, le mois porte son vrai nom (index 24322 = novembre 2026).
+    const reel = evenementAffiche(ev("cloture_mois", { totalPaye: 1, resultat: 5, tresorerieFin: 1 }, { mois_jeu: 24322 }), NOMS);
+    expect(reel.texte).toMatch(/^Novembre 2026 clos : /);
     expect(evenementAffiche(ev("cloture_mois", { totalPaye: 1, resultat: 5, tresorerieFin: -1 }), NOMS).ton).toBe("critique");
   });
 

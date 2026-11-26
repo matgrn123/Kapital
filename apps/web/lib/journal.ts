@@ -1,4 +1,5 @@
 import type { DetailCloture } from "@kapital/server";
+import { titreMois } from "./cadre";
 import { formaterEuros } from "./formatage";
 
 // Journal d'événements (table evenements, migration 0041) : phrases lisibles,
@@ -128,7 +129,7 @@ export function evenementAffiche(e: LigneEvenementLue, noms: NomsJournal): Evene
       return {
         ...base,
         ton: nombre(c.tresorerieFin) < 0 ? "critique" : resultat < 0 ? "alerte" : "bon",
-        texte: `Mois ${e.mois_jeu} clos : ${eur(nombre(c.totalPaye))} payés (paie, loyers, échéances, TVA), ${
+        texte: `${titreMois(nombre(e.mois_jeu))} clos : ${eur(nombre(c.totalPaye))} payés (paie, loyers, échéances, TVA), ${
           resultat >= 0 ? `bénéfice de ${eur(resultat)}` : `perte de ${eur(-resultat)}`
         }.`,
         lien: { href: "/finances", libelle: "Finances" },

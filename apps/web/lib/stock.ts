@@ -96,19 +96,6 @@ export function libelleJours(jours: number | null, joursParMois: number): string
   return `${n} jour${n > 1 ? "s" : ""}`;
 }
 
-/** Les mêmes jours de jeu, en temps réel (un jour de jeu = minutes réelles par mois ÷ jours par mois) ; null à 0 jour. */
-export function dureeReelleLisible(jours: number | null, t: Temps): string | null {
-  // Sans stock (0 jour), il n'y a pas de durée à traduire.
-  if (jours === null || !(jours > 0) || !(t.joursParMois > 0)) return null;
-  const minutes = (jours * t.minutesReellesParMois) / t.joursParMois;
-  if (!Number.isFinite(minutes)) return null;
-  if (minutes < 1) return "moins d'une minute réelle";
-  if (minutes < 60) return `${Math.floor(minutes)} min réelles`;
-  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} h réelles`;
-  const j = Math.floor(minutes / (24 * 60));
-  return `${j} jour${j > 1 ? "s" : ""} réel${j > 1 ? "s" : ""}`;
-}
-
 export function libelleRythme(piecesParMois: number): string {
   if (!(piecesParMois > 0)) return "aucune vente";
   if (piecesParMois < 1) return "moins d'une pièce / mois";

@@ -4,19 +4,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { pourcentageJauge } from "../../components/ui/calculs";
-import { dateDeJeu, ventesParJour } from "../../lib/cadre";
+import { dateHeureLisible, delaiReel, jourEcoule, ventesParJour } from "../../lib/cadre";
 import { creerClientNavigateur } from "../../lib/supabase/client";
 import { EVENEMENT_JOURNAL_VU } from "./journal/MarquerVu";
 
 // Barre du haut (design V2, docs/maquette) : ce qu'un joueur regarde sans
 // arrêt. Aucun chiffre n'est inventé : trésorerie, ventes et marque sont lues
-// en base, la date vient de l'horloge commune (/api/monde/horloge).
+// en base, la date vient de l'horloge commune (/api/monde/horloge). L'horloge
+// du jeu est l'horloge réelle, à l'heure de Paris.
 
 type Horloge = {
   readonly moisEnCours: number;
   readonly indexDansMois: number;
   readonly pasParMois: number;
   readonly finDuMoisMs: number;
+  /** Instant du jeu, s'il est fourni (en recette, il peut être en avance sur l'instant réel). */
+  readonly heureJeuMs?: number;
 };
 
 type Etat = {
@@ -28,13 +31,6 @@ type Etat = {
 };
 
 const RAFRAICHIR_MS = 30_000;
-
-function dureeLisible(ms: number): string {
-  const minutes = Math.max(0, Math.floor(ms / 60_000));
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return h === 0 ? `${m} min` : `${h} h ${String(m).padStart(2, "0")}`;
-}
 
 function eurosRonds(centimes: number): string {
   return (centimes / 100).toLocaleString("fr-FR", { maximumFractionDigits: 0 });
@@ -90,6 +86,8 @@ export function BarreJeu({
   });
   const [horloge, setHorloge] = useState<Horloge | null>(null);
   const [decalageMs, setDecalageMs] = useState(0);
+  // Avance du jeu sur l'instant réel du serveur (0 en production).
+  const [avanceJeuMs, setAvanceJeuMs] = useState(0);
   const [maintenant, setMaintenant] = useState<number | null>(null);
 
   // Horloge commune : relue chaque minute, l'affichage avance entre deux lectures.
@@ -102,7 +100,10 @@ export function BarreJeu({
         const j = (await r.json()) as { maintenantMs?: number; horloge?: Horloge };
         if (!actif || !j.horloge) return;
         setHorloge(j.horloge);
-        if (typeof j.maintenantMs === "number") setDecalageMs(j.maintenantMs - Date.now());
+        if (typeof j.maintenantMs === "number") {
+          setDecalageMs(j.maintenantMs - Date.now());
+          setAvanceJeuMs(typeof j.horloge.heureJeuMs === "number" ? j.horloge.heureJeuMs - j.maintenantMs : 0);
+        }
       } catch {
         // Réseau coupé : on garde le dernier affichage.
       }
@@ -191,12 +192,14 @@ export function BarreJeu({
     return () => clearInterval(t);
   }, []);
 
-  const date = horloge ? dateDeJeu(horloge.moisEnCours, horloge.indexDansMois, horloge.pasParMois) : null;
+  const instantServeur = maintenant === null ? null : maintenant + decalageMs;
+  const instantJeu = instantServeur === null ? null : instantServeur + avanceJeuMs;
+  const date = horloge && instantJeu !== null ? dateHeureLisible(instantJeu) : null;
   const parJour =
-    horloge && etat.caMoisHt !== null
-      ? ventesParJour(etat.caMoisHt, horloge.indexDansMois, horloge.pasParMois)
+    horloge && instantJeu !== null && etat.caMoisHt !== null
+      ? ventesParJour(etat.caMoisHt, jourEcoule(horloge, instantJeu))
       : null;
-  const reste = horloge && maintenant !== null ? horloge.finDuMoisMs - (maintenant + decalageMs) : null;
+  const reste = horloge && instantServeur !== null ? Math.max(0, horloge.finDuMoisMs - instantServeur) : null;
 
   return (
     <header className="sticky top-0 z-10 flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-line bg-bg py-3 max-[900px]:static">
@@ -217,7 +220,7 @@ export function BarreJeu({
       </Link>
 
       <div className="flex flex-wrap gap-2">
-        <Vignette libelle="Date de jeu">{date ?? "…"}</Vignette>
+        <Vignette libelle="Date">{date ?? "…"}</Vignette>
         <Vignette libelle="Trésorerie">
           <span className={etat.tresorerie < 0 ? "text-bad" : ""}>{eurosRonds(etat.tresorerie)} €</span>
         </Vignette>
@@ -252,10 +255,10 @@ export function BarreJeu({
 
       <div
         className="rounded-[9px] border border-accent bg-accent px-3.5 py-2 font-semibold text-on-accent"
-        title="Salaires, loyers et échéances sont payés en fin de mois de jeu, pour tous les joueurs en même temps."
+        title="Salaires, loyers et échéances sont payés à la fin du mois, à minuit, pour tous les joueurs en même temps."
       >
         Fin du mois{" "}
-        <small className="font-medium opacity-80">{reste === null ? "" : `dans ${dureeLisible(reste)}`}</small>
+        <small className="font-medium opacity-80">{reste === null ? "" : delaiReel(reste)}</small>
       </div>
     </header>
   );

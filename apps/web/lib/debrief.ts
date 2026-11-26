@@ -1,4 +1,5 @@
 import type { DetailCloture, PaiementsCloture } from "@kapital/server";
+import { enMois, majuscule } from "./cadre";
 import { formaterEuros } from "./formatage";
 
 // Bilan du mois en trois phrases : ce qui s'est passé, pourquoi, quoi essayer.
@@ -41,8 +42,8 @@ export function debriefDuMois(d: DetailCloture, nomsProduits: Readonly<Record<st
   const tresorerie = `ta trésorerie est passée de ${eur(d.tresorerieDebut)} à ${eur(d.tresorerieFin)}`;
   const quoi =
     d.chiffreAffairesHt > 0
-      ? `Au mois ${d.mois}, tu as vendu pour ${eur(d.chiffreAffairesHt)} HT et ${tresorerie}.`
-      : `Au mois ${d.mois}, tu n'as rien vendu et ${tresorerie}.`;
+      ? `${majuscule(enMois(d.mois))}, tu as vendu pour ${eur(d.chiffreAffairesHt)} HT et ${tresorerie}.`
+      : `${majuscule(enMois(d.mois))}, tu n'as rien vendu et ${tresorerie}.`;
 
   // Pourquoi : la cause la plus parlante d'abord.
   let pourquoi: string;
