@@ -348,8 +348,9 @@ describe("AE-10 : clôture du mois d'une boutique", () => {
   it("pendant les travaux : loyer et charges, pas d'amortissement", () => {
     const r = ecrituresClotureBoutique(boutique(), moisJeu(3));
     const g = gl(r.ecritures);
-    expect(soldeCompte(g, "613")).toBe(76_500);
-    expect(soldeCompte(g, "614")).toBe(11_250);
+    // T4 : signée le dernier jour du mois (avril 1970, 30 jours) : 1/30 du loyer et des charges.
+    expect(soldeCompte(g, "613")).toBe(2550);
+    expect(soldeCompte(g, "614")).toBe(375);
     expect(soldeCompte(g, "28135")).toBe(0);
     expect(enEquilibre(g)).toBe(true);
   });
@@ -551,7 +552,8 @@ describe("T3 : la boutique ouvre à l'instant où les travaux finissent", () => 
   it("le mois de l'ouverture : loyer depuis la signature, amortissement dès ce mois", () => {
     const r = ecrituresClotureBoutique(pdvNovembre(), novembre);
     const g = gl(r.ecritures);
-    expect(soldeCompte(g, "613")).toBe(76_500);
+    // T4 : signée le 10 novembre, loyer de 21 jours sur 30 (765 € × 21/30 = 535,50 €).
+    expect(soldeCompte(g, "613")).toBe(53_550);
     expect(soldeCompte(g, "28135")).toBe(18_750);
     expect(enEquilibre(g)).toBe(true);
   });

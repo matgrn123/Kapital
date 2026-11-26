@@ -6,6 +6,8 @@ import {
   materielDepuisLedger,
   materielParLocal,
   modulesDepuisLignes,
+  salarieDepuisLigne,
+  SELECTION_WORKSHOPS,
   type LigneWorkshop,
 } from "./stockageSupabase.js";
 
@@ -78,5 +80,52 @@ describe("3D-7 : locaux lus en base", () => {
     expect(ateliers[1]!.loyerMensuel).toBe(0);
     expect(ateliers[1]!.achat?.prixAchat).toBe(9_000_000);
     expect(postesEquipesAteliers(ateliers)).toBe(4);
+  });
+});
+
+describe("T4 : date de signature du bail (workshops.cree_le), pour le prorata du premier mois", () => {
+  const vide = { valeurBrute: centimes(0), amortissementsCumules: centimes(0) };
+  const reel = Date.parse("2026-11-21T09:00:00.000Z");
+
+  it("cree_le (instant réel) devient l'heure du jeu de la signature, en retirant worlds.debut_reel", () => {
+    const w = ligne({ id: "wA", cree_le: "2026-11-21T09:00:00.000Z" });
+    expect(atelierDepuisLigne(w, [], vide).bail?.signatureMs).toBe(reel);
+    // Recette : l'outil d'admin a reculé debut_reel de 10 jours, le jeu est en avance d'autant.
+    const recul = -10 * 86_400_000;
+    expect(atelierDepuisLigne(w, [], vide, recul).bail?.signatureMs).toBe(reel - recul);
+  });
+
+  it("sans cree_le : pas de date de signature (mois entier)", () => {
+    expect(atelierDepuisLigne(ligne({ id: "wA" }), [], vide).bail).not.toHaveProperty("signatureMs");
+    expect(atelierDepuisLigne(ligne({ id: "wA", cree_le: null }), [], vide).bail).not.toHaveProperty("signatureMs");
+  });
+
+  it("la lecture des locaux demande cree_le", () => {
+    expect(SELECTION_WORKSHOPS).toMatch(/\bcree_le\b/);
+  });
+});
+
+describe("T4 : salariés lus en base (date d'embauche en heure du jeu)", () => {
+  const LIGNE_SALARIE = {
+    id: "sal-uuid",
+    poste: "artisan" as const,
+    salaire_brut_mensuel_centimes: 200_000,
+    anciennete_mois_debut: 0,
+    experience_mois_debut: 0,
+    mois_jeu_debut: 24322,
+  };
+  const reel = Date.parse("2026-11-21T09:00:00.000Z");
+
+  it("cree_le devient embaucheMs, en retirant worlds.debut_reel", () => {
+    const l = { ...LIGNE_SALARIE, cree_le: "2026-11-21T09:00:00.000Z" };
+    expect(salarieDepuisLigne(l, 24322).embaucheMs).toBe(reel);
+    const recul = -10 * 86_400_000;
+    expect(salarieDepuisLigne(l, 24322, recul).embaucheMs).toBe(reel - recul);
+  });
+
+  it("ancienneté et expérience comptées en mois depuis l'embauche, comme avant", () => {
+    const s = salarieDepuisLigne({ ...LIGNE_SALARIE, anciennete_mois_debut: 2, experience_mois_debut: 3 }, 24324);
+    expect(s).toMatchObject({ id: "sal-uuid", poste: "artisan", salaireBrutMensuel: 200_000, ancienneteMois: 4, experienceMois: 5 });
+    expect(s).not.toHaveProperty("embaucheMs");
   });
 });

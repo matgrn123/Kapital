@@ -9,6 +9,7 @@ import {
   parametresBailDepuis,
   reglesPretDepuis,
 } from "@kapital/engine";
+import { lignesEcheancierEnBase } from "@kapital/server";
 import { chargerContexte, estErreurAction, refuserSiVerrouille } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
@@ -76,11 +77,6 @@ export async function POST(request: Request) {
   const estrLu = Number((estrLigne as { valeur?: unknown } | null)?.valeur);
   const estr = Number.isFinite(estrLu) ? estrLu : regles.estrDeSecoursAnnuel;
 
-  const minutesParMoisJeu = params["temps_minutes_reelles_par_mois_jeu"]?.valeur;
-  if (!minutesParMoisJeu || minutesParMoisJeu <= 0) {
-    return NextResponse.json({ error: "Paramètre de temps manquant." }, { status: 500 });
-  }
-
   const decision = acheterLocal({
     idEntreprise: ctx.companyId,
     mois: moisJeu(ctx.moisCourant),
@@ -105,14 +101,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const lignes = decision.echeancier.map((ech) => ({
-    numero: ech.numero,
-    mensualite_centimes: ech.montant,
-    interets_centimes: ech.interets,
-    amortissement_centimes: ech.amortissement,
-    capital_restant_apres_centimes: ech.capitalRestantApres,
-    instant_prevu: new Date(aujourdhui.getTime() + ech.numero * minutesParMoisJeu * 60_000).toISOString(),
-  }));
+  // T4 : chaque échéance tombe à la fin de son mois (minuit à Paris), quand la clôture la paie.
+  const lignes = lignesEcheancierEnBase(decision.echeancier, ctx.moisCourant, ctx.debutReelMs);
 
   const { data: idLocal, error } = await ctx.supabaseAdmin.rpc("acheter_local", {
     p_company_id: ctx.companyId,

@@ -8,6 +8,7 @@ import {
   PREFIXE_AMORTISSEMENT_AGENCEMENT,
   type PointDeVente,
   type Poste,
+  type Salarie,
   debutExercice,
   planComptableV1,
   resoudreModules,
@@ -114,7 +115,53 @@ export type LigneWorkshop = {
   apport_centimes: number;
   mois_achat: number | null;
   duree_amortissement_mois: number | null;
+  /** T4 : instant réel de la création du local, c'est-à-dire de la signature du bail. */
+  cree_le?: string | null;
 };
+
+/** Colonnes lues pour les locaux (T4 : cree_le date la signature du bail, pour le prorata). */
+export const SELECTION_WORKSHOPS =
+  "id, surface_m2, loyer_mensuel_centimes, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin, mode_detention, prix_achat_centimes, apport_centimes, mois_achat, duree_amortissement_mois, cree_le, placed_modules(module_type_id, x, y, pivote, statut)";
+
+/** Une ligne de la table employees telle que chargerEtat la lit. */
+export type LigneEmployee = {
+  id: string;
+  poste: Poste;
+  salaire_brut_mensuel_centimes: number;
+  anciennete_mois_debut: number;
+  experience_mois_debut: number;
+  mois_jeu_debut: number | null;
+  cree_le?: string | null;
+};
+
+/**
+ * Instant réel lu en base (timestamptz) ramené à l'heure du jeu en retirant worlds.debut_reel
+ * (`debutReelMs`, comme les livraisons et l'ouverture des boutiques). Absent ou illisible :
+ * undefined.
+ */
+function heureJeuDepuis(instantReel: string | null | undefined, debutReelMs: number): number | undefined {
+  const ms = instantReel ? Date.parse(instantReel) : Number.NaN;
+  return Number.isFinite(ms) ? ms - debutReelMs : undefined;
+}
+
+/**
+ * Un salarié lu en base, pour le moteur. T4 : cree_le (instant réel de l'embauche) devient
+ * l'heure du jeu de l'embauche, qui fixe le rendement (expérience en jours), le prorata du
+ * premier salaire et le début de la production. En production debut_reel vaut le 1er janvier
+ * 1970 : les deux se confondent ; l'outil « avancer le temps » de la recette les écarte.
+ */
+export function salarieDepuisLigne(e: LigneEmployee, moisEnCours: number, debutReelMs = 0): Salarie {
+  const dureeService = Math.max(0, moisEnCours - (e.mois_jeu_debut ?? 0));
+  const embaucheMs = heureJeuDepuis(e.cree_le, debutReelMs);
+  return {
+    id: idSalarie(e.id),
+    poste: e.poste,
+    salaireBrutMensuel: centimes(e.salaire_brut_mensuel_centimes),
+    ancienneteMois: e.anciennete_mois_debut + dureeService,
+    experienceMois: e.experience_mois_debut + dureeService,
+    ...(embaucheMs === undefined ? {} : { embaucheMs }),
+  };
+}
 
 /**
  * 3D-7 : matériel au bilan (2154 / 2815) réparti entre les locaux. Une écriture dont l'identifiant
@@ -137,8 +184,15 @@ export function materielParLocal(
 }
 
 /** Un local lu en base, pour le moteur : loué (bail) ou acheté (AE-6). */
-export function atelierDepuisLigne(w: LigneWorkshop, modules: ModulePose[], materiel: MaterielAtelier): Atelier {
+export function atelierDepuisLigne(
+  w: LigneWorkshop,
+  modules: ModulePose[],
+  materiel: MaterielAtelier,
+  /** worlds.debut_reel : retiré de cree_le pour obtenir l'heure du jeu de la signature (T4). */
+  debutReelMs = 0,
+): Atelier {
   if (w.mode_detention === "bail") {
+    const signatureMs = heureJeuDepuis(w.cree_le, debutReelMs);
     return {
       id: w.id,
       surfaceM2: w.surface_m2,
@@ -149,6 +203,7 @@ export function atelierDepuisLigne(w: LigneWorkshop, modules: ModulePose[], mate
         depotGarantie: centimes(Number(w.depot_garantie_centimes)),
         chargesMensuelles: centimes(Number(w.charges_mensuelles_centimes)),
         moisSignature: moisJeu(w.mois_signature ?? 0),
+        ...(signatureMs === undefined ? {} : { signatureMs }),
         moisFin: w.mois_fin === null ? null : moisJeu(w.mois_fin),
       },
     };
@@ -187,6 +242,8 @@ export type LignePointDeVente = {
   mois_ouverture: number;
   /** T3 (migration 0045) : instant réel de la fin des travaux ; absent ou null avant. */
   ouverture_le?: string | null;
+  /** T4 : instant réel de la création de la boutique, c'est-à-dire de la signature du bail. */
+  cree_le?: string | null;
   stock_boutique: { product_id: string; quantite_pieces: number; valeur_totale_centimes: number }[] | null;
 };
 
@@ -221,6 +278,7 @@ export function pointsDeVenteDepuisLignes(
       amorti += a.sens === "credit" ? Number(a.montant_centimes) : -Number(a.montant_centimes);
     }
     const ouvertureReelle = l.ouverture_le ? Date.parse(l.ouverture_le) : Number.NaN;
+    const signatureMs = heureJeuDepuis(l.cree_le, debutReelMs);
     return {
       id: l.id,
       batimentId: l.batiment_id,
@@ -229,6 +287,7 @@ export function pointsDeVenteDepuisLignes(
       chargesMensuelles: centimes(Number(l.charges_mensuelles_centimes)),
       depotGarantie: centimes(Number(l.depot_garantie_centimes)),
       moisSignature: moisJeu(l.mois_signature),
+      ...(signatureMs === undefined ? {} : { signatureMs }),
       moisOuverture: moisJeu(l.mois_ouverture),
       ...(Number.isFinite(ouvertureReelle) ? { ouvertureMs: ouvertureReelle - debutReelMs } : {}),
       agencement: {
@@ -512,7 +571,7 @@ export class StockageSupabase implements StockageMonde {
           .eq("statut", "actif"),
         this.supabase
           .from("workshops")
-          .select("id, surface_m2, loyer_mensuel_centimes, depot_garantie_centimes, charges_mensuelles_centimes, mois_signature, mois_fin, mode_detention, prix_achat_centimes, apport_centimes, mois_achat, duree_amortissement_mois, placed_modules(module_type_id, x, y, pivote, statut)")
+          .select(SELECTION_WORKSHOPS)
           .eq("company_id", companyId)
           // 3D-7 : tous les locaux de la société, du plus ancien au plus récent.
           .order("cree_le")
@@ -563,11 +622,7 @@ export class StockageSupabase implements StockageMonde {
     const pfStocks = (verifier("product_stock", pfR) ?? []) as Array<{
       product_id: string; quantite_pieces: number; valeur_totale_centimes: number;
     }>;
-    const employees = (verifier("employees", empR) ?? []) as Array<{
-      id: string; poste: Poste; salaire_brut_mensuel_centimes: number;
-      anciennete_mois_debut: number; experience_mois_debut: number; mois_jeu_debut: number | null;
-      cree_le?: string | null;
-    }>;
+    const employees = (verifier("employees", empR) ?? []) as LigneEmployee[];
     const workshops = (verifier("workshops", atelierR) ?? []) as LigneWorkshop[];
     const loans = (verifier("loans", pretsR) ?? []) as Array<{
       id: string; capital_initial_centimes: number; capital_restant_centimes: number;
@@ -588,7 +643,7 @@ export class StockageSupabase implements StockageMonde {
     const catalogueModules = chargerModulesV1();
     // 3D-7 : chaque local avec ses modules en service (statut 'actif') et sa part du matériel.
     const ateliers = workshops.map((w) =>
-      atelierDepuisLigne(w, modulesDepuisLignes(w.placed_modules, catalogueModules), materiels.get(w.id)!),
+      atelierDepuisLigne(w, modulesDepuisLignes(w.placed_modules, catalogueModules), materiels.get(w.id)!, debutReelMs),
     );
     // AE-10 : boutiques (aucune tant que la migration 0038 n'est pas appliquée).
     const lignesBoutiques = tableAbsente(boutiquesR.error)
@@ -627,21 +682,7 @@ export class StockageSupabase implements StockageMonde {
         quantite: s.quantite_pieces,
         valeurTotale: centimes(s.valeur_totale_centimes),
       })),
-      salaries: employees.map((e) => {
-        const dureeService = Math.max(0, moisEnCours - (e.mois_jeu_debut ?? 0));
-        // Rendement : expérience en jours depuis l'embauche (horloge réelle, rendement_tau_jours).
-        // cree_le est un instant réel ; en production worlds.debut_reel = 1er janvier 1970, il se
-        // confond avec l'heure du jeu (l'outil « avancer le temps » de la recette l'en écarte).
-        const embaucheMs = e.cree_le ? Date.parse(e.cree_le) : Number.NaN;
-        return {
-          id: idSalarie(e.id),
-          poste: e.poste,
-          salaireBrutMensuel: centimes(e.salaire_brut_mensuel_centimes),
-          ancienneteMois: e.anciennete_mois_debut + dureeService,
-          experienceMois: e.experience_mois_debut + dureeService,
-          ...(Number.isFinite(embaucheMs) ? { embaucheMs } : {}),
-        };
-      }),
+      salaries: employees.map((e) => salarieDepuisLigne(e, moisEnCours, debutReelMs)),
       ateliers,
       marque: { notoriete: marque?.notoriete ?? 50, desirabilite: marque?.desirabilite ?? 50 },
       prets: loans.map((l) => ({

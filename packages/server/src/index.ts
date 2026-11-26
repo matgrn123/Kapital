@@ -13,7 +13,7 @@ export {
   type LignePointDeVente,
 } from "./avance/stockageSupabase.js";
 export { validerLicenciement } from "./validations/licenciement.js";
-export { reglesPretV1, validerDemandePret } from "./validations/demandePret.js";
+export { lignesEcheancierEnBase, reglesPretV1, validerDemandePret, type LigneEcheanceEnBase } from "./validations/demandePret.js";
 export * from "./avance/index.js";
 export * from "./evenements/index.js";
 export { avancerLeTemps, DUREES_AVANCE, type ContexteAction, type DureeAvance } from "./admin/avancerLeTemps.js";

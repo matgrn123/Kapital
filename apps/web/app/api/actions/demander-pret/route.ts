@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { chargerParametresV1 } from "@kapital/content";
 import {
   centimes,
   estObjetPret,
@@ -9,7 +8,7 @@ import {
   tauxPret,
   type ObjetPret,
 } from "@kapital/engine";
-import { reglesPretV1 } from "@kapital/server";
+import { lignesEcheancierEnBase, reglesPretV1 } from "@kapital/server";
 import {
   chargerContexte,
   estErreurAction,
@@ -95,18 +94,8 @@ export async function POST(request: Request) {
   });
 
   const echeancier = genererEcheancier(centimes(capital), taux, duree);
-  const minutesParMoisJeu = chargerParametresV1()["temps_minutes_reelles_par_mois_jeu"]?.valeur;
-  if (!minutesParMoisJeu || minutesParMoisJeu <= 0) {
-    return NextResponse.json({ error: "Paramètre de temps manquant." }, { status: 500 });
-  }
-  const lignes = echeancier.map((ech) => ({
-    numero: ech.numero,
-    mensualite_centimes: ech.montant,
-    interets_centimes: ech.interets,
-    amortissement_centimes: ech.amortissement,
-    capital_restant_apres_centimes: ech.capitalRestantApres,
-    instant_prevu: new Date(aujourdhui.getTime() + ech.numero * minutesParMoisJeu * 60_000).toISOString(),
-  }));
+  // T4 : chaque échéance tombe à la fin de son mois (minuit à Paris), quand la clôture la paie.
+  const lignes = lignesEcheancierEnBase(echeancier, ctx.moisCourant, ctx.debutReelMs);
 
   const { data: idPret, error } = await ctx.supabaseAdmin.rpc("creer_pret", {
     p_company_id: ctx.companyId,

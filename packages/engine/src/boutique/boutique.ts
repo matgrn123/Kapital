@@ -13,6 +13,7 @@ import type {
 } from "../types/entreprise.js";
 import { centimes, type Centimes, type IdProduit, type MoisJeu } from "../types/primitifs.js";
 import { debutDuMoisMs, finDuMoisMs, moisDeLInstantMs } from "../moteur/temps.js";
+import { auProrata, moisEntier, partDuMoisDepuis } from "../moteur/prorata.js";
 import { prixHtDepuisTtc } from "../ventes/ventes.js";
 
 // AE-10 : la boutique (point de vente). Fonctions pures : les montants de l'emplacement
@@ -262,6 +263,7 @@ export function nouveauPointDeVente(args: {
     chargesMensuelles: centimes(b.charges_mensuelles_centimes),
     depotGarantie: depotGarantieBoutique(loyer, p),
     moisSignature: args.mois,
+    ...(args.instantMs === undefined ? {} : { signatureMs: args.instantMs }),
     moisOuverture: ouverture.moisOuverture,
     ouvertureMs: ouverture.ouvertureMs,
     agencement: {
@@ -533,6 +535,7 @@ export function ecritureVenteBoutique(e: EntreesEcritureVenteBoutique): Ecriture
  * Fin de mois d'une boutique : loyer (613) et charges (614) dès le mois de signature (le bail
  * court pendant les travaux) ; amortissement des agencements (681 / 28135) à partir du mois
  * d'ouverture (mise en service), plafonné à ce qui reste à amortir.
+ * Lot T4 : le mois de la signature, loyer et charges au prorata des jours restants.
  */
 export function ecrituresClotureBoutique(
   pdv: PointDeVente,
@@ -540,25 +543,30 @@ export function ecrituresClotureBoutique(
 ): { readonly ecritures: EcritureComptable[]; readonly pointDeVente: PointDeVente } {
   const ecritures: EcritureComptable[] = [];
   if (mois < pdv.moisSignature) return { ecritures, pointDeVente: pdv };
-  if (pdv.loyerMensuel > 0) {
+  const part = partDuMoisDepuis(mois, pdv.signatureMs);
+  const loyer = auProrata(pdv.loyerMensuel, part);
+  const charges = auProrata(pdv.chargesMensuelles, part);
+  if (loyer > 0) {
     ecritures.push({
       id: `boutique_loyer_${mois}_${pdv.id}`,
       mois,
-      libelle: "Loyer boutique",
+      libelle: moisEntier(part) ? "Loyer boutique" : `Loyer boutique (${part.jours} jours sur ${part.joursDuMois})`,
       lignes: [
-        { compte: "613", sens: "debit", montant: pdv.loyerMensuel },
-        { compte: "512", sens: "credit", montant: pdv.loyerMensuel },
+        { compte: "613", sens: "debit", montant: loyer },
+        { compte: "512", sens: "credit", montant: loyer },
       ],
     });
   }
-  if (pdv.chargesMensuelles > 0) {
+  if (charges > 0) {
     ecritures.push({
       id: `boutique_charges_${mois}_${pdv.id}`,
       mois,
-      libelle: "Charges locatives boutique",
+      libelle: moisEntier(part)
+        ? "Charges locatives boutique"
+        : `Charges locatives boutique (${part.jours} jours sur ${part.joursDuMois})`,
       lignes: [
-        { compte: "614", sens: "debit", montant: pdv.chargesMensuelles },
-        { compte: "512", sens: "credit", montant: pdv.chargesMensuelles },
+        { compte: "614", sens: "debit", montant: charges },
+        { compte: "512", sens: "credit", montant: charges },
       ],
     });
   }
