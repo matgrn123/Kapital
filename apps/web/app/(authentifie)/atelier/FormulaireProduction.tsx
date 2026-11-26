@@ -7,7 +7,9 @@ import { useMemo, useState } from "react";
 import { Bouton, EcritureComptable } from "../../../components/ui";
 import { Choix, Curseur, Ligne, Note, Refus, Resultat, Succes, Vide } from "../../../components/ui";
 import { centimes, idMatiere, piecesPermisesParLaMatiere, quantiteMaxPayable } from "@kapital/engine";
-import { apercuAtelier, apercuFaconnier, bornesQuantite, texteDelai } from "../../../lib/apercus";
+import { apercuAtelier, apercuFaconnier, bornesQuantite, texteDelai, texteLivraison } from "../../../lib/apercus";
+import { heureLisible, versQuand } from "../../../lib/cadre";
+import { useMaintenant } from "../../../lib/useMaintenant";
 import { formaterEuros } from "../../../lib/formatage";
 import { lireErreur, MESSAGE_RESEAU, type MessageErreur } from "./erreurs";
 
@@ -34,13 +36,14 @@ export type ProduitCatalogue = {
   } | null;
 };
 
-type ResultatGrossiste = { quantite: number; prixParPieceCentimes: number; totalCentimes: number };
+type ResultatGrossiste = { quantite: number; prixParPieceCentimes: number; totalCentimes: number; livraisonPrevue: string };
 
 type Faconnier = {
   id: string;
   nom: string;
   pays: string;
-  delai_mois: number;
+  /** Délai de fabrication et livraison en heures réelles (faconniers.delai_heures). */
+  delai_heures: number;
   minimum_commande: number;
 };
 
@@ -95,6 +98,7 @@ export function FormulaireProduction({
   delaiGrossisteMinutes,
   tresorerie,
   params,
+  maintenantMs,
 }: {
   aUnAtelier: boolean;
   faconniers: readonly Faconnier[];
@@ -106,8 +110,11 @@ export function FormulaireProduction({
   /** Trésorerie du joueur : sert à borner le curseur de quantité. */
   tresorerie: number;
   params: Parametres;
+  /** Instant du rendu serveur (ms) : point de départ de l'heure de livraison affichée. */
+  maintenantMs: number;
 }) {
   const router = useRouter();
+  const maintenant = useMaintenant(maintenantMs);
   const tauxChute = params["taux_chute_matiere_defaut"]?.valeur ?? 0;
   // « Réapprovisionner » (écran Stock) arrive ici avec ?produit=… : ce produit est présélectionné.
   const produitDemande = useSearchParams().get("produit");
@@ -185,14 +192,15 @@ export function FormulaireProduction({
           id: faconnier.id,
           nom: faconnier.nom,
           pays: faconnier.pays,
-          delaiMois: faconnier.delai_mois,
+          // Le grossiste livre en grossiste_delai_minutes (paramètre) ; sa ligne en base vaut 0.
+          delaiHeures: grossiste ? delaiGrossisteMinutes / 60 : Number(faconnier.delai_heures),
           // Le grossiste n'impose pas de minimum (route commander-grossiste).
           minimumCommande: grossiste ? 1 : faconnier.minimum_commande,
         },
         produit: produit.id,
         prixParPiece: prix,
         quantite: quantiteBornee,
-        moisCourant: 0,
+        instantCommandeMs: maintenant,
         prixVenteTtc: produit.prixVenteTtc,
         params,
         // Le façonnier travaille avec ta matière ; le grossiste fournit tout.
@@ -206,7 +214,7 @@ export function FormulaireProduction({
               },
       }),
     };
-  }, [produit, lieu, faconnier, prix, grossiste, quantiteBornee, tauxChute, params]);
+  }, [produit, lieu, faconnier, prix, grossiste, quantiteBornee, tauxChute, params, maintenant, delaiGrossisteMinutes]);
 
   async function lancer(e: React.FormEvent) {
     e.preventDefault();
@@ -245,10 +253,14 @@ export function FormulaireProduction({
       if (grossiste) {
         const r = (await reponse.json()) as ResultatGrossiste;
         setConfirmation(
-          `Commande passée : ${r.quantite} pièces à ${formaterEuros(r.prixParPieceCentimes)} € la pièce, soit ${formaterEuros(r.totalCentimes)} €. Livraison dans environ ${delaiGrossisteMinutes} minutes.`,
+          `Commande passée : ${r.quantite} pièces à ${formaterEuros(r.prixParPieceCentimes)} € la pièce, soit ${formaterEuros(r.totalCentimes)} €. Livraison ${versQuand(r.livraisonPrevue, Date.now())}.`,
         );
       } else {
-        setConfirmation("Production lancée.");
+        setConfirmation(
+          apercu.mode === "faconnier" && apercu.r.ok
+            ? `Production lancée. Livraison ${versQuand(apercu.r.instantLivraisonMs, Date.now())}.`
+            : "Production lancée.",
+        );
       }
       router.refresh();
     } catch {
@@ -317,7 +329,7 @@ export function FormulaireProduction({
                   p === null
                     ? "Ne fait pas ce produit"
                     : `${formaterEuros(p)} € la pièce${estGrossiste ? " (estimation)" : ""} · ${
-                        estGrossiste ? `environ ${delaiGrossisteMinutes} min` : texteDelai(f.delai_mois)
+                        texteDelai(estGrossiste ? delaiGrossisteMinutes / 60 : Number(f.delai_heures))
                       }`
                 }
               >
@@ -358,8 +370,8 @@ export function FormulaireProduction({
             />
             <Resultat
               libelle="Livraison"
-              valeur={grossiste ? `${delaiGrossisteMinutes} min` : `${faconnier?.delai_mois ?? 0} mois`}
-              detail={grossiste ? "environ, en temps réel" : "délai du façonnier"}
+              valeur={`vers ${heureLisible(apercu.r.instantLivraisonMs)}`}
+              detail={texteLivraison(apercu.r.instantLivraisonMs, maintenant)}
             />
           </div>
           <div className="grid gap-x-6 sm:grid-cols-2">

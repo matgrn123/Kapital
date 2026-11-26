@@ -24,7 +24,7 @@ type Faconnier = {
   id: string;
   nom: string;
   pays: string;
-  delai_mois: number;
+  delai_heures: number;
   minimum_commande: number;
 };
 
@@ -58,7 +58,7 @@ export default async function PageAtelier() {
       .select(`id, surface_m2, loyer_mensuel_centimes, ${COLONNES_MODULES_POSES}`)
       .eq("company_id", entreprise.id)
       .order("cree_le"),
-    supabase.from("faconniers").select("id, nom, pays, delai_mois, minimum_commande").order("nom"),
+    supabase.from("faconniers").select("id, nom, pays, delai_heures, minimum_commande").order("nom"),
     supabase.from("faconnier_catalogue").select("faconnier_id, product_id, prix_par_piece_centimes"),
     supabase
       .from("production_orders")
@@ -158,6 +158,7 @@ export default async function PageAtelier() {
               delaiGrossisteMinutes={delaiMinutes}
               tresorerie={Number(entreprise.tresorerie_centimes ?? 0)}
               params={params}
+              maintenantMs={maintenant}
             />
           </Carte>
 

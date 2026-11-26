@@ -36,6 +36,11 @@ export type ContexteAction = {
   readonly companyMoisDecouvert: number;
   readonly supabaseAdmin: SupabaseClient;
   readonly moisCourant: number;
+  /**
+   * Origine de l'horloge du jeu (worlds.debut_reel, ms) : heure du jeu = instant réel − origine.
+   * 0 en production (1er janvier 1970) ; l'outil d'admin « avancer le temps » la recule.
+   */
+  readonly debutReelMs: number;
 };
 
 export type ErreurAction = NextResponse<{ error: string }>;
@@ -68,11 +73,14 @@ export async function chargerContexte(): Promise<ContexteAction | ErreurAction> 
 
   const { data: monde } = await supabaseAdmin
     .from("worlds")
-    .select("mois_courant")
+    .select("mois_courant, debut_reel")
     .eq("etat", "actif")
     .limit(1)
     .maybeSingle();
   const moisCourant = (monde?.mois_courant as number | undefined) ?? 0;
+  // Sans origine connue, l'orchestrateur prend le 1er janvier 1970 : on fait de même.
+  const debut = monde?.debut_reel ? Date.parse(monde.debut_reel as string) : Number.NaN;
+  const debutReelMs = Number.isFinite(debut) ? debut : 0;
 
   return {
     userId: user.id,
@@ -86,6 +94,7 @@ export async function chargerContexte(): Promise<ContexteAction | ErreurAction> 
     companyMoisDecouvert: Number(entreprise.mois_decouvert_consecutifs ?? 0),
     supabaseAdmin,
     moisCourant,
+    debutReelMs,
   };
 }
 

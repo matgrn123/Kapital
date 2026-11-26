@@ -45,6 +45,7 @@ import {
 } from "@kapital/engine";
 import type { LigneEcriture } from "../components/ui/calculs";
 import { formaterEuros } from "./formatage";
+import { delaiReel, versQuand } from "./cadre";
 
 export type Refus = { readonly ok: false; readonly message: string };
 
@@ -254,18 +255,22 @@ export function apercuVente(e: {
 export type ApercuCommandeMatiere = {
   readonly ok: true;
   readonly total: number;
+  /** Instant de livraison prévu (ms) : commande + délai du fournisseur, en heures réelles. */
+  readonly instantLivraisonMs: number;
+  /** Mois de jeu de la livraison (celui de l'écriture 31 / 401). */
   readonly moisLivraison: number;
-  readonly delaiMois: number;
+  readonly delaiHeures: number;
   /** Écriture que le moteur passera à la livraison (rien n'est écrit à la commande). */
   readonly ecritureLivraison: LigneEcriture[];
 };
 
 export function apercuCommandeMatiere(e: {
-  fournisseur: { id: string; nom: string; delaiMois: number; minimumCommande: number };
+  fournisseur: { id: string; nom: string; delaiHeures: number; minimumCommande: number };
   matiere: string;
   prixUnitaire: number;
   quantite: number;
-  moisCourant: number;
+  /** Instant de la commande (ms) : maintenant. */
+  instantCommandeMs: number;
   params: Parametres;
 }): ApercuCommandeMatiere | Refus {
   if (!Number.isFinite(e.quantite) || e.quantite <= 0) {
@@ -285,7 +290,7 @@ export function apercuCommandeMatiere(e: {
         id: idFournisseur(e.fournisseur.id),
         nom: e.fournisseur.nom,
         qualite: 0,
-        delaiMois: e.fournisseur.delaiMois,
+        delaiHeures: e.fournisseur.delaiHeures,
         fiabilite: 1,
         minimumCommande: e.fournisseur.minimumCommande,
         delaiPaiementMois: 0,
@@ -296,7 +301,7 @@ export function apercuCommandeMatiere(e: {
       },
       matiere: idMatiere(e.matiere),
       quantite: e.quantite,
-      moisCommande: moisJeu(e.moisCourant),
+      instantCommandeMs: e.instantCommandeMs,
     });
     // Contrôle croisé : la fonction de livraison du module achats et le pas du moteur
     // (ce que le serveur exécute) doivent donner le même montant.
@@ -312,8 +317,9 @@ export function apercuCommandeMatiere(e: {
     return {
       ok: true,
       total,
+      instantLivraisonMs: commande.instantLivraisonPrevuMs,
       moisLivraison: commande.moisLivraisonPrevu,
-      delaiMois: e.fournisseur.delaiMois,
+      delaiHeures: e.fournisseur.delaiHeures,
       ecritureLivraison: versLignes(ecriture),
     };
   } catch (err) {
@@ -337,6 +343,8 @@ export type ApercuFaconnier = {
   /** Coût complet d'une pièce livrée (débit 35 ÷ quantité), calculé par le moteur. */
   readonly coutParPiece: number;
   readonly total: number;
+  /** Instant de livraison prévu (ms) : commande + délai du façonnier, en heures réelles. */
+  readonly instantLivraisonMs: number;
   readonly moisLivraison: number;
   readonly ecritureLivraison: LigneEcriture[];
   /** Marge par pièce vendue en direct au prix actuel (null si pas de prix). */
@@ -344,11 +352,13 @@ export type ApercuFaconnier = {
 };
 
 export function apercuFaconnier(e: {
-  faconnier: { id: string; nom: string; pays: string; delaiMois: number; minimumCommande: number };
+  /** `delaiHeures` : délai du façonnier ; pour le grossiste, grossiste_delai_minutes ÷ 60. */
+  faconnier: { id: string; nom: string; pays: string; delaiHeures: number; minimumCommande: number };
   produit: string;
   prixParPiece: number;
   quantite: number;
-  moisCourant: number;
+  /** Instant de la commande (ms) : maintenant. */
+  instantCommandeMs: number;
   prixVenteTtc: number | null;
   params: Parametres;
   /** Matière du joueur ; absente ou null pour le grossiste, qui fournit tout. */
@@ -385,7 +395,7 @@ export function apercuFaconnier(e: {
         id: idFaconnier(e.faconnier.id),
         nom: e.faconnier.nom,
         pays: e.faconnier.pays,
-        delaiMois: e.faconnier.delaiMois,
+        delaiHeures: e.faconnier.delaiHeures,
         fiabilite: 1,
         minimumCommande: e.faconnier.minimumCommande,
         delaiPaiementMois: 0,
@@ -393,7 +403,7 @@ export function apercuFaconnier(e: {
       },
       produit: idProduit(e.produit),
       quantite: e.quantite,
-      moisCommande: moisJeu(e.moisCourant),
+      instantCommandeMs: e.instantCommandeMs,
     });
     const ecriture = ecrituresDuMoteurPourLivraison(e.params, ordre.moisLivraisonPrevu, {
       type: "faconnier",
@@ -420,6 +430,7 @@ export function apercuFaconnier(e: {
       prixParPiece: ordre.prixFaconParPiece,
       coutParPiece,
       total: ordre.prixFaconParPiece * ordre.quantite,
+      instantLivraisonMs: ordre.instantLivraisonPrevuMs,
       moisLivraison: ordre.moisLivraisonPrevu,
       ecritureLivraison: versLignes(ecriture),
       margeParPiece,
@@ -576,9 +587,23 @@ export function bornesQuantite(e: { minimum: number; plafonds: readonly number[]
 
 /* ------------------------------------------------------------------ Délais */
 
-/** « livré en 1 mois » : l'horloge du jeu est l'horloge réelle, un mois de jeu est un vrai mois. */
-export function texteDelai(mois: number): string {
-  return `livré en ${mois} mois`;
+// Délais de livraison en heures réelles (décision du 26 novembre 2026) : l'horloge du jeu
+// est l'horloge réelle, une commande passée à 10 h 21 chez un fournisseur à 2 h arrive vers 12 h 21.
+const MS_PAR_HEURE = 3_600_000;
+
+/** Durée d'un délai en heures réelles : « 2 h », « 30 min », « 1 h 30 ». */
+export function texteDuree(heures: number): string {
+  return delaiReel(Math.round(heures * MS_PAR_HEURE)).replace(/^dans /, "");
+}
+
+/** Délai d'un fournisseur ou d'un façonnier, en heures réelles : « livré dans 2 h », « livré dans 30 min ». */
+export function texteDelai(heures: number): string {
+  return `livré dans ${texteDuree(heures)}`;
+}
+
+/** Heure de livraison prévue : « livré vers 12 h 21 (dans 2 h) », avec le jour s'il change. */
+export function texteLivraison(instantLivraisonMs: number, maintenantMs: number): string {
+  return `livré ${versQuand(instantLivraisonMs, maintenantMs)}`;
 }
 
 /* ---------------------------------------------------------- Atelier propre */

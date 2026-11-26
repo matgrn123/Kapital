@@ -89,14 +89,12 @@ describe("pilote du banc : décisions", () => {
     expect(m1.historique.every((b) => b.anomalies.length === 0)).toBe(true);
   });
 
-  it("matière : livrée après le délai du fournisseur, réglée après le délai de paiement", () => {
+  it("matière : livrée dans le mois (délai en heures), réglée après le délai de paiement (en mois)", () => {
     let e = ok(commanderMatiere(depart(), "four_fr", "mat_jersey_coton", 100));
-    e = avancerMois(e, 1); // mois 0 : en route
-    expect(e.entreprise.stocksMatiere).toHaveLength(0);
-    e = avancerMois(e, 2); // mois 1 : livrée (31 / 401)
+    e = avancerMois(e, 1); // mois 0 : livrée 2 h après la commande (31 / 401)
     expect(e.entreprise.stocksMatiere[0]?.quantite).toBe(100);
     expect(e.ecritures.some((x) => x.id.startsWith("reglement_matiere_"))).toBe(false);
-    e = avancerMois(e, 3); // mois 2 : réglée (401 / 512)
+    e = avancerMois(e, 2); // mois 1 : réglée (401 / 512), un mois après la livraison
     expect(e.ecritures.filter((x) => x.id.startsWith("reglement_matiere_"))).toHaveLength(1);
     for (const b of e.historique) expect(b.anomalies).toEqual([]);
   });

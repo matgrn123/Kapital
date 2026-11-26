@@ -11,7 +11,7 @@ import {
 } from "@kapital/engine";
 
 // TP-3 : démarrage sans attente. Série de lancement à la création, grossiste local
-// qui livre le jour même. Tout le calcul est dans packages/engine/src/demarrage ;
+// qui livre en 30 minutes réelles (paramètre grossiste_delai_minutes). Tout le calcul est dans packages/engine/src/demarrage ;
 // ici, seulement la lecture du catalogue et l'écriture en base.
 
 export const ID_GROSSISTE_LOCAL = "gros_local";
@@ -114,7 +114,13 @@ export async function passerCommandeGrossiste(
     productId: string;
     quantite: number;
     moisCourant: number;
+    /** Instant réel de la commande. */
     maintenant: Date;
+    /**
+     * Origine de l'horloge du jeu (worlds.debut_reel, ms) : heure du jeu = réel − origine.
+     * Vaut 0 en production ; l'outil d'admin « avancer le temps » la recule.
+     */
+    debutReelMs: number;
     /** Trésorerie du moment : la commande ne peut pas coûter plus (décision du 25/11/2026). */
     tresorerieCentimes: number;
   },
@@ -126,7 +132,8 @@ export async function passerCommandeGrossiste(
     produit: idProduit(p.productId),
     quantite: p.quantite,
     coutUsineParPiece: centimes(cout),
-    instantCommandeMs: p.maintenant.getTime(),
+    // Le moteur raisonne en heure du jeu ; la base garde des instants réels.
+    instantCommandeMs: p.maintenant.getTime() - p.debutReelMs,
   });
   const verif = verifierQuantiteCommande({
     quantite: c.quantite,
@@ -135,7 +142,7 @@ export async function passerCommandeGrossiste(
     tresorerie: p.tresorerieCentimes,
   });
   if (!verif.ok) throw new CommandeRefusee(verif.code, verif.message);
-  const livraison = new Date(c.instantLivraisonMs).toISOString();
+  const livraison = new Date(p.debutReelMs + c.instantLivraisonMs).toISOString();
   // Une commande au grossiste est un ordre « façonnier » sans matière : la livraison au pas
   // (TP-2) range les pièces au stock et inscrit la dette fournisseur (35 / 401).
   const { error } = await supabase.from("production_orders").insert({
@@ -148,7 +155,8 @@ export async function passerCommandeGrossiste(
     instant_commande: p.maintenant.toISOString(),
     instant_livraison_prevue: livraison,
     mois_jeu_commande: p.moisCourant,
-    mois_jeu_livraison: p.moisCourant,
+    // Mois de l'instant de livraison : une commande de 23 h 45 le 30 est livrée le 1er.
+    mois_jeu_livraison: c.moisLivraison,
   });
   if (error) throw new Error(error.message);
   return {

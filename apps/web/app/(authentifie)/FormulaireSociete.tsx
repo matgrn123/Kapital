@@ -117,7 +117,7 @@ export function FormulaireSociete({
         </p>
         <p className="mt-1 text-xs text-[color:var(--color-g-500)]">
           Pour la suite, tu fais fabriquer chez des façonniers (moins cher, mais il faut attendre) ou
-          chez le grossiste local, qui livre le jour même, plus cher.
+          chez le grossiste local, qui livre dans l&apos;heure, plus cher.
         </p>
       </div>
 

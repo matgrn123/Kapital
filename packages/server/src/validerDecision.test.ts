@@ -93,7 +93,7 @@ function fournisseur(): Fournisseur {
     id: FOUR,
     nom: "Fournisseur FR",
     qualite: 80,
-    delaiMois: 1,
+    delaiHeures: 2,
     fiabilite: 0.95,
     minimumCommande: 50,
     delaiPaiementMois: 1,

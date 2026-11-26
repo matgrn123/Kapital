@@ -10,7 +10,7 @@ type Fournisseur = {
   id: string;
   nom: string;
   pays: string;
-  delai_mois: number;
+  delai_heures: number;
   minimum_commande: number;
 };
 
@@ -40,7 +40,7 @@ export default async function PageAchats() {
 
   const [{ data: fournisseurs }, { data: catalogue }, { data: commandes }, { data: materials }, { data: stocks }] =
     await Promise.all([
-      supabase.from("suppliers").select("id, nom, pays, delai_mois, minimum_commande").order("nom"),
+      supabase.from("suppliers").select("id, nom, pays, delai_heures, minimum_commande").order("nom"),
       supabase.from("supplier_catalogue").select("supplier_id, material_id, prix_centimes"),
       supabase
         .from("purchase_orders")
@@ -64,7 +64,7 @@ export default async function PageAchats() {
     <div className="flex flex-col gap-5">
       <EnTete surTitre="Fournisseurs" titre="Achats de matière">
         Commande le tissu dont ton atelier a besoin. Le prix est figé le jour de la commande ; la matière arrive après le
-        délai du fournisseur.
+        délai du fournisseur, en heures réelles.
       </EnTete>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
@@ -76,6 +76,7 @@ export default async function PageAchats() {
               materials={Array.from(materialsMap.entries()).map(([id, nom]) => ({ id, nom, unite: unites.get(id) ?? "metre" }))}
               tresorerie={Number(entreprise.tresorerie_centimes ?? 0)}
               params={params}
+              maintenantMs={maintenant}
             />
           </Carte>
 

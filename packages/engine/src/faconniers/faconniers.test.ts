@@ -11,6 +11,7 @@ import {
   idProduit,
   moisJeu,
 } from "../types/primitifs.js";
+import { indexDuMois } from "../moteur/temps.js";
 import {
   coutRevientFaconnier,
   ErreurFaconnier,
@@ -26,12 +27,16 @@ const FAC_TR = idFaconnier("fac_turquie");
 const TSHIRT = idProduit("prod_tshirt");
 const CHEMISE = idProduit("prod_chemise");
 
+const HEURE = 3_600_000;
+/** Jeudi 26 novembre 2026, 10 h 21 à Paris (UTC + 1). */
+const JEU_26_NOV_10H21 = Date.UTC(2026, 10, 26, 9, 21);
+
 function faconnierPt(prixFaconTshirt = 450): Faconnier {
   return {
     id: FAC_PT,
     nom: "Façonnier Portugal",
     pays: "Portugal",
-    delaiMois: 2,
+    delaiHeures: 6,
     fiabilite: 0.9,
     minimumCommande: 75,
     delaiPaiementMois: 1,
@@ -44,7 +49,7 @@ function faconnierTurquie(): Faconnier {
     id: FAC_TR,
     nom: "Façonnier Turquie",
     pays: "Turquie",
-    delaiMois: 2,
+    delaiHeures: 8,
     fiabilite: 0.85,
     minimumCommande: 300,
     delaiPaiementMois: 2,
@@ -62,18 +67,48 @@ describe("prixChezFaconnier", () => {
 });
 
 describe("passerOrdreFaconnier", () => {
-  it("fige le prix façon et calcule le mois de livraison", () => {
+  it("fige le prix façon et livre après le délai en heures (Portugal : 6 h)", () => {
     const o = passerOrdreFaconnier({
       id: "o_1",
       entreprise: ENT,
       faconnier: faconnierPt(450),
       produit: TSHIRT,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: JEU_26_NOV_10H21,
     });
     expect(o.prixFaconParPiece).toBe(450);
-    expect(o.moisLivraisonPrevu).toBe(2);
+    expect(o.instantCommandeMs).toBe(JEU_26_NOV_10H21);
+    expect(o.instantLivraisonPrevuMs).toBe(JEU_26_NOV_10H21 + 6 * HEURE);
+    expect(o.moisCommande).toBe(indexDuMois(2026, 11));
+    expect(o.moisLivraisonPrevu).toBe(indexDuMois(2026, 11));
     expect(o.statut).toBe("en_cours");
+  });
+
+  it("Turquie (8 h) : commandé le 30 novembre à 20 h, livré le 1er décembre à 4 h, en décembre", () => {
+    const o = passerOrdreFaconnier({
+      id: "o_tr",
+      entreprise: ENT,
+      faconnier: faconnierTurquie(),
+      produit: TSHIRT,
+      quantite: 300,
+      instantCommandeMs: Date.UTC(2026, 10, 30, 19, 0),
+    });
+    expect(o.instantLivraisonPrevuMs).toBe(Date.UTC(2026, 11, 1, 3, 0));
+    expect(o.moisCommande).toBe(indexDuMois(2026, 11));
+    expect(o.moisLivraisonPrevu).toBe(indexDuMois(2026, 12));
+  });
+
+  it("refuse un délai négatif", () => {
+    expect(() =>
+      passerOrdreFaconnier({
+        id: "o_delai",
+        entreprise: ENT,
+        faconnier: { ...faconnierPt(), delaiHeures: -2 },
+        produit: TSHIRT,
+        quantite: 100,
+        instantCommandeMs: JEU_26_NOV_10H21,
+      }),
+    ).toThrow(ErreurFaconnier);
   });
 
   it("refuse sous le minimum (Turquie 300 pièces)", () => {
@@ -84,7 +119,7 @@ describe("passerOrdreFaconnier", () => {
         faconnier: faconnierTurquie(),
         produit: TSHIRT,
         quantite: 100,
-        moisCommande: moisJeu(0),
+        instantCommandeMs: JEU_26_NOV_10H21,
       }),
     ).toThrow(ErreurFaconnier);
   });
@@ -97,7 +132,7 @@ describe("passerOrdreFaconnier", () => {
         faconnier: faconnierPt(),
         produit: TSHIRT,
         quantite: 0,
-        moisCommande: moisJeu(0),
+        instantCommandeMs: JEU_26_NOV_10H21,
       }),
     ).toThrow(/positive/);
   });
@@ -110,7 +145,7 @@ describe("passerOrdreFaconnier", () => {
         faconnier: faconnierPt(),
         produit: CHEMISE,
         quantite: 100,
-        moisCommande: moisJeu(0),
+        instantCommandeMs: JEU_26_NOV_10H21,
       }),
     ).toThrow(/ne fabrique pas/);
   });
@@ -164,7 +199,7 @@ describe("livrerFaconnier — écriture comptable", () => {
       faconnier: faconnierPt(450),
       produit: TSHIRT,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: JEU_26_NOV_10H21,
     });
     const result = livrerFaconnier({
       grandLivre: gl,
@@ -215,7 +250,7 @@ describe("livrerFaconnier — écriture comptable", () => {
       faconnier: faconnierPt(450),
       produit: TSHIRT,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: JEU_26_NOV_10H21,
     });
     const result = livrerFaconnier({
       grandLivre: gl,
@@ -234,7 +269,7 @@ describe("livrerFaconnier — écriture comptable", () => {
       faconnier: faconnierPt(450),
       produit: TSHIRT,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: JEU_26_NOV_10H21,
     });
     const r1 = livrerFaconnier({
       grandLivre: planComptableV1(),
