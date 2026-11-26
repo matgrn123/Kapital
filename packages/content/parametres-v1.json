@@ -461,6 +461,18 @@
     "source": "décision de Mathieu du 26/11/2026 (horloge réelle : le grossiste local livre en 30 minutes réelles)",
     "date": "2026-11-26"
   },
+  "boutique_travaux_duree_heures": {
+    "valeur": 24,
+    "unite": "heures_reelles",
+    "source": "Décision de Mathieu du 26/11/2026 (horloge réelle, lot T3) : les travaux d'agencement de la boutique durent 24 h réelles ; la boutique ouvre à cet instant précis. Remplace boutique_travaux_duree_mois (un mois de jeu)",
+    "date": "2026-11-26"
+  },
+  "amenagement_delai_heures": {
+    "valeur": 2,
+    "unite": "heures_reelles",
+    "source": "Décision de Mathieu du 26/11/2026 (horloge réelle, lot T3) : un plan d'aménagement d'atelier s'applique 2 h réelles après sa sauvegarde, au lieu d'attendre la clôture du mois",
+    "date": "2026-11-26"
+  },
   "calendrier_mois_debut_collection_pe": {
     "valeur": 2,
     "unite": "mois_calendaire_1_a_12",
@@ -624,10 +636,10 @@
     "date": "2026-11-24"
   },
   "bail_preavis_mois": {
-    "valeur": 6,
+    "valeur": 1,
     "unite": "mois_de_jeu",
-    "source": "Code de commerce, article L145-4 (congé donné au moins six mois à l'avance, par acte d'huissier ou lettre recommandée) ; simplification du jeu : le locataire peut donner congé à tout moment, et non à l'échéance triennale ; valeur à confirmer",
-    "date": "2026-11-24"
+    "source": "Décision de Mathieu du 26/11/2026 (horloge réelle, lot T3) : préavis ramené à 1 mois, le local est rendu à la fin du mois qui suit le congé (le loyer reste payé en fin de mois). Simplification du jeu : le Code de commerce, article L145-4, prévoit un congé six mois à l'avance, à l'échéance triennale",
+    "date": "2026-11-26"
   },
   "bail_machines_a_la_signature": {
     "valeur": 2,
@@ -777,12 +789,6 @@
     "valeur": 50000,
     "unite": "centimes_par_m2",
     "source": "Proposition AE-9, à valider par Mathieu. Budget type d'une boutique de vêtements : « Travaux et aménagement du local : 55 000 € » pour environ 115 m², soit ≈ 478 €/m² (modelesdebusinessplan.com, « Budget pour ouvrir un magasin de vêtements », mis à jour le 14 septembre 2026, https://modelesdebusinessplan.com/blogs/infos/budget-ouvrir-magasin-vetement) ; une rénovation complète (façade, électricité, murs, plafonds) d'un magasin de prêt-à-porter va de 1 000 à 1 500 €/m² (Companeo, « Devis travaux : l'évaluation de votre budget », mis à jour le 18 juillet 2021). 500 €/m² retenu pour une boutique simple, arrondi du premier chiffre",
-    "date": "2026-11-25"
-  },
-  "boutique_travaux_duree_mois": {
-    "valeur": 1,
-    "unite": "mois_de_jeu",
-    "source": "docs/batiments-3d-groupe.md section 3.3 (des travaux prennent un mois de jeu, un jour réel ; l'espace concerné ne produit pas pendant ce temps) ; docs/cahier-des-charges-v1.md section 13 (AE-10 : un mois de travaux)",
     "date": "2026-11-25"
   },
   "boutique_amortissement_agencement_mois": {

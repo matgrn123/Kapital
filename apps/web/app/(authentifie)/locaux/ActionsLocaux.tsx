@@ -236,7 +236,16 @@ export function CarteOffre({
   );
 }
 
-export function BoutonConge({ preavisMois, workshopId }: { preavisMois: number; workshopId: string }) {
+export function BoutonConge({
+  preavisMois,
+  workshopId,
+  finSiConge,
+}: {
+  preavisMois: number;
+  workshopId: string;
+  /** Fin du bail si le congé est donné maintenant (« jeu. 31 déc. 2026 (dans 35 jours) ») ; null si inconnue. */
+  finSiConge: string | null;
+}) {
   const router = useRouter();
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -244,7 +253,7 @@ export function BoutonConge({ preavisMois, workshopId }: { preavisMois: number; 
   async function donner() {
     if (
       !confirm(
-        `Donner congé ? Le bail se termine dans ${preavisMois} mois et le loyer reste dû jusque-là. Le dépôt de garantie t'est rendu à la fin.`,
+        `Donner congé ? Avec ${preavisMois} mois de préavis, le bail prend fin ${finSiConge ? `le ${finSiConge}` : "à la fin du préavis"} et le loyer reste dû jusque-là. Le dépôt de garantie t'est rendu à la fin.`,
       )
     )
       return;
@@ -262,6 +271,7 @@ export function BoutonConge({ preavisMois, workshopId }: { preavisMois: number; 
       <Bouton onClick={donner} disabled={enCours}>
         {enCours ? "Envoi…" : `Donner congé (préavis de ${preavisMois} mois)`}
       </Bouton>
+      {finSiConge && <p className="text-[0.8rem] text-muted">Congé donné aujourd&apos;hui : fin du bail le {finSiConge}.</p>}
       {erreur && <Message ton="erreur">{erreur}</Message>}
     </div>
   );

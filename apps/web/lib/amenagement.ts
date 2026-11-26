@@ -75,6 +75,21 @@ export function postesFournisDepuisParametres(p: Parametres): number {
   return v.valeur;
 }
 
+const MS_PAR_HEURE = 3_600_000;
+
+/**
+ * T3 (horloge réelle) : délai entre la sauvegarde d'un plan et sa mise en service, en
+ * millisecondes (paramètre amenagement_delai_heures, 2 h réelles).
+ */
+export function delaiMiseEnPlaceAmenagementMs(p: Parametres): number {
+  const v = p["amenagement_delai_heures"];
+  if (!v) throw new Error("Paramètre manquant : amenagement_delai_heures");
+  if (!Number.isFinite(v.valeur) || v.valeur < 0) {
+    throw new Error(`amenagement_delai_heures doit être >= 0, reçu ${v.valeur}.`);
+  }
+  return Math.round(v.valeur * MS_PAR_HEURE);
+}
+
 /**
  * Modules achetés, par type, d'un plan : tous les modules, sauf les postes fournis avec le local
  * (même règle que modulesAchetes du moteur, qui décide de ce qui est amorti).

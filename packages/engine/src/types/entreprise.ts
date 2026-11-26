@@ -89,8 +89,9 @@ export type Atelier = {
 
 /**
  * AE-10 : boutique louée (table points_de_vente), distincte de l'atelier. Bail commercial
- * (loyer, charges, dépôt), un mois de travaux d'agencement (2135, amortis en 28135), puis
- * ouverture. Elle a son propre stock de produits finis, toujours au compte 35.
+ * (loyer, charges, dépôt), des travaux d'agencement (2135, amortis en 28135 ; 24 h réelles
+ * depuis le lot T3), puis ouverture. Elle a son propre stock de produits finis, toujours au
+ * compte 35.
  */
 export type PointDeVente = {
   readonly id: string;
@@ -102,8 +103,13 @@ export type PointDeVente = {
   /** Dépôt versé à la signature (compte 275). */
   readonly depotGarantie: Centimes;
   readonly moisSignature: MoisJeu;
-  /** Premier mois de vente : signature + durée des travaux. Avant, aucune vente. */
+  /** Mois qui contient l'instant d'ouverture : l'amortissement des agencements commence ce mois-là. */
   readonly moisOuverture: MoisJeu;
+  /**
+   * Instant d'ouverture (heure du jeu, ms) : signature + durée des travaux. Avant, aucune vente.
+   * Absent pour une boutique enregistrée avant la migration 0045 : on compare alors au mois.
+   */
+  readonly ouvertureMs?: number;
   /** Travaux d'agencement immobilisés (2135) et amortissements déjà passés (28135). */
   readonly agencement: {
     readonly valeurBrute: Centimes;

@@ -60,6 +60,11 @@ export type ResultatLotAEnregistrer = {
   readonly ordresFaconnierLivres: readonly string[];
   /** État du mois à conserver, ou null si le mois est clos. */
   readonly cumul: CumulMois | null;
+  /**
+   * T3 : instant réel (ms) de la fin du lot. La base applique les plans d'aménagement prévus
+   * dont l'heure de mise en place (workshops.plan_prevu_le) est atteinte (migration 0045).
+   */
+  readonly finDuLotMs?: number;
 };
 
 /** Un autre traitement a déjà appliqué ces pas : rien à faire, ce n'est pas une panne. */
@@ -78,7 +83,11 @@ export interface StockageMonde {
   listerEntreprises(mondeId: string): Promise<readonly EntrepriseDuMonde[]>;
   /** Positionne une entreprise sur le pas courant, sans rejouer d'historique. */
   demarrerEntreprise(companyId: string, pas: number, cumul: CumulMois | null): Promise<void>;
-  chargerEtat(companyId: string, moisEnCours: number): Promise<EtatChargeEntreprise>;
+  /**
+   * `debutReelMs` (worlds.debut_reel) convertit les instants enregistrés en base (ouverture
+   * d'une boutique) en heure du jeu ; absent, ils sont lus tels quels (production : 1970).
+   */
+  chargerEtat(companyId: string, moisEnCours: number, debutReelMs?: number): Promise<EtatChargeEntreprise>;
   /** Commandes en cours dont la livraison est prévue avant `avantMs`. */
   chargerLivraisons(companyId: string, avantMs: number): Promise<LivraisonsEnAttente>;
   /** Créances revendeurs à encaisser au premier pas du mois. */

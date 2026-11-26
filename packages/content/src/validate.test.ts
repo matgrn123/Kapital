@@ -132,11 +132,21 @@ describe("parametres-v1.json (le vrai fichier)", () => {
       expect(params[cle], `paramètre manquant : ${cle}`).toBeDefined();
     }
   });
+  it("horloge réelle (T3) : travaux 24 h, aménagement 2 h, préavis d'un mois, sourcés et datés", () => {
+    const params = validateParametres(JSON.parse(readFileSync(cheminParametres, "utf-8")));
+    expect(params["boutique_travaux_duree_heures"]).toMatchObject({ valeur: 24, unite: "heures_reelles", date: "2026-11-26" });
+    expect(params["amenagement_delai_heures"]).toMatchObject({ valeur: 2, unite: "heures_reelles", date: "2026-11-26" });
+    expect(params["bail_preavis_mois"]).toMatchObject({ valeur: 1, unite: "mois_de_jeu", date: "2026-11-26" });
+    for (const cle of ["boutique_travaux_duree_heures", "amenagement_delai_heures", "bail_preavis_mois"]) {
+      expect(params[cle]!.source).toContain("26/11/2026");
+    }
+  });
+
   it("contient les paramètres de la tranche boutique (AE-9)", () => {
     const params = validateParametres(JSON.parse(readFileSync(cheminParametres, "utf-8")));
     const cles = [
       "boutique_travaux_amenagement_centimes_par_m2",
-      "boutique_travaux_duree_mois",
+      "boutique_travaux_duree_heures",
       "boutique_amortissement_agencement_mois",
       "boutique_depot_garantie_mois_de_loyer",
       "vendeur_salaire_brut_mensuel_centimes",
@@ -150,9 +160,10 @@ describe("parametres-v1.json (le vrai fichier)", () => {
     }
   });
 
-  it("boutique : travaux d'un mois de jeu, dépôt dans le plafond légal de 3 mois", () => {
+  it("boutique : travaux de 24 h réelles, dépôt dans le plafond légal de 3 mois", () => {
     const params = validateParametres(JSON.parse(readFileSync(cheminParametres, "utf-8")));
-    expect(params["boutique_travaux_duree_mois"]!.valeur).toBe(1);
+    expect(params["boutique_travaux_duree_heures"]!.valeur).toBe(24);
+    expect(params["boutique_travaux_duree_mois"]).toBeUndefined();
     const depot = params["boutique_depot_garantie_mois_de_loyer"]!.valeur;
     expect(depot).toBeGreaterThan(0);
     expect(depot).toBeLessThanOrEqual(3);

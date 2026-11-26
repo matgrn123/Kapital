@@ -1,7 +1,12 @@
 import { chargerBatimentsV1 } from "@kapital/content";
 import { centimes, idEntreprise, moisJeu, passantsReferenceBoutiques, type Entreprise } from "@kapital/engine";
 import { describe, expect, it } from "vitest";
-import { chargeUtileDepuisLot, fonctionDePas, pointsDeVenteDepuisLignes } from "./stockageSupabase.js";
+import {
+  chargeUtileDepuisLot,
+  fonctionDePas,
+  pointsDeVenteDepuisLignes,
+  SELECTION_POINTS_DE_VENTE,
+} from "./stockageSupabase.js";
 import type { ResultatLotAEnregistrer } from "./port.js";
 
 const BATIMENTS = chargerBatimentsV1();
@@ -45,6 +50,32 @@ describe("AE-10 : chargerEtat lit les boutiques", () => {
 
   it("sans boutique : liste vide", () => {
     expect(pointsDeVenteDepuisLignes(null, [], BATIMENTS)).toEqual([]);
+  });
+
+  it("T3 : ouverture_le (instant réel) devient l'heure du jeu, en retirant worlds.debut_reel", () => {
+    const ligne = { ...LIGNE, ouverture_le: "2026-11-27T09:21:00.000Z" };
+    const reel = Date.parse("2026-11-27T09:21:00.000Z");
+    expect(pointsDeVenteDepuisLignes([ligne], [], BATIMENTS)[0]!.ouvertureMs).toBe(reel);
+    // Recette : l'outil d'admin a reculé debut_reel de 10 jours, le jeu est en avance d'autant.
+    const recul = -10 * 86_400_000;
+    expect(pointsDeVenteDepuisLignes([ligne], [], BATIMENTS, recul)[0]!.ouvertureMs).toBe(reel - recul);
+  });
+
+  it("T3 : sans ouverture_le (avant la migration 0045), pas d'instant : comparaison au mois", () => {
+    expect(pointsDeVenteDepuisLignes([LIGNE], [], BATIMENTS)[0]).not.toHaveProperty("ouvertureMs");
+    expect(pointsDeVenteDepuisLignes([{ ...LIGNE, ouverture_le: null }], [], BATIMENTS)[0]).not.toHaveProperty("ouvertureMs");
+  });
+
+  it("T3 : la lecture prend toutes les colonnes (« * »), pour lire ouverture_le sans casser avant 0045", () => {
+    expect(SELECTION_POINTS_DE_VENTE.startsWith("*, stock_boutique(")).toBe(true);
+  });
+});
+
+describe("T3 : la charge utile du pas porte la fin du lot", () => {
+  it("instant_fin_lot en ISO quand le lot la donne, absent sinon", () => {
+    const fin = Date.parse("2026-11-26T09:22:00.000Z");
+    expect(chargeUtileDepuisLot({ ...lot({}), finDuLotMs: fin }).instant_fin_lot).toBe("2026-11-26T09:22:00.000Z");
+    expect(chargeUtileDepuisLot(lot({}))).not.toHaveProperty("instant_fin_lot");
   });
 });
 
