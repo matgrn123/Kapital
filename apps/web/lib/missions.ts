@@ -1,6 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { chargerParametresV1, type Parametres } from "@kapital/content";
+import { enregistrerEvenementsSupabase, evenementMissionValidee } from "@kapital/server";
 import {
+  DEFINITIONS_MISSIONS,
   configTempsDepuis,
   evaluerMissions,
   horlogeDepuis,
@@ -120,6 +122,27 @@ export async function chargerProgressionMissions(
     await admin
       .from("mission_progress")
       .upsert(upserts, { onConflict: "company_id,mission_id" });
+
+    // Journal : une mission qui vient d'être validée (une seule fois par mission, clé unique).
+    const nouvelles = resultat.filter((p) => p.etat === "validee" && !dejaValidees.has(p.id));
+    if (nouvelles.length > 0) {
+      try {
+        await enregistrerEvenementsSupabase(
+          admin,
+          companyId,
+          nouvelles.map((p) =>
+            evenementMissionValidee({
+              missionId: p.id,
+              titreMission: DEFINITIONS_MISSIONS.find((d) => d.id === p.id)?.titre ?? p.id,
+              moisJeu: moisCourant,
+              instantMs: Date.parse(maintenant),
+            }),
+          ),
+        );
+      } catch {
+        // Journal indisponible : la mission reste validée, seul le récit manque.
+      }
+    }
   }
 
   return resultat;
