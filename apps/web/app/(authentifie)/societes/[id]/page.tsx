@@ -9,9 +9,10 @@ import {
   lireComptesPublics,
   moisDuProchainDepot,
   SELECT_COMPTES_PUBLICS,
+  titreExercice,
   type LigneComptesPublics,
 } from "../../../../lib/empire";
-import { enMois, estIndexCalendaire, periodeMois } from "../../../../lib/cadre";
+import { enMois, estIndexCalendaire } from "../../../../lib/cadre";
 import { formaterEuros } from "../../../../lib/formatage";
 import { creerClientServeur } from "../../../../lib/supabase/server";
 import { nomLisibleSociete } from "../../../../lib/lisible";
@@ -101,9 +102,7 @@ export default async function PageSociete({ params }: { params: Promise<{ id: st
       <Carte
         surTitre="Comptes annuels publics"
         titre={
-          ex
-            ? `Exercice ${ex.numero + 1} (${periodeMois(ex.moisDebut, ex.moisFin) ?? `mois ${ex.moisDebut + 1} à ${ex.moisFin + 1}`})`
-            : "Premier exercice en cours"
+          ex ? titreExercice(ex) : "Premier exercice en cours"
         }
       >
         {ex ? (
@@ -119,7 +118,7 @@ export default async function PageSociete({ params }: { params: Promise<{ id: st
           </div>
         ) : (
           <Vide>
-            Aucun exercice n&apos;est encore clos. Les comptes de la première année seront publiés{" "}
+            Aucun exercice n&apos;est encore clos. L&apos;exercice suit l&apos;année civile : les comptes de cette année seront publiés{" "}
             {estIndexCalendaire(moisCourant)
               ? enMois(moisDuProchainDepot(moisCourant))
               : `au mois ${moisDuProchainDepot(moisCourant) + 1} du jeu`}

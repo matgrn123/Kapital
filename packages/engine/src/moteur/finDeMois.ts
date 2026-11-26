@@ -16,7 +16,10 @@ export function tvaRestantDue(lignes44551JusquAuMoisPrecedent: readonly LigneSim
   return Math.max(0, solde);
 }
 
-/** Premier mois de l'exercice qui contient `mois` (exercices de 12 mois, comptés depuis 0). */
+/**
+ * Premier mois de l'exercice qui contient `mois` : le multiple de 12 qui le précède. Avec l'index
+ * calendaire (année × 12 + mois civil − 1), c'est janvier : l'exercice est l'année civile.
+ */
 export function debutExercice(mois: number): number {
   return mois - (((mois % 12) + 12) % 12);
 }

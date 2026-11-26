@@ -7,6 +7,7 @@ import { centimes, idEntreprise, moisJeu } from "../types/primitifs.js";
 import { cloturerMois } from "./cloture.js";
 import { cumulVide } from "./donneesMois.js";
 import { debutExercice, resultatDepuisLignes, tvaRestantDue } from "./finDeMois.js";
+import { indexDuMois } from "./temps.js";
 
 const PARAMS = chargerParametresV1();
 
@@ -52,6 +53,11 @@ describe("exercice et résultat", () => {
     expect(debutExercice(11)).toBe(0);
     expect(debutExercice(23)).toBe(12);
     expect(debutExercice(12)).toBe(12);
+  });
+  it("index calendaire : l'exercice est l'année civile (janvier à décembre)", () => {
+    expect(debutExercice(indexDuMois(2026, 11))).toBe(indexDuMois(2026, 1));
+    expect(debutExercice(indexDuMois(2026, 12))).toBe(indexDuMois(2026, 1));
+    expect(debutExercice(indexDuMois(2027, 1))).toBe(indexDuMois(2027, 1));
   });
   it("résultat = produits − charges, selon le plan comptable", () => {
     const lignes = [

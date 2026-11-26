@@ -4,6 +4,7 @@
 
 import type { TypeBatiment } from "@kapital/content";
 import type { BatimentProps, StyleBatiment } from "../components/iso";
+import { estIndexCalendaire, periodeMois } from "./cadre";
 
 /* ------------------------------------------------------------ Comptes publics */
 
@@ -91,10 +92,22 @@ export function lireComptesPublics(l: LigneComptesPublics): ComptesPublics {
   };
 }
 
+/**
+ * Titre d'un exercice publié. L'exercice suit l'année civile (migration 0046) : « Exercice 2025
+ * (janvier à décembre 2025) », ou « Exercice 2026 (novembre à décembre 2026) » pour le premier
+ * exercice, raccourci, d'une société créée en novembre. Ancien compteur (mois depuis 0) : numéroté
+ * à partir de 1.
+ */
+export function titreExercice(ex: Pick<ExercicePublic, "numero" | "moisDebut" | "moisFin">): string {
+  const periode = periodeMois(ex.moisDebut, ex.moisFin);
+  if (periode !== null && estIndexCalendaire(ex.moisFin)) return `Exercice ${ex.numero} (${periode})`;
+  return `Exercice ${ex.numero + 1} (mois ${ex.moisDebut + 1} à ${ex.moisFin + 1})`;
+}
+
 /** Durée d'un exercice comptable en mois de jeu (le moteur clôt l'exercice au 12e mois). */
 const MOIS_PAR_EXERCICE = 12;
 
-/** Mois de jeu à partir duquel les comptes de l'exercice en cours seront publiés. */
+/** Mois de jeu à partir duquel les comptes de l'exercice en cours seront publiés (janvier suivant). */
 export function moisDuProchainDepot(moisCourant: number): number {
   return (Math.floor(moisCourant / MOIS_PAR_EXERCICE) + 1) * MOIS_PAR_EXERCICE;
 }
