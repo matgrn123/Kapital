@@ -735,6 +735,37 @@ describe("simulerMoisEntreprise — découvert", () => {
     }
   });
 
+  it("le taux des agios vient du paramètre agios_taux_annuel (taux doublé → agios doublés, à l'arrondi près)", () => {
+    const ent: Entreprise = { ...entreprisePnjBase(), tresorerie: centimes(-1_200_000) };
+    const agiosAvec = (taux: number) => {
+      const params = { ...PARAMS, agios_taux_annuel: { ...PARAMS["agios_taux_annuel"]!, valeur: taux } };
+      const r = simulerMoisEntreprise(ent, donneeesVides(), marketInputsTest(), params, GRAINE, MOIS_1);
+      const ec = r.ecritures.find((e) => e.id === `agios_${MOIS_1}_ent_test`);
+      return ec!.lignes.find((l) => l.compte === "661")!.montant;
+    };
+    const simple = agiosAvec(0.15);
+    expect(simple).toBeGreaterThan(0);
+    expect(Math.abs(agiosAvec(0.3) - 2 * simple)).toBeLessThanOrEqual(1);
+  });
+
+  it("le seuil « en difficulté » vient du paramètre decouvert_mois_avant_difficulte", () => {
+    const ent: Entreprise = { ...entreprisePnjBase(), tresorerie: centimes(-500000) };
+    const params = {
+      ...PARAMS,
+      decouvert_mois_avant_difficulte: { ...PARAMS["decouvert_mois_avant_difficulte"]!, valeur: 2 },
+    };
+    const r = simulerMoisEntreprise(
+      ent,
+      { ...donneeesVides(), moisDecouvertConsecutifs: 1 },
+      marketInputsTest(),
+      params,
+      GRAINE,
+      MOIS_1,
+    );
+    expect(r.moisDecouvertConsecutifsApres).toBe(2);
+    expect(r.entrepriseApres.statut).toBe("en_difficulte");
+  });
+
   it("trésorerie positive : moisDecouvert remis à 0", () => {
     const ent: Entreprise = {
       ...entreprisePnjBase(),
