@@ -684,3 +684,36 @@ describe("simulerPas — vente revendeur au prix HT saisi, plus la TVA", () => {
     expect(enEquilibre(gl)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Écritures passées par une route pendant le mois (publicité 623, par exemple)
+// ---------------------------------------------------------------------------
+
+describe("simulerPas — une dépense passée par une route en cours de mois", () => {
+  // Le serveur recharge la trésorerie depuis la base à chaque lot : une écriture passée par une
+  // route (623 / 512) la fait baisser. Mais la clôture repart de cumul.tresorerieDebutMois plus
+  // les mouvements des seuls pas : elle ne la voit pas (agios, découvert, étape, message).
+  // CONNU, NON CORRIGÉ ICI : la correction est dans cloture.ts (hors du périmètre de ce correctif),
+  // signalée dans la PR. Ce test passera au rouge le jour où ce sera corrigé : retirer « .fails ».
+  it.fails("la trésorerie de clôture devrait compter une publicité de 500 € payée par la route", () => {
+    const params = paramsNeutres();
+    const nbPas = configTempsDepuis(params).pasParMois;
+    const depart = entrepriseDeTest();
+    let ent = depart;
+    let cumul: CumulMois | null = null;
+    const ecritures: EcritureComptable[] = [];
+    let cloture: ResultatClotureEntreprise | null = null;
+    for (let i = 0; i < nbPas; i++) {
+      // À mi-mois, la route publicité passe 623 / 512 : la base rend une trésorerie plus basse.
+      if (i === nbPas / 2) ent = { ...ent, tresorerie: centimes(ent.tresorerie - 50_000) };
+      const r = simulerPas(ent, cumul, FLUX_VIDE, i === nbPas - 1 ? FIN_VIDE : null, MARKET, params, G, moisJeu(1), i);
+      ent = r.entrepriseApres;
+      cumul = r.cumul;
+      ecritures.push(...r.ecrituresDuPas);
+      if (r.cloture) cloture = r.cloture;
+    }
+    expect(cloture!.entrepriseApres.tresorerie).toBe(
+      depart.tresorerie - 50_000 + (soldesParCompte(ecritures)["512"] ?? 0),
+    );
+  });
+});
