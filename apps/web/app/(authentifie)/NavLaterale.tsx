@@ -32,6 +32,7 @@ const GROUPES: ReadonlyArray<{ readonly titre: string; readonly liens: ReadonlyA
     liens: [
       { href: "/societe", libelle: "Société", icone: "M4 21V5l8-3 8 3v16M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4" },
       { href: "/atelier", libelle: "Production", icone: "M3 7h18v4H3zM5 11v9h14v-9M9 15h6" },
+      { href: "/stock", libelle: "Stock et ventes", icone: "M3 21V8l9-5 9 5v13M3 21h18M7 21v-8h10v8M7 17h10" },
       { href: "/achats", libelle: "Achats", icone: "M20 7l-8-4-8 4v10l8 4 8-4zM4 7l8 4 8-4M12 11v10" },
       { href: "/marketing", libelle: "Publicité", icone: "M3 11v2l13 5V6zM16 9a3 3 0 0 1 0 6M6 14l1 5h3l-1-4" },
       { href: "/produits", libelle: "Vente", icone: "M3 4h2l2.5 11h11L21 7H7M9 20a1 1 0 1 0 0-.01M18 20a1 1 0 1 0 0-.01" },
