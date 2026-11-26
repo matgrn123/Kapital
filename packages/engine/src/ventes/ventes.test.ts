@@ -14,6 +14,7 @@ import {
   margeRevendeur,
   margeVenteDirecte,
   prixHtDepuisTtc,
+  prixTtcDepuisHt,
   tvaSurPrixTtc,
 } from "./index.js";
 
@@ -118,19 +119,68 @@ describe("enregistrerVenteDirecte — écriture comptable", () => {
 });
 
 describe("enregistrerVenteRevendeur", () => {
-  it("passe 411 débit HT, 707 crédit HT, 7135 débit coût, 35 crédit coût (pas de TVA collectée)", () => {
+  it("prix saisi HT plus TVA : 411 débit TTC, 707 crédit HT, 44571 crédit TVA, 7135 / 35 au coût", () => {
+    // Critère d'acceptation : 30,00 € HT × 10 pièces à 20 %
     const gl = enregistrerVenteRevendeur(planComptableV1(), {
       idEcriture: "r1",
+      mois: moisJeu(0),
+      produit: TSHIRT,
+      quantite: 10,
+      prixGrosHtUnitaire: centimes(3000),
+      coutRevientUnitaire: centimes(2000),
+      tauxTva: 0.2,
+    });
+    expect(soldeCompte(gl, "707")).toBe(30_000);
+    expect(soldeCompte(gl, "44571")).toBe(6_000);
+    expect(soldeCompte(gl, "411")).toBe(36_000);
+    expect(gl.ecritures.at(-1)!.lignes).toEqual([
+      { compte: "411", sens: "debit", montant: 36_000 },
+      { compte: "707", sens: "credit", montant: 30_000 },
+      { compte: "44571", sens: "credit", montant: 6_000 },
+      { compte: "7135", sens: "debit", montant: 20_000 },
+      { compte: "35", sens: "credit", montant: 20_000 },
+    ]);
+    expect(enEquilibre(gl)).toBe(true);
+  });
+
+  it("la TVA est calculée sur le total HT de la facture, arrondie au centime ; 411 = 707 + 44571", () => {
+    // 12,34 € HT × 7 = 86,38 € HT ; TVA 20 % = 17,276 € → 17,28 € ; TTC 103,66 €
+    const gl = enregistrerVenteRevendeur(planComptableV1(), {
+      idEcriture: "r2",
+      mois: moisJeu(0),
+      produit: TSHIRT,
+      quantite: 7,
+      prixGrosHtUnitaire: centimes(1234),
+      coutRevientUnitaire: centimes(500),
+      tauxTva: 0.2,
+    });
+    expect(soldeCompte(gl, "707")).toBe(8_638);
+    expect(soldeCompte(gl, "44571")).toBe(1_728);
+    expect(soldeCompte(gl, "411")).toBe(10_366);
+    expect(enEquilibre(gl)).toBe(true);
+  });
+
+  it("sans TVA (taux 0), aucune ligne 44571", () => {
+    const gl = enregistrerVenteRevendeur(planComptableV1(), {
+      idEcriture: "r3",
       mois: moisJeu(0),
       produit: TSHIRT,
       quantite: 100,
       prixGrosHtUnitaire: centimes(3000),
       coutRevientUnitaire: centimes(2000),
+      tauxTva: 0,
     });
     expect(soldeCompte(gl, "411")).toBe(300_000);
     expect(soldeCompte(gl, "707")).toBe(300_000);
-    expect(soldeCompte(gl, "44571")).toBe(0);
+    expect(gl.ecritures.at(-1)!.lignes.some((l) => l.compte === "44571")).toBe(false);
     expect(enEquilibre(gl)).toBe(true);
+  });
+});
+
+describe("prixTtcDepuisHt", () => {
+  it("30 € HT → 36 € TTC à 20 % ; 12,96 € HT → 15,55 € TTC (arrondi au centime)", () => {
+    expect(prixTtcDepuisHt(centimes(3000), 0.2)).toBe(3600);
+    expect(prixTtcDepuisHt(centimes(1296), 0.2)).toBe(1555);
   });
 });
 

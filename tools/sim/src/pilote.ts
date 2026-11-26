@@ -599,13 +599,17 @@ export function fixerProduction(etat: EtatBanc, produit: string, piecesParMois: 
   return modifierProduit(etat, produit, (p) => ({ ...p, productionMensuelleCible: piecesParMois }));
 }
 
-/** Prix TTC d'un canal ; le prix revendeur se débloque à l'étape 2. */
-export function fixerPrix(etat: EtatBanc, produit: string, canal: Canal, prixTtc: number): ResultatAction {
-  if (canal === "revendeur" && prixTtc > 0) {
+/**
+ * Prix d'un canal, en centimes, tel que le joueur le saisit : TTC en vente directe et en
+ * boutique, HT pour le revendeur (qui paie ce prix plus la TVA). Le prix revendeur se
+ * débloque à l'étape 2.
+ */
+export function fixerPrix(etat: EtatBanc, produit: string, canal: Canal, prixSaisi: number): ResultatAction {
+  if (canal === "revendeur" && prixSaisi > 0) {
     const bloque = verrou(etat, "vente_revendeur");
     if (bloque) return bloque;
   }
-  return modifierProduit(etat, produit, (p) => ({ ...p, prix: { ...p.prix, [canal]: centimes(prixTtc) } }));
+  return modifierProduit(etat, produit, (p) => ({ ...p, prix: { ...p.prix, [canal]: centimes(prixSaisi) } }));
 }
 
 function modifierProduit(

@@ -75,9 +75,10 @@ export type DonneesFinMois = {
   readonly tvaAPayerCeMois: Centimes;
   readonly moisDecouvertConsecutifs: number;
   /**
-   * Résultat (produits − charges) des mois de l'exercice déjà clos avant ce mois, lu dans le
-   * grand livre. Sert à l'impôt sur les sociétés, calculé au 12e mois sur l'exercice entier.
-   * Absent = 0.
+   * Résultat (produits − charges) de l'exercice lu dans le grand livre, hors ce que les pas du
+   * mois ont déjà compté (cumul.agregats) : les mois déjà clos, plus les écritures du mois passées
+   * par une route (publicité…). Sert à l'impôt sur les sociétés, calculé au 12e mois sur
+   * l'exercice entier. Absent = 0.
    */
   readonly resultatExerciceAvantMois?: Centimes;
 };
