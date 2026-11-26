@@ -241,7 +241,8 @@ export type ContexteFlux = {
   /**
    * Portion du mois couverte par ce flux, en nombre de pas entiers :
    * du pas `pasDebut` (inclus) au pas `pasFin` (exclu), sur `pasParMois` pas.
-   * Un mois pris d'un bloc : pasDebut 0, pasFin 1, pasParMois 1.
+   * `pasParMois` est le nombre de pas de CE mois (`pasDansLeMois` : un mois calendaire
+   * réel compte 28 à 31 jours). Un mois pris d'un bloc : pasDebut 0, pasFin 1, pasParMois 1.
    * Des entiers, pour que le dernier pas retombe exactement sur 1 mois.
    */
   readonly pasDebut: number;

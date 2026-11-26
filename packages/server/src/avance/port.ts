@@ -18,9 +18,13 @@ import type { EvenementJournal } from "../evenements/types.js";
 
 export type MondeActif = {
   readonly id: string;
-  /** Mois de jeu en cours (nombre de mois déjà clos). */
+  /** Mois de jeu en cours : index calendaire année × 12 + (mois − 1) (novembre 2026 = 24322). */
   readonly moisCourant: number;
-  /** Création du monde sur l'horloge commune, en ms ; null = ancien monde, pas encore initialisé. */
+  /**
+   * Origine de l'horloge du jeu (worlds.debut_reel), en ms : instant réel où le jeu marquait
+   * le 1er janvier 1970 0 h UTC. Vaut 0 en production ; l'avance du temps en recette la recule.
+   * null = pas encore fixée (l'orchestrateur la fixe au 1er janvier 1970).
+   */
   readonly debutReelMs: number | null;
 };
 

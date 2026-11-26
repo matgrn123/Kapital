@@ -1,5 +1,5 @@
 import type { Parametres } from "@kapital/content";
-import { configTempsDepuis, horlogeDepuis } from "@kapital/engine";
+import { configTempsDepuis, estMoisCalendaire, horlogeDepuis } from "@kapital/engine";
 import type { ResultatAvanceMonde } from "../avance/orchestrateur.js";
 import type { HorlogeDuMonde } from "../avance/horloge.js";
 import type { MondeActif } from "../avance/port.js";
@@ -86,15 +86,20 @@ export function construireVueCockpit(
   const config = configTempsDepuis(params);
   const alertes: string[] = [];
 
+  const ancienCalendrier = !estMoisCalendaire(donnees.monde.moisCourant);
   const horloge: HorlogeDuMonde =
-    donnees.monde.debutReelMs === null
+    donnees.monde.debutReelMs === null || ancienCalendrier
       ? { actif: false, moisCourant: donnees.monde.moisCourant }
       : {
           actif: true,
           maintenantMs,
           horloge: horlogeDepuis(config, donnees.monde.debutReelMs, maintenantMs),
         };
-  if (!horloge.actif) {
+  if (ancienCalendrier) {
+    alertes.push(
+      "Monde encore sur l'ancien calendrier : la migration 0043 (horloge réelle) n'est pas appliquée, rien n'avance.",
+    );
+  } else if (!horloge.actif) {
     alertes.push(
       "Horloge commune non initialisée : cliquer sur « Mettre le monde à jour maintenant ».",
     );
