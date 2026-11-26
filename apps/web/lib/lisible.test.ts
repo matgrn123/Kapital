@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { libelleGamme, libelleLisible, nomMatiere } from "./lisible";
+import { libelleGamme, libelleLisible, nomLisibleSociete, nomMatiere } from "./lisible";
 
 describe("libelleLisible", () => {
   const noms = { prod_tshirt: "T-shirt basique", prod_sac: "Sac en toile" };
@@ -46,5 +46,13 @@ describe("nomMatiere", () => {
 
   it("à défaut, rend l'identifiant lisible", () => {
     expect(nomMatiere("mat_toile_coton", {})).toBe("toile coton");
+  });
+});
+
+describe("nomLisibleSociete", () => {
+  it("retire le préfixe technique des sociétés du jeu", () => {
+    expect(nomLisibleSociete("PNJ_Bazaar Mode")).toBe("Bazaar Mode");
+    expect(nomLisibleSociete("PNJ_Noble_Couture")).toBe("Noble Couture");
+    expect(nomLisibleSociete("Robot Testeur")).toBe("Robot Testeur");
   });
 });

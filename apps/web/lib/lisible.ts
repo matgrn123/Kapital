@@ -30,3 +30,8 @@ export function nomMatiere(
   if (nom) return nom.charAt(0).toLowerCase() + nom.slice(1);
   return id.replace(/^mat_/, "").replace(/_/g, " ");
 }
+
+/** Nom affiché d'une société : sans le préfixe technique « PNJ_ » ni tirets bas. */
+export function nomLisibleSociete(nom: string): string {
+  return nom.replace(/^PNJ_/, "").replace(/_/g, " ").trim();
+}

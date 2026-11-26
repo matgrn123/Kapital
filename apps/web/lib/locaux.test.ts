@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { localAffiche, localVise, salariesDuLocal } from "./locaux";
+import { localAffiche, localVise, messageSignature, salariesDuLocal } from "./locaux";
+
+describe("messageSignature", () => {
+  it("annonce le bail signé ou le local acheté, en haut de la page Locaux", () => {
+    expect(messageSignature("bail")).toMatch(/^Bail signé/);
+    expect(messageSignature("achat")).toMatch(/^Local acheté/);
+  });
+  it("ne dit rien sans signature, ou avec une valeur inconnue", () => {
+    expect(messageSignature(undefined)).toBeNull();
+    expect(messageSignature("autre")).toBeNull();
+  });
+  it("lit la première valeur si le paramètre est répété", () => {
+    expect(messageSignature(["bail", "achat"])).toMatch(/^Bail signé/);
+  });
+});
 
 const A = { id: "wA", mode_detention: "bail" };
 const B = { id: "wB", mode_detention: "credit" };

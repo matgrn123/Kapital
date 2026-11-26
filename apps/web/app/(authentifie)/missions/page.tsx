@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DEFINITIONS_MISSIONS, ordonnerClassement, type EtatMission } from "@kapital/engine";
 import { BoutonLien, Carte, EncadreNotion, EnTete, Jauge, Puce, TableauRang, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
+import { nomLisibleSociete } from "../../../lib/lisible";
 import { chargerProgressionMissions } from "../../../lib/missions";
 import { formaterDateHeure, formaterEuros } from "../../../lib/formatage";
 
@@ -149,7 +150,7 @@ export default async function PageMissions() {
                 moi,
                 cellules: [
                   l.rang,
-                  <Link key="n" href={`/societes/${l.company_id}`} className="text-accent hover:underline">{l.nom}</Link>,
+                  <Link key="n" href={`/societes/${l.company_id}`} className="text-accent hover:underline">{nomLisibleSociete(l.nom)}</Link>,
                   moi ? "Toi" : l.pseudo,
                   LIBELLE_GAMME[l.gamme] ?? "—",
                   <span key="v" className="tabular-nums">

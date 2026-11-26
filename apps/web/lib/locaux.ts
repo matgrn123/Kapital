@@ -3,6 +3,20 @@
 
 export type LocalMinimal = { readonly id: string; readonly mode_detention?: string | null };
 
+/** Paramètre d'adresse posé après une signature (`/locaux?signe=bail`) : la page affiche le message en haut. */
+export const PARAM_SIGNATURE = "signe";
+
+const MESSAGES_SIGNATURE: Readonly<Record<string, string>> = {
+  bail: "Bail signé : ton atelier est prêt. Il apparaît ci-dessous et dans le village ; embauche maintenant tes artisans, un par poste.",
+  achat: "Local acheté : tu es propriétaire. Il apparaît ci-dessous et dans le village ; embauche maintenant tes artisans, un par poste.",
+};
+
+/** Message de réussite à montrer en haut de la page Locaux, ou null. */
+export function messageSignature(valeur: string | string[] | undefined): string | null {
+  const v = Array.isArray(valeur) ? valeur[0] : valeur;
+  return (v !== undefined && MESSAGES_SIGNATURE[v]) || null;
+}
+
 export type LocalVise =
   | { readonly ok: true; readonly id: string }
   | { readonly ok: false; readonly code: "aucun_local" | "local_a_preciser"; readonly message: string };

@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { Bouton, Carte, CLASSE_SAISIE, Champ, EcritureComptable, Ligne as LigneValeur, Message, Note, Options } from "../../../components/ui";
 import { apercuAchat, dureesProposees, lireEuros, type EcritureAffichee } from "../../../lib/apercu-lot4";
 import { formaterEuros } from "../../../lib/formatage";
+import { PARAM_SIGNATURE } from "../../../lib/locaux";
 import { appelerAction } from "../_partage/reponses";
 
 export type OffreLocal = {
@@ -82,7 +83,6 @@ export function CarteOffre({
   const [duree, setDuree] = useState(String(contexte.dureeDefaut));
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [succes, setSucces] = useState<string | null>(null);
 
   const apportCentimes = lireEuros(apport);
   const dureeN = Number.parseInt(duree, 10);
@@ -101,27 +101,25 @@ export function CarteOffre({
     [offre, apportCentimes, dureeN, contexte],
   );
 
+  // Le message de réussite s'affiche en haut de la page (là où le nouveau local apparaît),
+  // pas au pied de cette carte, que le joueur ne voit plus une fois la page rechargée.
   async function louer() {
     setErreur(null);
-    setSucces(null);
     setEnCours(true);
     const r = await appelerAction("/api/actions/louer-atelier", { batimentId: offre.id });
     setEnCours(false);
     if (!r.ok) return setErreur(r.message);
-    setSucces("Bail signé : ton atelier est prêt.");
-    router.refresh();
+    router.push(`/locaux?${PARAM_SIGNATURE}=bail`);
   }
 
   async function acheter() {
     setErreur(null);
-    setSucces(null);
     if (!achat.ok || apportCentimes === null) return setErreur(achat.ok ? "Apport invalide." : achat.message);
     setEnCours(true);
     const r = await appelerAction("/api/actions/acheter-local", { batimentId: offre.id, apportCentimes, dureeMois: dureeN });
     setEnCours(false);
     if (!r.ok) return setErreur(r.message);
-    setSucces("Local acheté : tu es propriétaire.");
-    router.refresh();
+    router.push(`/locaux?${PARAM_SIGNATURE}=achat`);
   }
 
   const c = offre.comparatif;
@@ -234,7 +232,6 @@ export function CarteOffre({
       )}
 
       {erreur && <Message ton="erreur">{erreur}</Message>}
-      {succes && <Message ton="succes">{succes}</Message>}
     </Carte>
   );
 }

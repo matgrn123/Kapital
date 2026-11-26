@@ -65,8 +65,10 @@ export function FormulairePret({
   const curseur = curseurMontant(capacite.montantMaximal);
   const [montantChoisi, setMontantChoisi] = useState<number | null>(null);
   const milieu = Math.max(curseur.min, Math.floor(curseur.max / 2 / curseur.pas) * curseur.pas);
+  // La saisie directe va jusqu'au maximum exact du moteur (le curseur, lui, s'arrête au dernier cran rond).
+  const bornesSaisie = { min: curseur.min, max: Math.max(curseur.max, capacite.montantMaximal) };
   const capitalCentimes: number | null =
-    curseur.max <= 0 ? null : Math.min(curseur.max, Math.max(curseur.min, montantChoisi ?? milieu));
+    curseur.max <= 0 ? null : Math.min(bornesSaisie.max, Math.max(curseur.min, montantChoisi ?? milieu));
   const apercu = useMemo(
     () =>
       apercuPret({
@@ -141,7 +143,8 @@ export function FormulairePret({
           max={curseur.max}
           pas={curseur.pas}
           onChange={setMontantChoisi}
-          affichage={`${formaterEuros(capitalCentimes ?? 0)} €`}
+          saisie="euros"
+          bornesSaisie={bornesSaisie}
           aide={`Jusqu'à ${formaterEuros(capacite.montantMaximal)} € aujourd'hui : le plus gros prêt que la banque accepte pour cet objet.`}
         />
 

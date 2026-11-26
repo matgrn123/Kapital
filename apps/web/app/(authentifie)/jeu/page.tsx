@@ -14,7 +14,7 @@ import {
   SurTitre,
 } from "../../../components/ui";
 import { formaterDateHeure, formaterEuros } from "../../../lib/formatage";
-import { libelleGamme, libelleLisible } from "../../../lib/lisible";
+import { libelleGamme, libelleLisible, nomLisibleSociete } from "../../../lib/lisible";
 import { chargerProgressionMissions } from "../../../lib/missions";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import {
@@ -373,7 +373,7 @@ export default async function PageJeu() {
             </div>
             {premier ? (
               <>
-                <h4 className="text-base font-bold">{premier.nom} en tête du classement</h4>
+                <h4 className="text-base font-bold">{nomLisibleSociete(premier.nom)} en tête du classement</h4>
                 <p className="mb-2.5 text-[0.84rem] text-muted">
                   Valeur de l&apos;entreprise : {euros(premier.valeur_centimes)}, sur {rangs.length} sociétés en lice.
                 </p>

@@ -8,7 +8,6 @@ import {
   horsBatiments,
   idBoutique,
   idLocal,
-  nomLisibleSociete,
   placerActeurs,
   raccourcirEnseigne,
   type ActeurVillage,
@@ -145,13 +144,5 @@ describe("raccourcirEnseigne", () => {
     expect(raccourcirEnseigne("Atelier du Nord")).toBe("ATELIER DU NORD");
     expect(raccourcirEnseigne("Une société au nom vraiment très long", 12)).toBe("UNE SOCIÉTÉ");
     expect(raccourcirEnseigne("Anticonstitutionnellement", 10)).toBe("ANTICONST…");
-  });
-});
-
-describe("nomLisibleSociete", () => {
-  it("retire le préfixe technique des sociétés du jeu", () => {
-    expect(nomLisibleSociete("PNJ_Bazaar Mode")).toBe("Bazaar Mode");
-    expect(nomLisibleSociete("PNJ_Noble_Couture")).toBe("Noble Couture");
-    expect(nomLisibleSociete("Robot Testeur")).toBe("Robot Testeur");
   });
 });

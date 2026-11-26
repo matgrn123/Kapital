@@ -13,7 +13,7 @@ import {
 } from "../../../../lib/empire";
 import { formaterEuros } from "../../../../lib/formatage";
 import { creerClientServeur } from "../../../../lib/supabase/server";
-import { nomLisibleSociete } from "../../../../lib/vue3d";
+import { nomLisibleSociete } from "../../../../lib/lisible";
 import { VignetteBatiment } from "../../empire/VignetteBatiment";
 
 // 3D-8 : profil public d'une société, lisible par tous les joueurs connectés.

@@ -101,11 +101,6 @@ export function horsBatiments<T extends { readonly x: number; readonly y: number
   return decor.filter((o) => !places.some((p) => o.x > p.x - marge && o.x < p.x + p.w + marge && o.y > p.y - marge && o.y < p.y + p.d + marge));
 }
 
-/** Nom affiché d'une société : sans le préfixe technique « PNJ_ » ni tirets bas. */
-export function nomLisibleSociete(nom: string): string {
-  return nom.replace(/^PNJ_/, "").replace(/_/g, " ").trim();
-}
-
 /** Texte d'enseigne : en capitales ; s'il est trop long, les premiers mots qui tiennent, sinon coupé. */
 export function raccourcirEnseigne(nom: string, max = 16): string {
   const t = nom.toLocaleUpperCase("fr-FR");
