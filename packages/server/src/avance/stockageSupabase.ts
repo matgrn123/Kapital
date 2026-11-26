@@ -185,17 +185,30 @@ export type LignePointDeVente = {
   duree_amortissement_mois: number;
   mois_signature: number;
   mois_ouverture: number;
+  /** T3 (migration 0045) : instant réel de la fin des travaux ; absent ou null avant. */
+  ouverture_le?: string | null;
   stock_boutique: { product_id: string; quantite_pieces: number; valeur_totale_centimes: number }[] | null;
 };
 
 /**
+ * Colonnes lues pour les boutiques : « * » prend ouverture_le (0045) quand la colonne existe,
+ * sans casser la lecture avant la migration (même principe que prix_boutique_centimes).
+ */
+export const SELECTION_POINTS_DE_VENTE = "*, stock_boutique(product_id, quantite_pieces, valeur_totale_centimes)";
+
+/**
  * Boutiques lues en base, complétées par le catalogue (passants, bonus de désirabilité) et par
  * les amortissements déjà passés (écritures 28135 « boutique_amort_<mois>_<id> » de chacune).
+ *
+ * T3 : l'instant d'ouverture (ouverture_le, instant réel) devient l'heure du jeu en retirant
+ * `debutReelMs` (worlds.debut_reel, comme les livraisons). Par défaut 0 : l'instant est gardé
+ * tel quel (production, et écrans qui le comparent à l'heure réelle).
  */
 export function pointsDeVenteDepuisLignes(
   lignes: readonly LignePointDeVente[] | null | undefined,
   amortissements: readonly { ecriture_id: string; sens: string; montant_centimes: number }[],
   catalogue: readonly TypeBatiment[],
+  debutReelMs = 0,
 ): PointDeVente[] {
   if (!lignes || lignes.length === 0) return [];
   const reference = passantsReferenceBoutiques(catalogue);
@@ -207,6 +220,7 @@ export function pointsDeVenteDepuisLignes(
       if (!a.ecriture_id.startsWith(PREFIXE_AMORTISSEMENT_AGENCEMENT) || !a.ecriture_id.endsWith(`_${l.id}`)) continue;
       amorti += a.sens === "credit" ? Number(a.montant_centimes) : -Number(a.montant_centimes);
     }
+    const ouvertureReelle = l.ouverture_le ? Date.parse(l.ouverture_le) : Number.NaN;
     return {
       id: l.id,
       batimentId: l.batiment_id,
@@ -216,6 +230,7 @@ export function pointsDeVenteDepuisLignes(
       depotGarantie: centimes(Number(l.depot_garantie_centimes)),
       moisSignature: moisJeu(l.mois_signature),
       moisOuverture: moisJeu(l.mois_ouverture),
+      ...(Number.isFinite(ouvertureReelle) ? { ouvertureMs: ouvertureReelle - debutReelMs } : {}),
       agencement: {
         valeurBrute: centimes(Number(l.travaux_centimes)),
         amortissementsCumules: centimes(amorti),
@@ -300,6 +315,11 @@ export type ChargeUtilePas = {
   readonly commandes_matiere_livrees: readonly string[];
   readonly ordres_faconnier_livres: readonly string[];
   readonly cumul: CumulMois | null;
+  /**
+   * T3 (migration 0045) : instant réel de la fin du lot (ISO). La base y applique les plans
+   * d'aménagement dont workshops.plan_prevu_le est atteint. Ignoré avant la migration.
+   */
+  readonly instant_fin_lot?: string;
 };
 
 export function chargeUtileDepuisLot(lot: ResultatLotAEnregistrer): ChargeUtilePas {
@@ -355,6 +375,7 @@ export function chargeUtileDepuisLot(lot: ResultatLotAEnregistrer): ChargeUtileP
     commandes_matiere_livrees: lot.commandesMatiereLivrees,
     ordres_faconnier_livres: lot.ordresFaconnierLivres,
     cumul: lot.cumul,
+    ...(lot.finDuLotMs === undefined ? {} : { instant_fin_lot: new Date(lot.finDuLotMs).toISOString() }),
   };
 }
 
@@ -468,7 +489,7 @@ export class StockageSupabase implements StockageMonde {
     }
   }
 
-  async chargerEtat(companyId: string, moisEnCours: number): Promise<EtatChargeEntreprise> {
+  async chargerEtat(companyId: string, moisEnCours: number, debutReelMs = 0): Promise<EtatChargeEntreprise> {
     const [companyR, matR, pfR, empR, atelierR, pretsR, produitsR, marqueR, etatR, materielR, boutiquesR, amortBoutiqueR] =
       await Promise.all([
         this.supabase
@@ -523,7 +544,7 @@ export class StockageSupabase implements StockageMonde {
           .in("compte", ["2154", "2815"]),
         this.supabase
           .from("points_de_vente")
-          .select("id, batiment_id, surface_m2, loyer_mensuel_centimes, charges_mensuelles_centimes, depot_garantie_centimes, travaux_centimes, duree_amortissement_mois, mois_signature, mois_ouverture, stock_boutique(product_id, quantite_pieces, valeur_totale_centimes)")
+          .select(SELECTION_POINTS_DE_VENTE)
           .eq("company_id", companyId)
           .eq("statut", "actif")
           .order("cree_le"),
@@ -578,6 +599,7 @@ export class StockageSupabase implements StockageMonde {
         ? []
         : ((verifier("ledger 28135", amortBoutiqueR) ?? []) as Array<{ ecriture_id: string; sens: string; montant_centimes: number }>),
       chargerBatimentsV1(),
+      debutReelMs,
     );
 
     const entreprise: Entreprise = {

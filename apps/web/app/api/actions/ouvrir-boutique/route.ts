@@ -9,6 +9,8 @@ import {
 } from "@kapital/engine";
 import { verifierDeblocageEtape } from "@kapital/server";
 import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
+import { fonctionAbsente } from "../../../../lib/rpc";
+import { instantDuJeu } from "../../../../lib/cadre";
 
 export const runtime = "nodejs";
 
@@ -16,7 +18,8 @@ export const runtime = "nodejs";
 // bâtiments (catégorie boutique), le dépôt, les travaux et leur durée des paramètres boutique_* ;
 // le moteur calcule tout (apercuOuvertureBoutique). La fonction SQL ouvrir_boutique enregistre la
 // boutique et ses deux écritures (275 / 512 dépôt, 2135 / 512 travaux) dans une seule transaction.
-// La boutique ouvre après les travaux (mois de signature + boutique_travaux_duree_mois).
+// T3 (horloge réelle) : la boutique ouvre à un instant précis, la signature plus
+// boutique_travaux_duree_heures (24 h réelles) ; points_de_vente.ouverture_le (migration 0045).
 
 export async function POST(request: Request) {
   const ctx = await chargerContexte();
@@ -63,12 +66,25 @@ export async function POST(request: Request) {
   }
 
   const params = chargerParametresV1();
+  // Heure du jeu de la signature (en production, l'heure réelle ; en recette, l'outil
+  // « avancer le temps » met le jeu en avance) : elle fixe le mois d'ouverture.
+  const maintenant = Date.now();
+  const { data: monde } = await ctx.supabaseAdmin
+    .from("worlds")
+    .select("debut_reel")
+    .eq("etat", "actif")
+    .limit(1)
+    .maybeSingle();
+  const signatureJeu = instantDuJeu(maintenant, (monde as { debut_reel?: string | null } | null)?.debut_reel ?? null);
   const apercu = apercuOuvertureBoutique({
     batiment,
     params,
     mois: moisJeu(ctx.moisCourant),
+    instantMs: signatureJeu,
     tresorerie: centimes(ctx.companyTresorerie),
   });
+  // Instant réel de l'ouverture, comme les livraisons : maintenant + durée des travaux.
+  const ouvertureLe = new Date(maintenant + (apercu.ouvertureMs - signatureJeu)).toISOString();
   if (!apercu.tresorerieSuffisante) {
     return NextResponse.json(
       {
@@ -81,7 +97,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data, error } = await ctx.supabaseAdmin.rpc("ouvrir_boutique", {
+  const argumentsBoutique = {
     p_company_id: ctx.companyId,
     p_batiment_id: batiment.id,
     p_surface_m2: apercu.surfaceM2,
@@ -92,7 +108,15 @@ export async function POST(request: Request) {
     p_duree_amortissement_mois: params["boutique_amortissement_agencement_mois"]!.valeur,
     p_mois_signature: apercu.moisSignature,
     p_mois_ouverture: apercu.moisOuverture,
+  };
+  let { data, error } = await ctx.supabaseAdmin.rpc("ouvrir_boutique", {
+    ...argumentsBoutique,
+    p_ouverture_le: ouvertureLe,
   });
+  // Base pas encore migrée (0045) : l'ancienne fonction, ouverture au mois comme avant.
+  if (fonctionAbsente(error)) {
+    ({ data, error } = await ctx.supabaseAdmin.rpc("ouvrir_boutique", argumentsBoutique));
+  }
   if (error) {
     if (error.message.startsWith("boutique_deja_ouverte")) {
       return NextResponse.json({ error: "Vous avez déjà une boutique.", code: "boutique_deja_ouverte" }, { status: 409 });
@@ -111,5 +135,6 @@ export async function POST(request: Request) {
     depotGarantieCentimes: apercu.depotGarantie,
     travauxCentimes: apercu.travaux,
     moisOuverture: apercu.moisOuverture,
+    ouvertureLe,
   });
 }

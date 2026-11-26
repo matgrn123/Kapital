@@ -10,6 +10,7 @@ import {
   ecritureVenteBoutique,
   parametresBoutiqueDepuis,
   pointsDeVenteOuverts,
+  premierPasOuvert,
   sortirDesBoutiques,
 } from "../boutique/boutique.js";
 import { coefficientsMarketingDepuisParametres, fluxMarque } from "../marketing/index.js";
@@ -39,6 +40,7 @@ import {
   piecesPermisesParLaMatiere,
 } from "./fabrication.js";
 import type { CumulMois, DonneesFlux } from "./donneesMois.js";
+import { debutDuMoisMs, finDuMoisMs } from "./temps.js";
 
 // ---------------------------------------------------------------------------
 // Utilitaires partagés avec la clôture de fin de mois
@@ -277,6 +279,11 @@ export function avancerFlux(
   const { params, mois, pasDebut, pasFin, pasParMois, suffixeId } = ctx;
   // Part du mois vécue par l'entreprise depuis son démarrage, à la fin de ce flux
   const pasVecus = pasFin - cumulAvant.pasDemarrage;
+  // T3 : instant de la fin de ce flux (heure du jeu) : une boutique dont les travaux finissent
+  // avant compte comme ouverte pendant ce flux. Proportionnel à la part du mois, pour qu'un mois
+  // pris d'un bloc (pasParMois = 1) aille jusqu'à la fin du mois.
+  const debutMoisMs = debutDuMoisMs(mois);
+  const finFluxMs = debutMoisMs + Math.floor(((finDuMoisMs(mois) - debutMoisMs) * pasFin) / pasParMois);
   let ent = { ...entreprise };
   let gl: GrandLivre = planComptableV1();
   const ecritures: EcritureComptable[] = [];
@@ -424,7 +431,7 @@ export function avancerFlux(
   };
   // AE-10 : chaque boutique ouverte ajoute le bonus de son emplacement (points par mois,
   // catalogue des bâtiments) à la désirabilité, au prorata de la part du mois écoulée.
-  const bonusBoutiques = pointsDeVenteOuverts(ent, mois).reduce((s, p) => s + p.bonusDesirabiliteParMois, 0);
+  const bonusBoutiques = pointsDeVenteOuverts(ent, mois, finFluxMs).reduce((s, p) => s + p.bonusDesirabiliteParMois, 0);
   if (bonusBoutiques > 0) {
     const desirabilite = ent.marque.desirabilite + (bonusBoutiques * (pasFin - pasDebut)) / pasParMois;
     ent = { ...ent, marque: { ...ent.marque, desirabilite: Math.min(100, desirabilite) } };
@@ -469,15 +476,21 @@ export function avancerFlux(
 
   let stocksFinis = ent.stocksFinis;
 
-  // AE-10 : boutiques ouvertes ce mois (pendant les travaux, aucune vente) et plafond des
-  // vendeurs, cumulé depuis le début du mois comme la demande : vendeurs × ventes max × part du mois.
+  // AE-10 : boutiques ouvertes pendant ce flux (pendant les travaux, aucune vente) et plafond
+  // des vendeurs, cumulé depuis le début du mois comme la demande : vendeurs × ventes max × part
+  // du mois. T3 : le mois de l'ouverture, la part court depuis l'ouverture (avant, la demande de la
+  // boutique n'est pas servie ; elle n'est pas comptée en ventes perdues, voir cloture.ts).
   let pointsDeVente = ent.pointsDeVente ?? [];
-  const ouverts = new Set(pointsDeVenteOuverts(ent, mois).map((p) => p.id));
+  const boutiquesOuvertes = pointsDeVenteOuverts(ent, mois, finFluxMs);
+  const ouverts = new Set(boutiquesOuvertes.map((p) => p.id));
+  const pasVendeurs =
+    pasFin - Math.max(cumulAvant.pasDemarrage, premierPasOuvert(boutiquesOuvertes, mois, pasParMois));
   const plafondVendeursCumule =
     ouverts.size === 0
       ? 0
       : Math.floor(
-          (capaciteVendeursMois(ent, mois, parametresBoutiqueDepuis(params)) * pasVecus) / pasParMois,
+          (capaciteVendeursMois(ent, mois, parametresBoutiqueDepuis(params), finFluxMs) * Math.max(0, pasVendeurs)) /
+            pasParMois,
         );
   const serviBoutique = (): number =>
     Object.entries(serviParLigne).reduce((s, [cle, q]) => (cle.endsWith("|boutique") ? s + q : s), 0);

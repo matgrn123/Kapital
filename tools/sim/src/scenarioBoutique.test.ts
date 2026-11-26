@@ -6,7 +6,7 @@ import { creerEntreprise, ouvrirBoutique } from "./pilote.js";
 import { jouerScenarioBoutique, missionsDuBanc, POLITIQUE_BOUTIQUE } from "./scenarioBoutique.js";
 
 // AE-11 : banc prolongé à 36 mois. Le joueur du scénario solo fait de la publicité dès l'étape 1,
-// atteint l'étape 3, ouvre une boutique (un mois de travaux), embauche un vendeur et y envoie
+// atteint l'étape 3, ouvre une boutique (24 h de travaux, lot T3), embauche un vendeur et y envoie
 // du stock. Garde-fou monétaire (3D-9) à chaque clôture, missions évaluées avec la règle du site.
 
 const { etat, journal } = jouerScenarioBoutique({ mois: 36, graine: 7 });
@@ -47,9 +47,11 @@ describe("AE-11 · banc de 36 mois jusqu'à la boutique", () => {
     expect(etapeRequisePour("ouverture_boutique")).toBe(3);
   });
 
-  it("aucune vente pendant le mois de travaux, puis des ventes plafonnées par le vendeur", () => {
+  it("24 h de travaux : elle ouvre le mois de la signature, puis des ventes plafonnées par le vendeur", () => {
     expect(pdv).toBeDefined();
-    expect(ventesBoutique(pdv!.moisSignature)).toHaveLength(0);
+    // T3 : la signature a lieu au début du mois (banc d'essai), l'ouverture 24 h plus tard.
+    expect(pdv!.moisOuverture).toBe(pdv!.moisSignature);
+    expect(pdv!.ouvertureMs).toBeDefined();
     const plafond = PARAMS["vendeur_ventes_max_pieces_par_mois"]!.valeur;
     for (let m = pdv!.moisOuverture; m < 36; m++) {
       const pieces = ventesBoutique(m).reduce((s, e) => s + Number(/Vente boutique (\d+)/.exec(e.libelle)![1]), 0);

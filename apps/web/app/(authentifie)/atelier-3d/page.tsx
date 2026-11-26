@@ -2,6 +2,7 @@ import { chargerBatimentsV1, chargerModulesV1, chargerParametresV1 } from "@kapi
 import { BoutonLien, Carte, EnTete, Etapes } from "../../../components/ui";
 import { postesFournisDepuisParametres, valeurNetteMaterielEnService } from "../../../lib/amenagement";
 import { postesPoses } from "../../../lib/api-helpers";
+import { versQuand } from "../../../lib/cadre";
 import { localAffiche, salariesDuLocal } from "../../../lib/locaux";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { EcranAtelier } from "./EcranAtelier";
@@ -10,8 +11,9 @@ import type { SalarieFiche } from "./salaries";
 
 // Écran « L'atelier » (design V2, maquette V.atelier), dessiné en SVG isométrique.
 // placed_modules.x / y comptent les cases à partir de 1 (convention de validerPlanEtage).
-// 3D-5 : placed_modules.statut sépare le plan en service ('actif') du plan prévu ('prevu'),
-// appliqué à la clôture du mois de jeu (migration 0037).
+// 3D-5 : placed_modules.statut sépare le plan en service ('actif') du plan prévu ('prevu').
+// T3 (horloge réelle) : le plan prévu entre en service à workshops.plan_prevu_le, 2 h après sa
+// sauvegarde (migration 0045) ; sans cette heure (plan d'avant 0045), à la clôture du mois.
 // 3D-7 : une société peut avoir plusieurs locaux ; ?local=<id> choisit celui qu'on aménage
 // (par défaut le plus ancien), et un sélecteur passe de l'un à l'autre.
 
@@ -28,6 +30,8 @@ type Employe = {
 type Workshop = {
   id: string; batiment_id: string | null; surface_m2: number; largeur_grille: number; hauteur_grille: number;
   entree_x: number; entree_y: number; plan_prevu_mois: number | null; plan_prevu_cout_centimes: number | null;
+  /** T3 (0045) : absent avant la migration. */
+  plan_prevu_le?: string | null;
   placed_modules: { module_type_id: string; x: number; y: number; pivote: boolean | null; statut: string | null }[] | null;
 };
 
@@ -41,7 +45,8 @@ export default async function PageAtelier({ searchParams }: { searchParams: Prom
   const [{ data: workshops }, { data: employes }, { data: monde }] = await Promise.all([
     supabase
       .from("workshops")
-      .select("id, batiment_id, surface_m2, largeur_grille, hauteur_grille, entree_x, entree_y, plan_prevu_mois, plan_prevu_cout_centimes, placed_modules(module_type_id, x, y, pivote, statut)")
+      // « * » : plan_prevu_le (migration 0045) est lu quand la colonne existe.
+      .select("*, placed_modules(module_type_id, x, y, pivote, statut)")
       .eq("company_id", entreprise.id)
       .order("cree_le"),
     supabase
@@ -96,6 +101,8 @@ export default async function PageAtelier({ searchParams }: { searchParams: Prom
   const planActif = versPlan("actif");
   const aPlanPrevu = w.plan_prevu_mois !== null && w.plan_prevu_mois !== undefined;
   const coutPlanPrevu = aPlanPrevu ? Number(w.plan_prevu_cout_centimes ?? 0) : 0;
+  // Heure de mise en service du plan prévu, lisible : « vers 12 h 21 (dans 2 h) ».
+  const planPrevuQuand = aPlanPrevu && w.plan_prevu_le ? versQuand(w.plan_prevu_le, Date.now()) : null;
   const parametres = chargerParametresV1();
 
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
@@ -125,6 +132,7 @@ export default async function PageAtelier({ searchParams }: { searchParams: Prom
       planActif={planActif}
       planPrevu={aPlanPrevu ? versPlan("prevu") : null}
       coutPlanPrevu={coutPlanPrevu}
+      planPrevuQuand={planPrevuQuand}
       tresorerie={Number(entreprise.tresorerie_centimes)}
       postesFournis={postesFournisDepuisParametres(parametres)}
       valeurNetteMateriel={valeurNetteMaterielEnService(

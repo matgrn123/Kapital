@@ -1,7 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { chargerModulesV1, chargerParametresV1 } from "@kapital/content";
 import { MODULE_POSE_A_LA_SIGNATURE } from "@kapital/engine";
-import { deciderAmenagement, postesFournisDepuisParametres, retraitsAchetes, valeurNetteMaterielEnService } from "./amenagement";
+import {
+  deciderAmenagement,
+  delaiMiseEnPlaceAmenagementMs,
+  postesFournisDepuisParametres,
+  retraitsAchetes,
+  valeurNetteMaterielEnService,
+} from "./amenagement";
+
+describe("delaiMiseEnPlaceAmenagementMs (T3)", () => {
+  it("le plan entre en service 2 h réelles après sa sauvegarde (paramètre amenagement_delai_heures)", () => {
+    const params = chargerParametresV1();
+    expect(delaiMiseEnPlaceAmenagementMs(params)).toBe(2 * 3_600_000);
+    expect(delaiMiseEnPlaceAmenagementMs({ ...params, amenagement_delai_heures: { ...params["amenagement_delai_heures"]!, valeur: 0.5 } })).toBe(1_800_000);
+  });
+
+  it("refuse un paramètre manquant ou négatif", () => {
+    const { amenagement_delai_heures: _retire, ...sans } = chargerParametresV1();
+    expect(() => delaiMiseEnPlaceAmenagementMs(sans)).toThrow(/amenagement_delai_heures/);
+    const params = chargerParametresV1();
+    expect(() =>
+      delaiMiseEnPlaceAmenagementMs({ ...params, amenagement_delai_heures: { ...params["amenagement_delai_heures"]!, valeur: -1 } }),
+    ).toThrow(/>= 0/);
+  });
+});
 
 describe("valeurNetteMaterielEnService", () => {
   it("2154 − 2815, sans la commande du plan prévu pas encore posée", () => {

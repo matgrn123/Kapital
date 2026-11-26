@@ -45,6 +45,8 @@ export function offresEmplacements(args: {
   readonly catalogue: readonly TypeBatiment[];
   readonly params: Parametres;
   readonly mois: number;
+  /** Instant de la signature si elle avait lieu maintenant (ms) : fixe l'heure d'ouverture affichée. */
+  readonly instantMs?: number;
   readonly tresorerie: number;
   readonly margeParPiece: number | null;
 }): OffreEmplacement[] {
@@ -56,12 +58,14 @@ export function offresEmplacements(args: {
       batiment: b,
       params: args.params,
       mois: moisJeu(args.mois),
+      ...(args.instantMs === undefined ? {} : { instantMs: args.instantMs }),
       tresorerie: centimes(args.tresorerie),
     });
     const pdv = nouveauPointDeVente({
       id: "apercu",
       batiment: b,
       mois: moisJeu(args.mois),
+      ...(args.instantMs === undefined ? {} : { instantMs: args.instantMs }),
       params: args.params,
       passantsReference: reference,
     });

@@ -17,7 +17,7 @@ import {
 import { chargerPointsDeVenteSupabase } from "@kapital/server";
 import { BoutonLien, Carte, EncadreNotion, FilRouge, Jauge, Kpi, Puce } from "../../../components/ui";
 import { EnTete, Ligne, Note } from "../../../components/ui/formulaire";
-import { enMois, libelleMois } from "../../../lib/cadre";
+import { dateHeureLisible, enMois, libelleMois, versQuand } from "../../../lib/cadre";
 import { formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { conditionsBoutique } from "../societe/donnees";
@@ -65,6 +65,8 @@ export default async function PageMagasin() {
     ]);
 
   const params = chargerParametresV1();
+  // Les instants des boutiques (ouverture_le) sont des instants réels : comparés à l'heure réelle.
+  const maintenant = Date.now();
   const seuils = seuilsEtapesDepuis(params);
   const pb = parametresBoutiqueDepuis(params);
   const tva = params["tva_standard"]!.valeur;
@@ -148,6 +150,7 @@ export default async function PageMagasin() {
       catalogue: chargerBatimentsV1(),
       params,
       mois: moisCourant,
+      instantMs: maintenant,
       tresorerie,
       margeParPiece: marge,
     });
@@ -206,6 +209,7 @@ export default async function PageMagasin() {
               <ChoixEmplacement
                 offres={offres}
                 tresorerie={tresorerie}
+                maintenantMs={maintenant}
                 peutOuvrir={peutOuvrir}
                 ventesMaxParVendeur={pb.ventesMaxParVendeur}
               />
@@ -221,7 +225,8 @@ export default async function PageMagasin() {
   }
 
   // -------------------------------------------------------------------------- Boutique signée
-  const ouverte = boutiqueOuverte(boutique, moisJeu(moisCourant));
+  const ouverte = boutiqueOuverte(boutique, moisJeu(moisCourant), maintenant);
+  const ouvertureMs = boutique.ouvertureMs;
   const nom = chargerBatimentsV1().find((b) => b.id === boutique.batimentId)?.nom ?? "Ta boutique";
   const stockBoutique = boutique.stock.reduce((s, l) => s + l.quantite, 0);
   const margeBoutique =
@@ -280,16 +285,20 @@ export default async function PageMagasin() {
         titre={nom}
         action={
           ouverte ? (
-            <Puce ton="bon">Ouverte depuis {libelleMois(boutique.moisOuverture)}</Puce>
+            <Puce ton="bon">
+              Ouverte depuis {ouvertureMs === undefined ? libelleMois(boutique.moisOuverture) : dateHeureLisible(ouvertureMs)}
+            </Puce>
           ) : (
-            <Puce ton="alerte">En travaux · ouverture {enMois(boutique.moisOuverture)}</Puce>
+            <Puce ton="alerte">
+              En travaux · ouverture {ouvertureMs === undefined ? enMois(boutique.moisOuverture) : versQuand(ouvertureMs, maintenant)}
+            </Puce>
           )
         }
       >
         <p className="text-[0.88rem] text-muted">
           {ouverte
             ? "Les passants entrent, les vendeurs vendent ce qu'il y a en rayon. Le loyer, les charges et les salaires tombent à la fin de chaque mois."
-            : `Bail signé ${enMois(boutique.moisSignature)}. Pendant les travaux, le loyer court mais la boutique ne vend rien : prépare l'ouverture (vendeur, stock).`}
+            : `Bail signé ${enMois(boutique.moisSignature)}. Pendant les ${pb.dureeTravauxHeures.toLocaleString("fr-FR")} h de travaux, le loyer court mais la boutique ne vend rien : prépare l'ouverture (vendeur, stock).`}
         </p>
         <div className="mt-3">
           <BoutonLien href="/vue-3d" petit>

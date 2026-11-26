@@ -1,13 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { chargerBatimentsV1 } from "@kapital/content";
 import type { PointDeVente } from "@kapital/engine";
-import { pointsDeVenteDepuisLignes, type LignePointDeVente } from "../avance/stockageSupabase.js";
+import {
+  pointsDeVenteDepuisLignes,
+  SELECTION_POINTS_DE_VENTE,
+  type LignePointDeVente,
+} from "../avance/stockageSupabase.js";
 
 // AE-10 : lecture des boutiques d'une société (routes, écran Magasin, village). Même
 // conversion que le moteur (pointsDeVenteDepuisLignes) : un seul endroit sait lire la table.
 
-export const COLONNES_POINTS_DE_VENTE =
-  "id, batiment_id, surface_m2, loyer_mensuel_centimes, charges_mensuelles_centimes, depot_garantie_centimes, travaux_centimes, duree_amortissement_mois, mois_signature, mois_ouverture, stock_boutique(product_id, quantite_pieces, valeur_totale_centimes)";
+/** T3 : « * » lit aussi ouverture_le (migration 0045) quand la colonne existe. */
+export const COLONNES_POINTS_DE_VENTE = SELECTION_POINTS_DE_VENTE;
 
 /**
  * Boutiques actives de la société, avec leur stock et leurs amortissements déjà passés.

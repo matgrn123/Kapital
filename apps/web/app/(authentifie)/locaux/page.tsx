@@ -12,7 +12,7 @@ import { reglesPretV1 } from "@kapital/server";
 import { BandeauEtape, BoutonLien, Carte, EncadreNotion, EnTete, Etapes, Faits, FilRouge, Puce, Succes } from "../../../components/ui";
 import { messageSignature, PARAM_SIGNATURE } from "../../../lib/locaux";
 import { apercuBail } from "../../../lib/apercu-lot4";
-import { enMois } from "../../../lib/cadre";
+import { enMois, estIndexCalendaire, finDuMoisLisible } from "../../../lib/cadre";
 import { formaterEuros } from "../../../lib/formatage";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { COLONNES_MODULES_POSES, postesPoses, type AvecModulesPoses } from "../../../lib/api-helpers";
@@ -88,6 +88,7 @@ export default async function PageLocaux({
   ]);
   const locaux = (lignes ?? []) as Local[];
   const moisCourant = Number((monde as { mois_courant?: number } | null)?.mois_courant ?? 0);
+  const maintenant = Date.now();
   const prets = (pretsActifs ?? []) as Array<{ id: string; objet: string | null; capital_restant_centimes: number }>;
   const detteEnCours = prets.reduce((s, p) => s + Number(p.capital_restant_centimes), 0);
   const catalogue = chargerBatimentsV1().filter((b) => b.categorie === "atelier");
@@ -213,12 +214,20 @@ export default async function PageLocaux({
                 <div>
                   {local.mois_fin !== null ? (
                     <p className="text-[0.9rem]">
-                      Congé donné : le bail prend fin {enMois(local.mois_fin)}
-                      {local.mois_fin > moisCourant ? ` (dans ${local.mois_fin - moisCourant} mois)` : ""}. Le loyer reste
-                      dû jusque-là, puis le dépôt de garantie t&apos;est rendu.
+                      Congé donné : le bail prend fin{" "}
+                      {estIndexCalendaire(local.mois_fin)
+                        ? `le ${finDuMoisLisible(local.mois_fin, maintenant)}`
+                        : enMois(local.mois_fin)}
+                      . Le loyer reste dû jusque-là, puis le dépôt de garantie t&apos;est rendu.
                     </p>
                   ) : (
-                    <BoutonConge preavisMois={bail.preavisMois} workshopId={local.id} />
+                    <BoutonConge
+                      preavisMois={bail.preavisMois}
+                      workshopId={local.id}
+                      finSiConge={
+                        estIndexCalendaire(moisCourant) ? finDuMoisLisible(moisCourant + bail.preavisMois, maintenant) : null
+                      }
+                    />
                   )}
                 </div>
               </div>
@@ -297,8 +306,9 @@ export default async function PageLocaux({
           paies plus de loyer, mais des intérêts et un amortissement.
         </EncadreNotion>
         <EncadreNotion titre="Le préavis">
-          Un bail ne s&apos;arrête pas du jour au lendemain : après le congé, tu paies encore {bail.preavisMois} mois de
-          loyer. Le dépôt de garantie, {bail.depotMoisDeLoyer} mois de loyer, revient en banque à la fin du bail.
+          Un bail ne s&apos;arrête pas du jour au lendemain : après le congé, tu paies encore le loyer jusqu&apos;à la fin
+          du {bail.preavisMois === 1 ? "mois suivant" : `${bail.preavisMois}e mois qui suit`} (préavis de {bail.preavisMois} mois).
+          Le dépôt de garantie, {bail.depotMoisDeLoyer} mois de loyer, revient en banque à la fin du bail.
         </EncadreNotion>
       </div>
       <FilRouge ecran="locaux" />

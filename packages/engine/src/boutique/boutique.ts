@@ -12,12 +12,18 @@ import type {
   Salarie,
 } from "../types/entreprise.js";
 import { centimes, type Centimes, type IdProduit, type MoisJeu } from "../types/primitifs.js";
+import { debutDuMoisMs, finDuMoisMs, moisDeLInstantMs } from "../moteur/temps.js";
 import { prixHtDepuisTtc } from "../ventes/ventes.js";
 
 // AE-10 : la boutique (point de vente). Fonctions pures : les montants de l'emplacement
 // (loyer, charges, surface, passants, bonus) viennent du catalogue des bâtiments
 // (catégorie boutique), les règles (travaux au m², durée des travaux, amortissement,
 // dépôt, vendeur) des paramètres sourcés boutique_* et vendeur_*.
+//
+// Horloge réelle (lot T3, décision du 26 novembre 2026) : les travaux durent
+// boutique_travaux_duree_heures heures réelles (24 h) ; la boutique ouvre à un instant précis,
+// signature + durée des travaux, et non plus « le mois suivant ». Les instants sont en heure
+// du jeu (millisecondes, voir moteur/temps.ts) ; le loyer et l'amortissement restent mensuels.
 //
 // Comptabilité (à valider par Mathieu) :
 //   ouverture   275 / 512 (dépôt de garantie)  et  2135 / 512 (travaux d'agencement)
@@ -38,7 +44,8 @@ export class ErreurBoutique extends Error {
 
 export type ParametresBoutique = {
   readonly travauxCentimesParM2: number;
-  readonly dureeTravauxMois: number;
+  /** Durée des travaux d'agencement, en heures réelles (boutique_travaux_duree_heures). */
+  readonly dureeTravauxHeures: number;
   readonly amortissementAgencementMois: number;
   readonly depotMoisDeLoyer: number;
   readonly salaireVendeur: Centimes;
@@ -57,12 +64,25 @@ function entierPositifOuNul(params: Parametres, cle: string): number {
   return v;
 }
 
+function positifOuNul(params: Parametres, cle: string): number {
+  const v = lire(params, cle);
+  if (v < 0) throw new ErreurBoutique(`${cle} doit être >= 0, reçu ${v}.`);
+  return v;
+}
+
+const MS_PAR_HEURE = 3_600_000;
+
+/** Durée des travaux en millisecondes (entier). */
+export function dureeTravauxMs(p: ParametresBoutique): number {
+  return Math.round(p.dureeTravauxHeures * MS_PAR_HEURE);
+}
+
 export function parametresBoutiqueDepuis(params: Parametres): ParametresBoutique {
   const amort = entierPositifOuNul(params, "boutique_amortissement_agencement_mois");
   if (amort === 0) throw new ErreurBoutique("boutique_amortissement_agencement_mois doit être > 0.");
   return {
     travauxCentimesParM2: entierPositifOuNul(params, "boutique_travaux_amenagement_centimes_par_m2"),
-    dureeTravauxMois: entierPositifOuNul(params, "boutique_travaux_duree_mois"),
+    dureeTravauxHeures: positifOuNul(params, "boutique_travaux_duree_heures"),
     amortissementAgencementMois: amort,
     depotMoisDeLoyer: lire(params, "boutique_depot_garantie_mois_de_loyer"),
     salaireVendeur: centimes(entierPositifOuNul(params, "vendeur_salaire_brut_mensuel_centimes")),
@@ -114,8 +134,11 @@ export type ApercuOuvertureBoutique = {
   /** Dépôt + travaux : ce qui sort de la banque à la signature. */
   readonly totalALaSignature: Centimes;
   readonly moisSignature: MoisJeu;
+  /** Instant d'ouverture (heure du jeu, ms) : signature + durée des travaux. */
+  readonly ouvertureMs: number;
+  /** Mois de jeu qui contient l'instant d'ouverture (l'amortissement commence ce mois-là). */
   readonly moisOuverture: MoisJeu;
-  readonly dureeTravauxMois: number;
+  readonly dureeTravauxHeures: number;
   readonly amortissementMensuel: Centimes;
   /** Coût employeur d'un vendeur payé au salaire du paramètre. */
   readonly coutEmployeurVendeur: Centimes;
@@ -154,11 +177,30 @@ function coutEmployeurVendeur(params: Parametres, salaireBrut: Centimes): Centim
   });
 }
 
+/**
+ * Instant et mois d'ouverture d'une boutique signée au mois `mois`, à l'instant `instantMs`
+ * (heure du jeu ; par défaut le début du mois de signature). Le mois d'ouverture n'est jamais
+ * avant le mois de signature (contrainte de points_de_vente).
+ */
+export function ouvertureBoutique(
+  mois: MoisJeu,
+  instantMs: number | undefined,
+  p: ParametresBoutique,
+): { readonly ouvertureMs: number; readonly moisOuverture: MoisJeu } {
+  const signature = instantMs ?? debutDuMoisMs(mois);
+  if (!Number.isFinite(signature)) throw new ErreurBoutique(`Instant de signature invalide : ${signature}.`);
+  const ouvertureMs = signature + dureeTravauxMs(p);
+  return { ouvertureMs, moisOuverture: Math.max(mois, moisDeLInstantMs(ouvertureMs)) as MoisJeu };
+}
+
 /** Tout ce que coûte l'ouverture d'un emplacement, sans rien écrire (aperçu de l'écran Magasin). */
 export function apercuOuvertureBoutique(args: {
   readonly batiment: TypeBatiment;
   readonly params: Parametres;
+  /** Mois de la signature. */
   readonly mois: MoisJeu;
+  /** Instant de la signature (heure du jeu, ms) ; par défaut le début du mois de signature. */
+  readonly instantMs?: number;
   readonly tresorerie: Centimes;
 }): ApercuOuvertureBoutique {
   const b = args.batiment;
@@ -171,6 +213,7 @@ export function apercuOuvertureBoutique(args: {
   const total = centimes(depot + travaux);
   const amort = amortissementMensuelAgencement(travaux, p.amortissementAgencementMois);
   const vendeur = coutEmployeurVendeur(args.params, p.salaireVendeur);
+  const ouverture = ouvertureBoutique(args.mois, args.instantMs, p);
   return {
     batimentId: b.id,
     nom: b.nom,
@@ -181,8 +224,9 @@ export function apercuOuvertureBoutique(args: {
     travaux,
     totalALaSignature: total,
     moisSignature: args.mois,
-    moisOuverture: (args.mois + p.dureeTravauxMois) as MoisJeu,
-    dureeTravauxMois: p.dureeTravauxMois,
+    ouvertureMs: ouverture.ouvertureMs,
+    moisOuverture: ouverture.moisOuverture,
+    dureeTravauxHeures: p.dureeTravauxHeures,
     amortissementMensuel: amort,
     coutEmployeurVendeur: vendeur,
     chargesFixesMensuellesAvecUnVendeur: centimes(loyer + charges + vendeur + amort),
@@ -198,7 +242,10 @@ export function apercuOuvertureBoutique(args: {
 export function nouveauPointDeVente(args: {
   readonly id: string;
   readonly batiment: TypeBatiment;
+  /** Mois de la signature. */
   readonly mois: MoisJeu;
+  /** Instant de la signature (heure du jeu, ms) ; par défaut le début du mois de signature. */
+  readonly instantMs?: number;
   readonly params: Parametres;
   readonly passantsReference: number;
 }): PointDeVente {
@@ -206,6 +253,7 @@ export function nouveauPointDeVente(args: {
   if (!estEmplacementBoutique(b)) throw new ErreurBoutique(`${b.id} n'est pas une boutique.`);
   const p = parametresBoutiqueDepuis(args.params);
   const loyer = centimes(b.loyer_mensuel_centimes);
+  const ouverture = ouvertureBoutique(args.mois, args.instantMs, p);
   return {
     id: args.id,
     batimentId: b.id,
@@ -214,7 +262,8 @@ export function nouveauPointDeVente(args: {
     chargesMensuelles: centimes(b.charges_mensuelles_centimes),
     depotGarantie: depotGarantieBoutique(loyer, p),
     moisSignature: args.mois,
-    moisOuverture: (args.mois + p.dureeTravauxMois) as MoisJeu,
+    moisOuverture: ouverture.moisOuverture,
+    ouvertureMs: ouverture.ouvertureMs,
     agencement: {
       valeurBrute: travauxAgencement(b.surface_m2, p),
       amortissementsCumules: centimes(0),
@@ -264,16 +313,39 @@ export function ecrituresOuvertureBoutique(pdv: PointDeVente): EcritureComptable
 // État d'une boutique dans le temps
 // ---------------------------------------------------------------------------
 
-export function boutiqueEnTravaux(pdv: PointDeVente, mois: MoisJeu): boolean {
-  return mois >= pdv.moisSignature && mois < pdv.moisOuverture;
-}
-
-export function boutiqueOuverte(pdv: PointDeVente, mois: MoisJeu): boolean {
+/**
+ * Vrai si la boutique est ouverte. Avec un instant (heure du jeu, ms) et une boutique datée
+ * (ouvertureMs), la comparaison se fait à l'instant près ; sinon au mois (boutiques
+ * enregistrées avant la migration 0045, clôture du mois).
+ */
+export function boutiqueOuverte(pdv: PointDeVente, mois: MoisJeu, instantMs?: number): boolean {
+  if (instantMs !== undefined && pdv.ouvertureMs !== undefined) return instantMs >= pdv.ouvertureMs;
   return mois >= pdv.moisOuverture;
 }
 
-export function pointsDeVenteOuverts(e: Entreprise, mois: MoisJeu): readonly PointDeVente[] {
-  return (e.pointsDeVente ?? []).filter((p) => boutiqueOuverte(p, mois));
+export function boutiqueEnTravaux(pdv: PointDeVente, mois: MoisJeu, instantMs?: number): boolean {
+  return mois >= pdv.moisSignature && !boutiqueOuverte(pdv, mois, instantMs);
+}
+
+export function pointsDeVenteOuverts(e: Entreprise, mois: MoisJeu, instantMs?: number): readonly PointDeVente[] {
+  return (e.pointsDeVente ?? []).filter((p) => boutiqueOuverte(p, mois, instantMs));
+}
+
+/**
+ * Premier pas du mois (sur `pasParMois`) où l'une des boutiques données est ouverte : 0 si
+ * elle l'était dès le début du mois (ou si elle n'est pas datée). Sert à proratiser le plafond
+ * des vendeurs le mois de l'ouverture : avant l'ouverture, ils ne vendent rien.
+ */
+export function premierPasOuvert(pointsDeVente: readonly PointDeVente[], mois: MoisJeu, pasParMois: number): number {
+  const debut = debutDuMoisMs(mois);
+  const duree = finDuMoisMs(mois) - debut;
+  let premier = pasParMois;
+  for (const p of pointsDeVente) {
+    const ecoule = p.ouvertureMs === undefined ? 0 : p.ouvertureMs - debut;
+    const pas = ecoule <= 0 ? 0 : Math.min(pasParMois, Math.floor((ecoule * pasParMois) / duree));
+    premier = Math.min(premier, pas);
+  }
+  return premier;
 }
 
 export function vendeurs(salaries: readonly Salarie[]): readonly Salarie[] {
@@ -285,8 +357,13 @@ export function vendeurs(salaries: readonly Salarie[]): readonly Salarie[] {
  * confondues : vendeurs × ventes max par vendeur. Sans boutique ouverte, 0.
  * (En V1, une seule boutique par société : tous les vendeurs y travaillent.)
  */
-export function capaciteVendeursMois(e: Entreprise, mois: MoisJeu, p: ParametresBoutique): number {
-  if (pointsDeVenteOuverts(e, mois).length === 0) return 0;
+export function capaciteVendeursMois(
+  e: Entreprise,
+  mois: MoisJeu,
+  p: ParametresBoutique,
+  instantMs?: number,
+): number {
+  if (pointsDeVenteOuverts(e, mois, instantMs).length === 0) return 0;
   return vendeurs(e.salaries).length * p.ventesMaxParVendeur;
 }
 

@@ -2,8 +2,11 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { chargerModulesV1, chargerParametresV1 } from "@kapital/content";
 import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
+import { fonctionAbsente } from "../../../../lib/rpc";
+import { versQuand } from "../../../../lib/cadre";
 import {
   deciderAmenagement,
+  delaiMiseEnPlaceAmenagementMs,
   postesFournisDepuisParametres,
   valeurNetteMaterielEnService,
   type GrilleAtelier,
@@ -25,7 +28,9 @@ type Atelier = GrilleAtelier & {
   plan_prevu_cout_centimes: number | null;
 };
 
-// 3D-5 : le plan est revalidé et enregistré par le serveur ; il s'applique à la clôture suivante.
+// 3D-5 : le plan est revalidé et enregistré par le serveur. T3 (horloge réelle) : il entre en
+// service amenagement_delai_heures (2 h réelles) après sa sauvegarde (workshops.plan_prevu_le,
+// migration 0045), et non plus à la clôture du mois.
 // - { workshopId, modules } : enregistre le plan PRÉVU (migration 0037) et paie les modules ajoutés ;
 // - { workshopId, annuler: true } : annule le plan prévu et rembourse sa commande.
 export async function POST(request: Request) {
@@ -129,8 +134,10 @@ export async function POST(request: Request) {
   }
 
   // Plan prévu remplacé, commande précédente remboursée et modules ajoutés payés (2154 / 512),
-  // dans une seule transaction (0037). Le plan s'applique à la clôture du mois de jeu.
-  const { error } = await ctx.supabaseAdmin.rpc("sauvegarder_amenagement", {
+  // dans une seule transaction (0037). Le plan entre en service à prevuLe (0045).
+  const maintenant = Date.now();
+  const prevuLe = new Date(maintenant + delaiMiseEnPlaceAmenagementMs(chargerParametresV1())).toISOString();
+  const argumentsPlan = {
     p_company_id: ctx.companyId,
     p_workshop_id: atelier.id,
     p_modules: modules.map((m) => ({
@@ -142,7 +149,14 @@ export async function POST(request: Request) {
     p_cout_centimes: decision.cout,
     p_mois_jeu: ctx.moisCourant,
     p_ecriture_id: `amenagement_${atelier.id}_${randomUUID()}`,
-  });
+  };
+  let { error } = await ctx.supabaseAdmin.rpc("sauvegarder_amenagement", { ...argumentsPlan, p_prevu_le: prevuLe });
+  let miseEnPlace = `il sera en place ${versQuand(prevuLe, maintenant)}`;
+  // Base pas encore migrée (0045) : l'ancienne fonction, plan appliqué à la clôture comme avant.
+  if (fonctionAbsente(error)) {
+    ({ error } = await ctx.supabaseAdmin.rpc("sauvegarder_amenagement", argumentsPlan));
+    miseEnPlace = "il s'appliquera à la fin du mois de jeu";
+  }
   if (error) {
     const refusConcurrent = error.message.startsWith("tresorerie_insuffisante") || error.code === "KP422";
     return NextResponse.json(
@@ -158,6 +172,7 @@ export async function POST(request: Request) {
     ok: true,
     coutCentimes: decision.cout,
     remboursementCentimes: decision.remboursement,
-    message: "Plan enregistré : il s'appliquera à la fin du mois de jeu.",
+    prevuLe,
+    message: `Plan enregistré : ${miseEnPlace}.`,
   });
 }

@@ -15,18 +15,22 @@ import { cumulVide, type CumulMois } from "../moteur/donneesMois.js";
 import { avancerFlux } from "../moteur/flux.js";
 import { cloturerMois } from "../moteur/cloture.js";
 import { simulerMoisEntreprise } from "../moteur/simulerMois.js";
+import { debutDuMoisMs, finDuMoisMs, indexDuMois } from "../moteur/temps.js";
 import { coefficientsSalairesDepuisParametres, coutEmployeur } from "../salaires/calculs.js";
 import { margeParCanal, parametresIndicateursDepuis } from "../indicateurs/indicateurs.js";
 import type { Entreprise, PointDeVente, Salarie } from "../types/entreprise.js";
 import { centimes, graine, idEntreprise, idProduit, idSalarie, moisJeu } from "../types/primitifs.js";
 import {
   apercuOuvertureBoutique,
+  boutiqueEnTravaux,
+  boutiqueOuverte,
   ecrituresClotureBoutique,
   ecrituresOuvertureBoutique,
   nouveauPointDeVente,
   passantsReferenceBoutiques,
   pointMortBoutique,
   pointMortBoutiqueEntreprise,
+  premierPasOuvert,
   transfererStockVersBoutique,
   valeurSortieCmp,
 } from "./boutique.js";
@@ -42,12 +46,19 @@ function batiment(id: string): TypeBatiment {
   return b;
 }
 
-/** Boutique « quartier des créateurs » signée au mois 3, ouverte au mois 4 (un mois de travaux). */
+const HEURE = 3_600_000;
+const TRAVAUX_MS = PARAMS["boutique_travaux_duree_heures"]!.valeur * HEURE;
+
+/**
+ * Boutique « quartier des créateurs » signée au mois 3, une heure avant la fin du mois : les
+ * 24 h de travaux la font ouvrir au mois 4 (le mois 3 est tout entier « en travaux »).
+ */
 function boutique(stock = 0, valeur = 0, o: Partial<PointDeVente> = {}): PointDeVente {
   const pdv = nouveauPointDeVente({
     id: "pdv_1",
     batiment: batiment("boutique_quartier_createurs"),
     mois: moisJeu(3),
+    instantMs: finDuMoisMs(3) - HEURE,
     params: PARAMS,
     passantsReference: REF,
   });
@@ -122,21 +133,65 @@ function gl(ecritures: readonly EcritureComptable[]) {
 }
 
 describe("AE-10 : ouverture d'une boutique (aperçu et écritures)", () => {
-  it("dépôt = 3 mois de loyer, travaux = surface × 500 €/m², ouverture un mois après la signature", () => {
+  it("dépôt = 3 mois de loyer, travaux = surface × 500 €/m², ouverture 24 h après la signature", () => {
+    // Signature le jeudi 26 novembre 2026 à 10 h 21 (heure de Paris, 9 h 21 UTC).
+    const novembre = indexDuMois(2026, 11);
+    const signature = Date.UTC(2026, 10, 26, 9, 21);
     const a = apercuOuvertureBoutique({
       batiment: batiment("boutique_quartier_createurs"),
       params: PARAMS,
-      mois: moisJeu(3),
+      mois: novembre,
+      instantMs: signature,
       tresorerie: centimes(2_000_000),
     });
     expect(a.depotGarantie).toBe(3 * 76_500);
     expect(a.travaux).toBe(45 * 50_000);
     expect(a.totalALaSignature).toBe(229_500 + 2_250_000);
-    expect(a.moisOuverture).toBe(4);
+    expect(a.dureeTravauxHeures).toBe(24);
+    expect(a.ouvertureMs).toBe(Date.UTC(2026, 10, 27, 9, 21));
+    expect(a.moisOuverture).toBe(novembre);
     expect(a.amortissementMensuel).toBe(2_250_000 / 120);
     expect(a.etapeRequise).toBe(3);
     expect(a.tresorerieSuffisante).toBe(false);
     expect(a.manque).toBe(2_479_500 - 2_000_000);
+  });
+
+  it("signée le 30 novembre au soir, elle ouvre le 1er décembre : le mois d'ouverture suit l'instant", () => {
+    const novembre = indexDuMois(2026, 11);
+    const a = apercuOuvertureBoutique({
+      batiment: batiment("boutique_quartier_createurs"),
+      params: PARAMS,
+      mois: novembre,
+      instantMs: finDuMoisMs(novembre) - 2 * HEURE,
+      tresorerie: centimes(0),
+    });
+    expect(a.ouvertureMs).toBe(finDuMoisMs(novembre) + 22 * HEURE);
+    expect(a.moisOuverture).toBe(novembre + 1);
+  });
+
+  it("sans instant de signature : début du mois de signature (banc d'essai, aperçus)", () => {
+    const a = apercuOuvertureBoutique({
+      batiment: batiment("boutique_quartier_createurs"),
+      params: PARAMS,
+      mois: moisJeu(3),
+      tresorerie: centimes(0),
+    });
+    expect(a.ouvertureMs).toBe(debutDuMoisMs(3) + TRAVAUX_MS);
+    expect(a.moisOuverture).toBe(3);
+  });
+
+  it("le point de vente enregistré porte l'instant d'ouverture de l'aperçu", () => {
+    const signature = Date.UTC(2026, 10, 26, 9, 21);
+    const pdv = nouveauPointDeVente({
+      id: "x",
+      batiment: batiment("boutique_quartier_createurs"),
+      mois: indexDuMois(2026, 11),
+      instantMs: signature,
+      params: PARAMS,
+      passantsReference: REF,
+    });
+    expect(pdv.ouvertureMs).toBe(signature + TRAVAUX_MS);
+    expect(pdv.moisSignature).toBe(pdv.moisOuverture);
   });
 
   it("refuse un bâtiment qui n'est pas une boutique", () => {
@@ -426,5 +481,78 @@ describe("AE-10 : clôture complète", () => {
     expect(f.cumul.demandeParLigne[`${TSHIRT}|boutique`]).toBeGreaterThan(0);
     const r = cloturerMois(f.entreprise, f.cumul, { tvaAPayerCeMois: centimes(0), moisDecouvertConsecutifs: 0 }, PARAMS, moisJeu(4));
     expect(r.ventesPerdues).toEqual([]);
+  });
+});
+
+describe("T3 : la boutique ouvre à l'instant où les travaux finissent", () => {
+  // Signée le mardi 10 novembre 2026 à 12 h (heure de Paris) : ouverte le 11 novembre à 12 h.
+  const novembre = indexDuMois(2026, 11);
+  const signature = Date.UTC(2026, 10, 10, 11, 0);
+  const ouverture = signature + TRAVAUX_MS;
+  /** Heures écoulées depuis le 1er novembre à minuit jusqu'à l'ouverture : 10 jours et 12 h. */
+  const HEURE_OUVERTURE = 10 * 24 + 12;
+  const pdvNovembre = (): PointDeVente => ({
+    ...nouveauPointDeVente({
+      id: "pdv_1",
+      batiment: batiment("boutique_quartier_createurs"),
+      mois: novembre,
+      instantMs: signature,
+      params: PARAMS,
+      passantsReference: REF,
+    }),
+    stock: [{ produit: TSHIRT, quantite: 10_000, valeurTotale: centimes(20_000_000) }],
+  });
+
+  it("ouverte ou en travaux, à l'instant près", () => {
+    const pdv = pdvNovembre();
+    expect(ouverture - debutDuMoisMs(novembre)).toBe(HEURE_OUVERTURE * HEURE);
+    expect(boutiqueOuverte(pdv, novembre, ouverture - 60_000)).toBe(false);
+    expect(boutiqueEnTravaux(pdv, novembre, ouverture - 60_000)).toBe(true);
+    expect(boutiqueOuverte(pdv, novembre, ouverture)).toBe(true);
+    expect(boutiqueEnTravaux(pdv, novembre, ouverture)).toBe(false);
+    // Sans instant (clôture du mois) : comparée au mois d'ouverture.
+    expect(boutiqueOuverte(pdv, novembre)).toBe(true);
+  });
+
+  it("une boutique non datée (enregistrée avant la migration 0045) reste comparée au mois", () => {
+    const ancienne: PointDeVente = { ...boutique(), ouvertureMs: undefined };
+    expect(boutiqueOuverte(ancienne, moisJeu(3), finDuMoisMs(3))).toBe(false);
+    expect(boutiqueOuverte(ancienne, moisJeu(4), debutDuMoisMs(4))).toBe(true);
+  });
+
+  it("premier pas ouvert du mois : 0 si elle était déjà ouverte, sinon le pas de l'ouverture", () => {
+    expect(premierPasOuvert([pdvNovembre()], novembre, 720)).toBe(HEURE_OUVERTURE);
+    expect(premierPasOuvert([pdvNovembre()], moisJeu(novembre + 1), 744)).toBe(0);
+    expect(premierPasOuvert([pdvNovembre()], novembre, 1)).toBe(0);
+  });
+
+  it("en pas d'une heure : rien avant l'ouverture, puis le plafond des vendeurs compté depuis l'ouverture", () => {
+    const heures = (finDuMoisMs(novembre) - debutDuMoisMs(novembre)) / HEURE;
+    expect(heures).toBe(720);
+    const e = entreprise({ salaries: [vendeur(1)], pointsDeVente: [pdvNovembre()] });
+    let cumul = cumulVide(novembre, e.tresorerie);
+    let courant = e;
+    let desirabiliteAvant = 0;
+    for (let i = 0; i < heures; i++) {
+      const r = flux(courant, novembre, { debut: i, fin: i + 1, parMois: heures }, cumul);
+      cumul = { ...r.cumul, pasTraites: i + 1 };
+      courant = r.entreprise;
+      if (i === HEURE_OUVERTURE - 2) {
+        // Jusqu'à l'ouverture : aucune vente en boutique.
+        expect(venduEnBoutique(cumul)).toBe(0);
+        desirabiliteAvant = courant.marque.desirabilite;
+      }
+    }
+    const max = PARAMS["vendeur_ventes_max_pieces_par_mois"]!.valeur;
+    expect(venduEnBoutique(cumul)).toBe(Math.floor((max * (heures - HEURE_OUVERTURE)) / heures));
+    expect(courant.marque.desirabilite).not.toBe(desirabiliteAvant);
+  });
+
+  it("le mois de l'ouverture : loyer depuis la signature, amortissement dès ce mois", () => {
+    const r = ecrituresClotureBoutique(pdvNovembre(), novembre);
+    const g = gl(r.ecritures);
+    expect(soldeCompte(g, "613")).toBe(76_500);
+    expect(soldeCompte(g, "28135")).toBe(18_750);
+    expect(enEquilibre(g)).toBe(true);
   });
 });

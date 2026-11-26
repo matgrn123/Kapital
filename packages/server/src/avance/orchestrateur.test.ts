@@ -10,10 +10,13 @@ import {
   idSalarie,
   indexDuMois,
   moisJeu,
+  nouveauPointDeVente,
   pasAbsoluDepuisPosition,
   pasDansLeMois,
+  passantsReferenceBoutiques,
   type Entreprise,
 } from "@kapital/engine";
+import { chargerBatimentsV1 } from "@kapital/content";
 import { describe, expect, it } from "vitest";
 import { avancerMondeJusquA, ErreurMondeAncienCalendrier } from "./orchestrateur.js";
 import { StockageMemoire } from "./stockageMemoire.js";
@@ -584,5 +587,49 @@ describe("avancerMondeJusquA — journal d'événements (migration 0041)", () =>
     expect(cles(s, "a")).toContain("livraison_matiere_cmd1");
     expect(cles(s, "b")).not.toContain("livraison_matiere_cmd1");
     expect(cles(s, "b")).toContain(`cloture_${M0}`);
+  });
+});
+
+describe("avancerMondeJusquA — travaux et aménagement en heures réelles (T3)", () => {
+  const ventesBoutique = (s: StockageMemoire) => idsEcritures(s, "a").filter((id) => id.includes("_boutique_p"));
+
+  it("la boutique signée à 2 h ouvre 24 h plus tard : aucune vente avant, des ventes après", async () => {
+    const batiment = chargerBatimentsV1().find((b) => b.id === "boutique_rue_commercante")!;
+    const pdv = nouveauPointDeVente({
+      id: "pdv_a",
+      batiment,
+      mois: moisJeu(M0),
+      instantMs: t(0, 2),
+      params: PARAMS,
+      passantsReference: passantsReferenceBoutiques(chargerBatimentsV1()),
+    });
+    expect(pdv.ouvertureMs).toBe(t(0, 26));
+    const s = new StockageMemoire({ id: "monde1", moisCourant: M0, debutReelMs: 0 });
+    const e = entreprise("a");
+    s.ajouterEntreprise(
+      {
+        ...e,
+        salaries: [
+          ...e.salaries,
+          { id: idSalarie("a_v1"), poste: "vendeur", salaireBrutMensuel: centimes(186702), ancienneteMois: 0, experienceMois: 0 },
+        ],
+        pointsDeVente: [{ ...pdv, stock: [{ produit: PRODUIT, quantite: 500, valeurTotale: centimes(750_000) }] }],
+      },
+      PAS(0),
+    );
+
+    await avancerMondeJusquA(s, PARAMS, t(0, 26));
+    expect(ventesBoutique(s)).toEqual([]);
+
+    await avancerMondeJusquA(s, PARAMS, t(0, 60));
+    expect(ventesBoutique(s).length).toBeGreaterThan(0);
+  });
+
+  it("chaque lot transmet sa fin (instant réel) à l'enregistrement : la base y applique les plans prévus", async () => {
+    const s = monde();
+    await avancerMondeJusquA(s, PARAMS, t(0, 3));
+    expect(s.finsDeLots.at(-1)).toBe(t(0, 3));
+    await avancerMondeJusquA(s, PARAMS, t(0, 5));
+    expect(s.finsDeLots.at(-1)).toBe(t(0, 5));
   });
 });

@@ -4,8 +4,9 @@
 // moteur ; il n'invente aucun chiffre. Coordonnées des modules : à partir de 1 (voir plan.ts).
 //
 // 3D-5 : le joueur prépare un plan (ajouter, déplacer, pivoter, retirer), voit son coût et
-// l'écriture comptable AVANT d'enregistrer ; le serveur revalide et enregistre le plan PRÉVU, qui
-// s'applique à la fin du mois de jeu. Jusque-là, le plan en service fait la production.
+// l'écriture comptable AVANT d'enregistrer ; le serveur revalide et enregistre le plan PRÉVU.
+// T3 (horloge réelle) : il entre en service amenagement_delai_heures (2 h réelles) après
+// l'enregistrement. Jusque-là, le plan en service fait la production.
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -27,7 +28,7 @@ import {
   Puce,
   Refus,
 } from "../../../components/ui";
-import { deciderAmenagement, phraseErreurPlan } from "../../../lib/amenagement";
+import { deciderAmenagement, delaiMiseEnPlaceAmenagementMs, phraseErreurPlan } from "../../../lib/amenagement";
 import { formaterEuros } from "../../../lib/formatage";
 import {
   apercuPlacement,
@@ -53,8 +54,13 @@ export type ProprietesAtelier = {
   atelier: DimensionsAtelier;
   /** Plan en service ce mois-ci (placed_modules.statut = 'actif'). */
   planActif: readonly ModulePlace[];
-  /** Plan prévu enregistré, appliqué à la clôture du mois ; null s'il n'y en a pas. */
+  /** Plan prévu enregistré, mis en service à son heure ; null s'il n'y en a pas. */
   planPrevu: readonly ModulePlace[] | null;
+  /**
+   * T3 : heure de mise en service du plan prévu, déjà lisible (« vers 12 h 21 (dans 2 h) ») ;
+   * null ou absent : plan d'avant la migration 0045, appliqué à la fin du mois de jeu.
+   */
+  planPrevuQuand?: string | null;
   /** Modules déjà payés pour le plan prévu (remboursés s'il est remplacé ou annulé). */
   coutPlanPrevu: number;
   /** Trésorerie de la société (centimes) ; null : inconnue (démonstration). */
@@ -70,6 +76,7 @@ export type ProprietesAtelier = {
 
 const TENUES = ["#C46E8A", "#3E7D4A", "#2D4A9E", "#B0362A", "#8A6A2E"];
 const heures = (min: number) => `${Math.round(min / 60).toLocaleString("fr-FR")} h`;
+const MS_PAR_HEURE = 3_600_000;
 const euros = (c: number) => `${formaterEuros(c)} €`;
 const memePlace = (a: ModulePlace, b: ModulePlace) =>
   a.module_type_id === b.module_type_id && a.x === b.x && a.y === b.y && a.pivote === b.pivote;
@@ -88,7 +95,9 @@ export function EcranAtelier(p: ProprietesAtelier) {
   const [envoi, setEnvoi] = useState<{ etat: "attente" | "ok" | "refus"; texte?: string } | null>(null);
 
   const typeDe = (id: string) => p.catalogue.find((c) => c.id === id);
-  // Production de CE mois : le plan en service (le plan prévu attend la clôture).
+  // T3 : délai de mise en service d'un plan enregistré (paramètre amenagement_delai_heures).
+  const delaiPlan = `${(delaiMiseEnPlaceAmenagementMs(p.parametres) / MS_PAR_HEURE).toLocaleString("fr-FR")} h`;
+  // Production actuelle : le plan en service (le plan prévu attend son heure de mise en place).
   const resume = useMemo(() => resumeProduction(p.planActif, p.salaries, p.catalogue, p.parametres), [p.planActif, p.salaries, p.catalogue, p.parametres]);
   const resumePlan = useMemo(() => resumeProduction(plan, p.salaries, p.catalogue, p.parametres), [plan, p.salaries, p.catalogue, p.parametres]);
   const modifie = JSON.stringify(plan) !== JSON.stringify(reference);
@@ -220,7 +229,7 @@ export function EcranAtelier(p: ProprietesAtelier) {
     }
   };
 
-  const enregistrer = () => void envoyer({ modules: plan }, "Plan enregistré : il s'appliquera à la fin du mois de jeu.");
+  const enregistrer = () => void envoyer({ modules: plan }, `Plan enregistré : il sera en place dans ${delaiPlan}.`);
   const annulerPrevu = async () => {
     if (await envoyer({ annuler: true }, "Plan prévu annulé.")) {
       setPlan([...p.planActif]);
@@ -244,7 +253,7 @@ export function EcranAtelier(p: ProprietesAtelier) {
       {p.planPrevu && (
         <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-line bg-thread-soft px-3 py-2">
           <p className="min-w-0 flex-1 text-[0.88rem] text-thread">
-            <b>Plan prévu</b> : il s&apos;appliquera à la fin du mois de jeu. D&apos;ici là, l&apos;atelier produit avec le plan en service
+            <b>Plan prévu</b> : {p.planPrevuQuand ? `il sera en place ${p.planPrevuQuand}` : "il s'appliquera à la fin du mois de jeu"}. D&apos;ici là, l&apos;atelier produit avec le plan en service
             {p.coutPlanPrevu > 0 ? ` ; les modules commandés (${euros(p.coutPlanPrevu)}) sont remboursés si tu l'annules.` : "."}
           </p>
           {p.workshopId && (
@@ -371,7 +380,7 @@ export function EcranAtelier(p: ProprietesAtelier) {
                     ))}
                     {decision.cout > 0 && (
                       <p className="text-[0.8rem] text-muted">
-                        Les modules sont payés maintenant ; ils entrent en service, et commencent à s&apos;amortir, à la fin du mois de jeu.
+                        Les modules sont payés maintenant ; ils entrent en service {delaiPlan} après l&apos;enregistrement, et s&apos;amortissent à chaque fin de mois.
                       </p>
                     )}
                   </div>
