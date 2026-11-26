@@ -13,17 +13,20 @@ export const DEFINITIONS_MISSIONS: readonly DefinitionMission[] = [
   {
     id: "mission2",
     numero: 2,
-    titre: "Tenir six mois",
-    objectif: "Ne jamais passer sous zéro de trésorerie pendant 6 mois de jeu.",
+    // Durée : paramètre mission_tenir_jours (le test des définitions vérifie que le texte le suit).
+    titre: "Tenir 7 jours",
+    objectif: "Ne jamais passer sous zéro de trésorerie pendant les 7 premiers jours de ta société.",
     notion: "Trésorerie et frais fixes",
     explication:
-      "La trésorerie, c'est l'argent disponible sur le compte, pas le bénéfice. Les frais fixes (loyer, salaires, cotisations) tombent chaque mois, même sans vente. Tenir six mois sans découvert, c'est garder une trésorerie supérieure aux frais fixes à venir.",
+      "La trésorerie, c'est l'argent disponible sur le compte, pas le bénéfice. Les achats de matière et de marchandises sortent tout de suite, les ventes rentrent petit à petit, et les frais fixes (loyer, salaires, cotisations) tombent à la fin de chaque mois, même sans vente. Tenir sans découvert, c'est garder assez d'argent pour payer ce qui arrive avant d'encaisser.",
   },
   {
     id: "mission3",
     numero: 3,
     titre: "Survivre à la croissance",
-    objectif: "Doubler le chiffre d'affaires mensuel sans découvert.",
+    // Périodes comparées : paramètre mission_croissance_periode_jours (7 jours, une semaine).
+    objectif:
+      "Doubler le chiffre d'affaires d'une semaine sans découvert : réussir une semaine à deux fois le chiffre d'affaires de ta première semaine de ventes.",
     notion: "Besoin en fonds de roulement",
     explication:
       "Vendre plus oblige à acheter plus de matière et à payer plus de façonniers avant d'encaisser les ventes. C'est le besoin en fonds de roulement : l'argent immobilisé dans le cycle d'exploitation. Une croissance rapide sans trésorerie suffisante conduit au découvert malgré des ventes qui montent.",
@@ -32,8 +35,9 @@ export const DEFINITIONS_MISSIONS: readonly DefinitionMission[] = [
     id: "mission4",
     numero: 4,
     titre: "Ouvrir ma boutique sans découvert",
+    // Durée : paramètre mission_boutique_jours.
     objectif:
-      "Ouvrir une boutique sans que la trésorerie passe sous zéro, du mois de la signature du bail jusqu'à la fin du premier mois d'ouverture.",
+      "Ouvrir une boutique sans que la trésorerie passe sous zéro pendant les 7 jours qui suivent la signature du bail : les travaux, puis les premières ventes.",
     notion: "Bail commercial et point mort",
     explication:
       "Ouvrir une boutique fait sortir beaucoup d'argent d'un coup : le dépôt de garantie du bail commercial (il reste à l'actif et te sera rendu en partant) et les travaux d'agencement (une immobilisation, amortie sur plusieurs années). Ensuite, chaque mois, le loyer, les charges et le salaire du vendeur tombent, même pendant les travaux, quand la boutique ne vend encore rien. Le point mort, c'est le chiffre d'affaires mensuel à partir duquel la marge couvre ces charges fixes. Pour ouvrir sans découvert, il faut garder de quoi tenir jusqu'à ce que la boutique l'atteigne.",

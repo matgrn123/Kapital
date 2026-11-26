@@ -3,12 +3,17 @@ import type {
   IdMission,
   MetriquesMissions,
   ProgressionMission,
-  SoldeTresorerieMois,
+  SoldeTresorerie,
 } from "./types.js";
 
 const CIBLE_PIECES_MISSION_1 = 50;
-const CIBLE_MOIS_MISSION_2 = 6;
 const RATIO_MISSION_3 = 2;
+const MS_PAR_JOUR = 86_400_000;
+
+/** Jours entiers écoulés entre deux instants (heure du jeu, ms) ; jamais négatif. */
+function joursEntiers(depuisMs: number, jusquAMs: number): number {
+  return Math.max(0, Math.floor((jusquAMs - depuisMs) / MS_PAR_JOUR));
+}
 
 export function evaluerMission1(m: MetriquesMissions): ProgressionMission {
   const etat: EtatMission =
@@ -26,78 +31,83 @@ export function evaluerMission1(m: MetriquesMissions): ProgressionMission {
   };
 }
 
+/**
+ * Mission 2 « Tenir 7 jours » (horloge réelle) : la trésorerie n'est jamais passée sous zéro,
+ * et `regles.joursTenir` jours se sont écoulés depuis la création. Un découvert la rend ratée
+ * (retour « à faire »). Progression : jours entiers écoulés.
+ */
 export function evaluerMission2(m: MetriquesMissions): ProgressionMission {
-  const moisEcoules = Math.max(0, m.mois_jeu_courant - m.mois_jeu_creation);
-  const etat: EtatMission = m.a_eu_decouvert
-    ? "a_faire"
-    : moisEcoules >= CIBLE_MOIS_MISSION_2
-      ? "validee"
-      : moisEcoules > 0
-        ? "en_cours"
-        : "a_faire";
+  const cible = m.regles.joursTenir;
+  const jours = joursEntiers(m.creation_ms, m.maintenant_ms);
+  if (m.a_eu_decouvert) return { id: "mission2", etat: "a_faire", actuel: 0, cible };
   return {
     id: "mission2",
-    etat,
-    actuel: Math.min(moisEcoules, CIBLE_MOIS_MISSION_2),
-    cible: CIBLE_MOIS_MISSION_2,
-  };
-}
-
-export function evaluerMission3(m: MetriquesMissions): ProgressionMission {
-  const cible = m.ca_mois_initial_centimes * RATIO_MISSION_3;
-  const aDouble =
-    m.ca_mois_initial_centimes > 0 &&
-    m.ca_mois_max_centimes >= cible;
-  const etat: EtatMission =
-    aDouble && !m.a_eu_decouvert
-      ? "validee"
-      : m.ca_mois_initial_centimes > 0
-        ? "en_cours"
-        : "a_faire";
-  return {
-    id: "mission3",
-    etat,
-    actuel: m.ca_mois_max_centimes,
+    etat: jours >= cible ? "validee" : "en_cours",
+    actuel: Math.min(jours, cible),
     cible,
   };
 }
 
 /**
- * Solde de trésorerie à la fin du mois `mois` : le dernier solde connu à ce mois ou avant
- * (un mois sans écriture garde le solde du précédent ; avant toute écriture, 0).
+ * Mission 3 « Survivre à la croissance » : le CA HT d'une période (une semaine, paramètre
+ * `mission_croissance_periode_jours`) atteint le double de celui de la première période de
+ * ventes, sans découvert depuis la création.
  */
-export function soldeFinDeMois(soldes: readonly SoldeTresorerieMois[], mois: number): number {
+export function evaluerMission3(m: MetriquesMissions): ProgressionMission {
+  const cible = m.ca_periode_initiale_centimes * RATIO_MISSION_3;
+  const aDouble =
+    m.ca_periode_initiale_centimes > 0 &&
+    m.ca_periode_max_centimes >= cible;
+  const etat: EtatMission =
+    aDouble && !m.a_eu_decouvert
+      ? "validee"
+      : m.ca_periode_initiale_centimes > 0
+        ? "en_cours"
+        : "a_faire";
+  return {
+    id: "mission3",
+    etat,
+    actuel: m.ca_periode_max_centimes,
+    cible,
+  };
+}
+
+/**
+ * Solde de trésorerie à l'instant `instantMs` : le dernier solde connu à cet instant ou avant
+ * (avant toute écriture, 0). Les soldes sont triés par instant croissant.
+ */
+export function soldeA(soldes: readonly SoldeTresorerie[], instantMs: number): number {
   let solde = 0;
   for (const s of soldes) {
-    if (s.mois > mois) break;
+    if (s.instant_ms > instantMs) break;
     solde = s.solde_centimes;
   }
   return solde;
 }
 
 /**
- * Mission 4 « Ouvrir ma boutique sans découvert » (AE-11). Règle : une boutique est signée, et
- * le solde de trésorerie est positif ou nul à la fin de chaque mois de la « fenêtre d'ouverture »,
- * du mois de signature du bail au mois d'ouverture inclus (les travaux, pendant lesquels le loyer
- * court sans aucune vente, puis le premier mois de vente). La mission se valide quand le mois
- * d'ouverture est clos (mois courant > mois d'ouverture). Un découvert dans la fenêtre la rend
- * ratée pour cette boutique (retour « à faire »). Progression : mois clos de la fenêtre.
+ * Mission 4 « Ouvrir ma boutique sans découvert » (AE-11, revue pour l'horloge réelle). Règle :
+ * une boutique est signée, et le solde de trésorerie reste positif ou nul pendant les
+ * `regles.joursBoutique` jours qui suivent la signature du bail : les travaux (le loyer court
+ * déjà), puis les premières ventes. Le solde à la signature compte (resté à découvert : ratée).
+ * La mission se valide quand la fenêtre est écoulée. Un découvert dans la fenêtre la rend ratée
+ * pour cette boutique (retour « à faire »). Progression : jours entiers écoulés depuis la signature.
  */
 export function evaluerMission4(m: MetriquesMissions): ProgressionMission {
+  const cible = m.regles.joursBoutique;
   let meilleure: ProgressionMission | null = null;
   for (const b of m.boutiques) {
-    const cible = Math.max(1, b.mois_ouverture - b.mois_signature + 1);
-    const dernierClos = Math.min(m.mois_jeu_courant - 1, b.mois_ouverture);
-    let decouvert = false;
-    for (let mois = b.mois_signature; mois <= dernierClos; mois++) {
-      if (soldeFinDeMois(m.tresorerie_fin_mois, mois) < 0) decouvert = true;
+    const finFenetre = b.signee_le_ms + cible * MS_PAR_JOUR;
+    const jusqua = Math.min(m.maintenant_ms, finFenetre);
+    // Le solde qui court à la signature compte, sauf s'il est remplacé à l'instant même par les
+    // écritures de la signature (dépôt, travaux : même transaction que le point de vente).
+    const ecrituresALaSignature = m.tresorerie.some((s) => s.instant_ms === b.signee_le_ms);
+    let decouvert = !ecrituresALaSignature && soldeA(m.tresorerie, b.signee_le_ms) < 0;
+    for (const s of m.tresorerie) {
+      if (s.instant_ms >= b.signee_le_ms && s.instant_ms <= jusqua && s.solde_centimes < 0) decouvert = true;
     }
-    const actuel = Math.max(0, Math.min(cible, dernierClos - b.mois_signature + 1));
-    const etat: EtatMission = decouvert
-      ? "a_faire"
-      : m.mois_jeu_courant > b.mois_ouverture
-        ? "validee"
-        : "en_cours";
+    const actuel = Math.min(cible, joursEntiers(b.signee_le_ms, m.maintenant_ms));
+    const etat: EtatMission = decouvert ? "a_faire" : m.maintenant_ms >= finFenetre ? "validee" : "en_cours";
     const p: ProgressionMission = { id: "mission4", etat, actuel: decouvert ? 0 : actuel, cible };
     if (etat === "validee") return p;
     if (!meilleure || (etat === "en_cours" && meilleure.etat !== "en_cours")) meilleure = p;

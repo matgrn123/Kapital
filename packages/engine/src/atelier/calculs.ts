@@ -4,20 +4,40 @@ import {
   type Centimes,
   type Minutes,
 } from "../types/primitifs.js";
+import type { Salarie } from "../types/entreprise.js";
+import { debutDuMoisMs, moisDeLInstantMs } from "../moteur/temps.js";
 
+/**
+ * Rendement d'un artisan selon son expérience : de rMin (débutant) vers rMax, courbe
+ * d'apprentissage de constante `tau`. Expérience et tau dans la même unité (des jours depuis
+ * l'horloge réelle : `rendement_tau_jours`).
+ */
 export function rendement(
-  moisExperience: number,
+  experience: number,
   rMin: number,
   rMax: number,
   tau: number,
 ): number {
-  if (moisExperience < 0) {
-    throw new Error("moisExperience doit être >= 0");
+  if (experience < 0) {
+    throw new Error("l'expérience doit être >= 0");
   }
   if (tau <= 0) {
     throw new Error("tau doit être > 0");
   }
-  return rMin + (rMax - rMin) * (1 - Math.exp(-moisExperience / tau));
+  return rMin + (rMax - rMin) * (1 - Math.exp(-experience / tau));
+}
+
+const MS_PAR_JOUR = 86_400_000;
+
+/**
+ * Expérience d'un salarié en jours à un instant (heure du jeu, ms), comptée depuis son embauche
+ * (décision de Mathieu du 26/11/2026). Sans date d'embauche, il est réputé embauché au début du
+ * mois, `experienceMois` mois complets avant le mois de l'instant. Jamais négative.
+ */
+export function experienceEnJours(salarie: Salarie, instantMs: number): number {
+  const embauche =
+    salarie.embaucheMs ?? debutDuMoisMs(moisDeLInstantMs(instantMs) - Math.max(0, salarie.experienceMois));
+  return Math.max(0, instantMs - embauche) / MS_PAR_JOUR;
 }
 
 export function capaciteMinutes(

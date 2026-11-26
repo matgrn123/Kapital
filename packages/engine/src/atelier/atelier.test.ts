@@ -117,7 +117,7 @@ describe("coutRevient — critère T06 : scénario t-shirt France ≈ 20 €", (
     const params = chargerParametresV1();
     const rMin = params["rendement_atelier_min"]!.valeur;
     const rMax = params["rendement_atelier_max"]!.valeur;
-    const tau = params["rendement_tau_mois"]!.valeur;
+    const tau = params["rendement_tau_jours"]!.valeur;
     const heures = params["heures_mensuelles_legales"]!.valeur;
     const smic = params["cout_employeur_smic_mensuel"]!.valeur;
     const tauxChute = params["taux_chute_matiere_defaut"]!.valeur;

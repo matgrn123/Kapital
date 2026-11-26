@@ -11,6 +11,10 @@ import { chiffresFiche, type SalarieFiche, type SalariePlace } from "./salaries"
 
 const POSTES = { artisan: "Artisan", encadrement: "Encadrement" } as const;
 const mois = (n: number) => `${n.toLocaleString("fr-FR")} mois`;
+const jours = (n: number) => {
+  const j = Math.floor(n);
+  return j < 1 ? "moins d'un jour" : `${j.toLocaleString("fr-FR")} jour${j > 1 ? "s" : ""}`;
+};
 const pourcent = (r: number) => `${Math.round(r * 100).toLocaleString("fr-FR")} %`;
 
 export function FicheSalarie({ salarie, place, parametres }: { salarie: SalarieFiche; place: SalariePlace | undefined; parametres: Parametres }) {
@@ -25,7 +29,7 @@ export function FicheSalarie({ salarie, place, parametres }: { salarie: SalarieF
           ["Poste occupé", poste ? `${poste.nom} (case ${poste.emprise.x}, ${poste.emprise.y})` : "Sans poste"],
           ["Depuis", dateLisible(salarie.depuis)],
           ["Ancienneté", mois(salarie.ancienneteMois)],
-          ["Expérience", mois(salarie.experienceMois)],
+          ["Expérience", jours(salarie.experienceJours)],
           ["Salaire brut", `${formaterEuros(salarie.salaireBrutCentimes)} € / mois`],
           ["Coût employeur", `${formaterEuros(c.coutEmployeurCentimes)} € / mois`],
           ...(artisan
@@ -38,6 +42,7 @@ export function FicheSalarie({ salarie, place, parametres }: { salarie: SalarieF
       {artisan && (
         <p className="text-[0.8rem] text-muted">
           Le rendement monte avec l&apos;expérience : un débutant produit moins par heure payée qu&apos;un artisan confirmé.
+          L&apos;essentiel s&apos;apprend pendant les deux premières semaines après l&apos;embauche.
         </p>
       )}
       <div>

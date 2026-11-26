@@ -29,8 +29,8 @@ describe("plan de l'atelier (cases comptées à partir de 1)", () => {
       { module_type_id: stock.id, x: 5, y: 1, pivote: false },
     ];
     const salaries = [
-      { id: "a", poste: "artisan" as const, experienceMois: 0 },
-      { id: "b", poste: "artisan" as const, experienceMois: 3 },
+      { id: "a", poste: "artisan" as const, experienceMois: 0, experienceJours: 0 },
+      { id: "b", poste: "artisan" as const, experienceMois: 3, experienceJours: 90 },
     ];
     const r = resumeProduction(plan, salaries, catalogue, parametres);
     expect(r.postes).toBe(1);
@@ -43,7 +43,7 @@ describe("plan de l'atelier (cases comptées à partir de 1)", () => {
   });
 
   it("sans poste, la capacité est nulle", () => {
-    const r = resumeProduction([], [{ id: "a", poste: "artisan", experienceMois: 0 }], catalogue, parametres);
+    const r = resumeProduction([], [{ id: "a", poste: "artisan", experienceMois: 0, experienceJours: 0 }], catalogue, parametres);
     expect(r.capaciteMinutes).toBe(0);
     expect(r.artisansSansPoste).toBe(1);
   });

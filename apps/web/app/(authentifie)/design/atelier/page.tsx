@@ -37,10 +37,10 @@ export default function PageDemoAtelier() {
         postesFournis={parametres["bail_machines_a_la_signature"]?.valeur ?? 0}
         valeurNetteMateriel={0}
         salaries={[
-          { id: "ex-1", poste: "artisan", experienceMois: 8, ancienneteMois: 8, depuis: "2026-03-02", salaireBrutCentimes: smic },
-          { id: "ex-2", poste: "artisan", experienceMois: 1, ancienneteMois: 1, depuis: "2026-10-05", salaireBrutCentimes: smic },
-          { id: "ex-3", poste: "artisan", experienceMois: 0, ancienneteMois: 0, depuis: "2026-11-02", salaireBrutCentimes: smic },
-          { id: "ex-4", poste: "artisan", experienceMois: 0, ancienneteMois: 0, depuis: "2026-11-20", salaireBrutCentimes: smic },
+          { id: "ex-1", poste: "artisan", experienceMois: 8, experienceJours: 240, ancienneteMois: 8, depuis: "2026-03-02", salaireBrutCentimes: smic },
+          { id: "ex-2", poste: "artisan", experienceMois: 1, experienceJours: 52, ancienneteMois: 1, depuis: "2026-10-05", salaireBrutCentimes: smic },
+          { id: "ex-3", poste: "artisan", experienceMois: 0, experienceJours: 24, ancienneteMois: 0, depuis: "2026-11-02", salaireBrutCentimes: smic },
+          { id: "ex-4", poste: "artisan", experienceMois: 0, experienceJours: 6, ancienneteMois: 0, depuis: "2026-11-20", salaireBrutCentimes: smic },
         ]}
         catalogue={catalogue}
         parametres={parametres}

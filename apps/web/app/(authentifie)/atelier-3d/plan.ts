@@ -23,8 +23,12 @@ import { TAILLE_MEUBLE as TAILLES, type TypeMeuble } from "../../../components/i
 
 export type ModulePlace = { module_type_id: string; x: number; y: number; pivote: boolean };
 export type DimensionsAtelier = { largeur: number; hauteur: number; entree_x: number; entree_y: number };
-/** Salarié tel que lu en base (expérience déjà à jour). */
-export type SalarieAtelier = { id: string; poste: "artisan" | "encadrement"; experienceMois: number };
+/**
+ * Salarié tel que lu en base (expérience déjà à jour). `experienceMois` ordonne les artisans au
+ * poste (comme le moteur) ; `experienceJours`, comptée depuis l'embauche, fixe le rendement
+ * (rendement_tau_jours, horloge réelle).
+ */
+export type SalarieAtelier = { id: string; poste: "artisan" | "encadrement"; experienceMois: number; experienceJours: number };
 /** Emprise en cases, coordonnées à partir de 1. */
 export type Emprise = { x: number; y: number; w: number; d: number };
 
@@ -126,7 +130,7 @@ export function resumeProduction(
   const heures = lire(parametres, "heures_mensuelles_legales");
   const rMin = lire(parametres, "rendement_atelier_min");
   const rMax = lire(parametres, "rendement_atelier_max");
-  const tau = lire(parametres, "rendement_tau_mois");
+  const tau = lire(parametres, "rendement_tau_jours");
 
   const pourMoteur = salaries.map((s) => ({
     id: idSalarie(s.id),
@@ -139,7 +143,7 @@ export function resumeProduction(
   const auPoste = salaries.filter((s) => idsAuPoste.has(s.id));
   const artisans = salaries.filter((s) => s.poste === "artisan").length;
 
-  const capacite = auPoste.reduce((s, a) => s + capaciteMinutes(1, 1, heures, rendement(a.experienceMois, rMin, rMax, tau)), 0);
+  const capacite = auPoste.reduce((s, a) => s + capaciteMinutes(1, 1, heures, rendement(Math.max(0, a.experienceJours), rMin, rMax, tau)), 0);
   return {
     postes,
     auPoste,

@@ -10,8 +10,10 @@ import {
   lireComptesPublics,
   moisDuProchainDepot,
   SELECT_COMPTES_PUBLICS,
+  titreExercice,
   type LocalDuJoueur,
 } from "./empire";
+import { indexDeMois } from "./cadre";
 
 const catalogue = chargerBatimentsV1();
 
@@ -88,6 +90,26 @@ describe("moisDuProchainDepot", () => {
     expect(moisDuProchainDepot(11)).toBe(12);
     expect(moisDuProchainDepot(12)).toBe(24);
     expect(moisDuProchainDepot(30)).toBe(36);
+  });
+  it("exercice civil : les comptes de 2026 sont publiés en janvier 2027", () => {
+    expect(moisDuProchainDepot(indexDeMois(2026, 11))).toBe(indexDeMois(2027, 1));
+    expect(moisDuProchainDepot(indexDeMois(2026, 12))).toBe(indexDeMois(2027, 1));
+  });
+});
+
+describe("titreExercice", () => {
+  it("nomme l'exercice par son année civile, sur toute l'année", () => {
+    expect(titreExercice({ numero: 2025, moisDebut: indexDeMois(2025, 1), moisFin: indexDeMois(2025, 12) })).toBe(
+      "Exercice 2025 (janvier à décembre 2025)",
+    );
+  });
+  it("premier exercice raccourci : du mois de création au 31 décembre", () => {
+    expect(titreExercice({ numero: 2026, moisDebut: indexDeMois(2026, 11), moisFin: indexDeMois(2026, 12) })).toBe(
+      "Exercice 2026 (novembre à décembre 2026)",
+    );
+  });
+  it("ancien compteur (mois depuis 0) : numéroté à partir de 1, comme avant", () => {
+    expect(titreExercice({ numero: 0, moisDebut: 0, moisFin: 11 })).toBe("Exercice 1 (mois 1 à 12)");
   });
 });
 

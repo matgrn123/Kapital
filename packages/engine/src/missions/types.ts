@@ -13,32 +13,50 @@ export type DefinitionMission = {
   readonly explication: string;
 };
 
-/** Une boutique signée : le bail court dès la signature, la boutique ouvre après les travaux. */
-export type BoutiquePourMission = {
-  readonly mois_signature: number;
-  readonly mois_ouverture: number;
+/**
+ * Durées des missions, en jours réels (horloge réelle, décision de Mathieu du 26/11/2026).
+ * Lues dans packages/content/parametres-v1.json par `reglesMissionsDepuis`.
+ */
+export type ReglesMissions = {
+  /** Mission 2 « Tenir 7 jours » : jours sans découvert depuis la création (`mission_tenir_jours`). */
+  readonly joursTenir: number;
+  /** Mission 3 : longueur des périodes de CA comparées, en jours (`mission_croissance_periode_jours`). */
+  readonly joursPeriodeCroissance: number;
+  /** Mission 4 : jours sans découvert après la signature du bail (`mission_boutique_jours`). */
+  readonly joursBoutique: number;
 };
 
-/** Solde du compte 512 (banque) à la fin d'un mois où il a bougé. */
-export type SoldeTresorerieMois = {
-  readonly mois: number;
+/** Une boutique signée : instant de la signature du bail (heure du jeu, ms). */
+export type BoutiquePourMission = {
+  readonly signee_le_ms: number;
+};
+
+/** Solde du compte 512 (banque) juste après les écritures d'un instant (heure du jeu, ms). */
+export type SoldeTresorerie = {
+  readonly instant_ms: number;
   readonly solde_centimes: Centimes;
 };
 
 export type MetriquesMissions = {
   readonly pieces_vendues_total: number;
   readonly marge_brute_cumul_centimes: Centimes;
-  readonly mois_jeu_courant: number;
-  readonly mois_jeu_creation: number;
+  /** Création de la société (heure du jeu, ms). */
+  readonly creation_ms: number;
+  /** Instant de l'évaluation (heure du jeu, ms). */
+  readonly maintenant_ms: number;
+  /** Le solde du 512 est passé sous zéro au moins une fois depuis la création. */
   readonly a_eu_decouvert: boolean;
-  readonly ca_mois_initial_centimes: Centimes;
-  readonly ca_mois_max_centimes: Centimes;
+  /** CA HT de la première période (semaine) où la société a vendu. */
+  readonly ca_periode_initiale_centimes: Centimes;
+  /** Meilleur CA HT d'une période (semaine). */
+  readonly ca_periode_max_centimes: Centimes;
   /** AE-11 : boutiques signées (vide si aucune). */
   readonly boutiques: readonly BoutiquePourMission[];
-  /** AE-11 : solde de trésorerie en fin de mois, mois croissants (seuls les mois où il a bougé). */
-  readonly tresorerie_fin_mois: readonly SoldeTresorerieMois[];
+  /** Solde de trésorerie au fil des écritures, par instant croissant (seuls les instants où il bouge). */
+  readonly tresorerie: readonly SoldeTresorerie[];
   /** AE-11 : un local a été loué (bail signé) ou acheté. */
   readonly local_signe: boolean;
+  readonly regles: ReglesMissions;
 };
 
 export type ProgressionMission = {

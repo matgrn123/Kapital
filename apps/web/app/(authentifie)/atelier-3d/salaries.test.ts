@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { chargerModulesV1, chargerParametresV1 } from "@kapital/content";
 import { centimes, coefficientsSalairesDepuisParametres, coutEmployeur } from "@kapital/engine";
 import { empriseModule, resumeProduction, type ModulePlace, type SalarieAtelier } from "./plan";
-import { casesAllee, chiffresFiche, placerSalaries, trierPostes, type PosteAtelier } from "./salaries";
+import { casesAllee, chiffresFiche, experienceJoursDepuis, placerSalaries, trierPostes, type PosteAtelier } from "./salaries";
 
 const catalogue = chargerModulesV1();
 const parametres = chargerParametresV1();
@@ -19,7 +19,7 @@ function placer(plan: ModulePlace[], salaries: SalarieAtelier[]) {
   return placerSalaries({ salaries, auPoste: resume.auPoste, postes, atelier, occupees: postes.map((p) => p.emprise) });
 }
 
-const artisan = (id: string, experienceMois = 0): SalarieAtelier => ({ id, poste: "artisan", experienceMois });
+const artisan = (id: string, experienceMois = 0): SalarieAtelier => ({ id, poste: "artisan", experienceMois, experienceJours: experienceMois * 30 });
 
 describe("salariés dans l'atelier (3D-6)", () => {
   it("chaque salarié recruté apparaît une fois, à un poste existant quand il y en a un", () => {
@@ -62,7 +62,7 @@ describe("salariés dans l'atelier (3D-6)", () => {
 
   it("l'encadrement n'occupe pas de poste de couture : il est dans l'allée", () => {
     const plan: ModulePlace[] = [{ module_type_id: typePoste.id, x: 3, y: 1, pivote: false }];
-    const places = placer(plan, [{ id: "chef", poste: "encadrement", experienceMois: 30 }]);
+    const places = placer(plan, [{ id: "chef", poste: "encadrement", experienceMois: 30, experienceJours: 900 }]);
     expect(places).toHaveLength(1);
     expect(places[0]!.poste).toBeNull();
   });
@@ -81,12 +81,29 @@ describe("salariés dans l'atelier (3D-6)", () => {
 
   it("la fiche reprend le coût employeur et le rendement du moteur", () => {
     const brut = parametres["smic_mensuel_brut"]!.valeur; // déjà en centimes
-    const c = chiffresFiche({ id: "a", poste: "artisan", experienceMois: 0, depuis: "2026-01-01", ancienneteMois: 0, salaireBrutCentimes: brut }, parametres);
+    const c = chiffresFiche({ id: "a", poste: "artisan", experienceMois: 0, experienceJours: 0, depuis: "2026-01-01", ancienneteMois: 0, salaireBrutCentimes: brut }, parametres);
     expect(c.coutEmployeurCentimes).toBe(coutEmployeur({ ...coefficientsSalairesDepuisParametres(parametres), salaireBrutMensuel: centimes(brut) }));
     expect(c.rendement).toBe(parametres["rendement_atelier_min"]!.valeur);
     expect(c.rendementDebutant).toBe(parametres["rendement_atelier_min"]!.valeur);
-    const ancien = chiffresFiche({ id: "a", poste: "artisan", experienceMois: 24, depuis: "2026-01-01", ancienneteMois: 24, salaireBrutCentimes: brut }, parametres);
+    const ancien = chiffresFiche({ id: "a", poste: "artisan", experienceMois: 24, experienceJours: 720, depuis: "2026-01-01", ancienneteMois: 24, salaireBrutCentimes: brut }, parametres);
     expect(ancien.rendement).toBeGreaterThan(c.rendement);
     expect(ancien.rendement).toBeLessThanOrEqual(ancien.rendementMax);
+  });
+
+  it("apprentissage en jours depuis l'embauche : aux deux tiers du chemin après rendement_tau_jours jours", () => {
+    const brut = parametres["smic_mensuel_brut"]!.valeur;
+    const tau = parametres["rendement_tau_jours"]!.valeur;
+    const rMin = parametres["rendement_atelier_min"]!.valeur;
+    const rMax = parametres["rendement_atelier_max"]!.valeur;
+    const c = chiffresFiche({ id: "a", poste: "artisan", experienceMois: 0, experienceJours: tau, depuis: "2026-11-12", ancienneteMois: 0, salaireBrutCentimes: brut }, parametres);
+    expect(c.rendement).toBeCloseTo(rMin + (rMax - rMin) * (1 - Math.exp(-1)), 10);
+  });
+
+  it("experienceJoursDepuis : jours écoulés depuis la date d'embauche, 0 sans date", () => {
+    const maintenant = Date.parse("2026-11-26T09:21:00.000Z");
+    expect(experienceJoursDepuis("2026-11-12T09:21:00.000Z", maintenant)).toBe(14);
+    expect(experienceJoursDepuis("2026-11-27T09:21:00.000Z", maintenant)).toBe(0);
+    expect(experienceJoursDepuis(null, maintenant)).toBe(0);
+    expect(experienceJoursDepuis("pas une date", maintenant)).toBe(0);
   });
 });

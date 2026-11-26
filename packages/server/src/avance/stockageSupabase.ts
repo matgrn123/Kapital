@@ -507,7 +507,7 @@ export class StockageSupabase implements StockageMonde {
           .eq("company_id", companyId),
         this.supabase
           .from("employees")
-          .select("id, poste, salaire_brut_mensuel_centimes, anciennete_mois_debut, experience_mois_debut, mois_jeu_debut")
+          .select("id, poste, salaire_brut_mensuel_centimes, anciennete_mois_debut, experience_mois_debut, mois_jeu_debut, cree_le")
           .eq("company_id", companyId)
           .eq("statut", "actif"),
         this.supabase
@@ -566,6 +566,7 @@ export class StockageSupabase implements StockageMonde {
     const employees = (verifier("employees", empR) ?? []) as Array<{
       id: string; poste: Poste; salaire_brut_mensuel_centimes: number;
       anciennete_mois_debut: number; experience_mois_debut: number; mois_jeu_debut: number | null;
+      cree_le?: string | null;
     }>;
     const workshops = (verifier("workshops", atelierR) ?? []) as LigneWorkshop[];
     const loans = (verifier("loans", pretsR) ?? []) as Array<{
@@ -628,12 +629,17 @@ export class StockageSupabase implements StockageMonde {
       })),
       salaries: employees.map((e) => {
         const dureeService = Math.max(0, moisEnCours - (e.mois_jeu_debut ?? 0));
+        // Rendement : expérience en jours depuis l'embauche (horloge réelle, rendement_tau_jours).
+        // cree_le est un instant réel ; en production worlds.debut_reel = 1er janvier 1970, il se
+        // confond avec l'heure du jeu (l'outil « avancer le temps » de la recette l'en écarte).
+        const embaucheMs = e.cree_le ? Date.parse(e.cree_le) : Number.NaN;
         return {
           id: idSalarie(e.id),
           poste: e.poste,
           salaireBrutMensuel: centimes(e.salaire_brut_mensuel_centimes),
           ancienneteMois: e.anciennete_mois_debut + dureeService,
           experienceMois: e.experience_mois_debut + dureeService,
+          ...(Number.isFinite(embaucheMs) ? { embaucheMs } : {}),
         };
       }),
       ateliers,
