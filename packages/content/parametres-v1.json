@@ -215,6 +215,150 @@
     "source": "docs/cahier-des-charges-v1.md section 6.2 - les relations presse jouent sur les deux jauges",
     "date": "2026-11-01"
   },
+  "marketing_k_notoriete_influenceur_nano": {
+    "valeur": 0.8,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : un petit compte (1 000 à 10 000 abonnés) touche peu de monde ; effet = k × ln(1 + montant en euros), même forme que docs/cahier-des-charges-v1.md section 6.2",
+    "date": "2026-11-25"
+  },
+  "marketing_k_desirabilite_influenceur_nano": {
+    "valeur": 1.6,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : le petit compte a l'engagement le plus élevé (5,85 % en France selon HypeAuditor, cité par The Media Leader), il donne surtout envie",
+    "date": "2026-11-25"
+  },
+  "marketing_montant_min_influenceur_nano": {
+    "valeur": 2500,
+    "unite": "centimes",
+    "source": "Bas de la fourchette 25 à 150 € par publication d'un nano-influenceur : Influee, « Combien coûte un influenceur en 2026 ? » (blog d'agence, https://influee.co/fr/blog/instagram-influencer-pricing) ; Influencer Hero, guide de tarification (blog, en dollars) ; étude Matriochka Influences 2025-2026 (600 collaborations françaises, médiane micro 3 000 €, macro 6 750 à 8 000 €). Chiffres de blogs, hypothèse de jeu, à valider",
+    "date": "2026-11-25"
+  },
+  "marketing_alea_amplitude_influenceur_nano": {
+    "valeur": 0.2,
+    "unite": "ratio",
+    "source": "hypothèse de jeu, à valider : l'effet d'un petit compte varie de ± 20 % (aléa = 1 + amplitude × (2u − 1))",
+    "date": "2026-11-25"
+  },
+  "marketing_k_notoriete_influenceur_micro": {
+    "valeur": 1.4,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : compte moyen (10 000 à 100 000 abonnés), notoriété et désirabilité à parts égales",
+    "date": "2026-11-25"
+  },
+  "marketing_k_desirabilite_influenceur_micro": {
+    "valeur": 1.4,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : compte moyen, notoriété et désirabilité à parts égales",
+    "date": "2026-11-25"
+  },
+  "marketing_montant_min_influenceur_micro": {
+    "valeur": 20000,
+    "unite": "centimes",
+    "source": "Bas de la fourchette 200 à 1 000 € par publication d'un micro-influenceur : Influee, « Combien coûte un influenceur en 2026 ? » (blog d'agence, https://influee.co/fr/blog/instagram-influencer-pricing) ; Influencer Hero, guide de tarification (blog, en dollars) ; étude Matriochka Influences 2025-2026 (600 collaborations françaises, médiane micro 3 000 €, macro 6 750 à 8 000 €). Chiffres de blogs, hypothèse de jeu, à valider",
+    "date": "2026-11-25"
+  },
+  "marketing_alea_amplitude_influenceur_micro": {
+    "valeur": 0.4,
+    "unite": "ratio",
+    "source": "hypothèse de jeu, à valider : l'effet d'un compte moyen varie de ± 40 %",
+    "date": "2026-11-25"
+  },
+  "marketing_k_notoriete_influenceur_macro": {
+    "valeur": 2.4,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : un gros compte (plus de 100 000 abonnés) fait surtout connaître la marque",
+    "date": "2026-11-25"
+  },
+  "marketing_k_desirabilite_influenceur_macro": {
+    "valeur": 0.8,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : un gros compte a un engagement plus faible, il donne moins envie qu'un petit",
+    "date": "2026-11-25"
+  },
+  "marketing_montant_min_influenceur_macro": {
+    "valeur": 100000,
+    "unite": "centimes",
+    "source": "Bas de la fourchette 1 000 à 5 000 € par publication d'un macro-influenceur : Influee, « Combien coûte un influenceur en 2026 ? » (blog d'agence, https://influee.co/fr/blog/instagram-influencer-pricing) ; Influencer Hero, guide de tarification (blog, en dollars) ; étude Matriochka Influences 2025-2026 (600 collaborations françaises, médiane micro 3 000 €, macro 6 750 à 8 000 €). Chiffres de blogs, hypothèse de jeu, à valider",
+    "date": "2026-11-25"
+  },
+  "marketing_alea_amplitude_influenceur_macro": {
+    "valeur": 0.7,
+    "unite": "ratio",
+    "source": "hypothèse de jeu, à valider : l'effet d'un gros compte varie de ± 70 % (un succès ou un flop)",
+    "date": "2026-11-25"
+  },
+  "marketing_k_notoriete_reseaux_sociaux": {
+    "valeur": 1.8,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : publicité ciblée sur les réseaux sociaux, presque aussi efficace qu'une publicité classique (2,0) pour la notoriété",
+    "date": "2026-11-25"
+  },
+  "marketing_k_desirabilite_reseaux_sociaux": {
+    "valeur": 0.2,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : une publicité sponsorisée donne peu envie",
+    "date": "2026-11-25"
+  },
+  "marketing_montant_min_reseaux_sociaux": {
+    "valeur": 5000,
+    "unite": "centimes",
+    "source": "hypothèse de jeu, à valider : une petite campagne d'environ 5 000 affichages au coût pour mille de marketing_cpm_reseaux_sociaux",
+    "date": "2026-11-25"
+  },
+  "marketing_cpm_reseaux_sociaux": {
+    "valeur": 1000,
+    "unite": "centimes",
+    "source": "Coût pour 1 000 affichages sur Facebook et Instagram en France : 8 à 14 € sur Facebook, 10 à 18 € sur Instagram (blogs Influee et iambeezy, 2026, https://influee.co/fr/blog/good-cpm-facebook-ads) ; pas de chiffre officiel de Meta, hypothèse de jeu à 10 €, à valider. Sert seulement à afficher le nombre d'affichages",
+    "date": "2026-11-25"
+  },
+  "marketing_k_notoriete_affichage_metro": {
+    "valeur": 2.6,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : l'affichage dans le métro est vu par beaucoup de monde, très bon pour la notoriété",
+    "date": "2026-11-25"
+  },
+  "marketing_k_desirabilite_affichage_metro": {
+    "valeur": 0.6,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : une affiche dans le métro donne un peu d'image à la marque",
+    "date": "2026-11-25"
+  },
+  "marketing_montant_min_affichage_metro": {
+    "valeur": 1300000,
+    "unite": "centimes",
+    "source": "Environ 13 000 € pour 100 affiches pendant 7 jours dans le métro parisien (source non officielle : la grille de Mediatransports, régie du métro, n'est pas publique), hypothèse de jeu, à valider",
+    "date": "2026-11-25"
+  },
+  "marketing_etape_min_affichage_metro": {
+    "valeur": 2,
+    "unite": "etape",
+    "source": "hypothèse de jeu, à valider : l'affichage dans le métro demande un budget d'entreprise installée, proposé à partir de l'étape 2 (docs/plan-architecture-entreprise.md section 1 pour les étapes)",
+    "date": "2026-11-25"
+  },
+  "marketing_k_notoriete_agence_publicite": {
+    "valeur": 2,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : une agence mène une campagne complète, aussi efficace qu'une publicité (2,0) sur ce qui reste du budget après ses honoraires",
+    "date": "2026-11-25"
+  },
+  "marketing_k_desirabilite_agence_publicite": {
+    "valeur": 2,
+    "unite": "coefficient",
+    "source": "hypothèse de jeu, à valider : et aussi efficace qu'une campagne d'image de marque (2,0)",
+    "date": "2026-11-25"
+  },
+  "marketing_montant_min_agence_publicite": {
+    "valeur": 300000,
+    "unite": "centimes",
+    "source": "hypothèse de jeu, à valider : budget minimum qu'une agence accepte pour une campagne",
+    "date": "2026-11-25"
+  },
+  "marketing_honoraires_agence_taux": {
+    "valeur": 0.15,
+    "unite": "ratio",
+    "source": "Commission d'agence d'usage : 15 % pour le web et les salons, 20 % pour la presse (JurisPedia, « Loi Sapin sur la publicité », https://lagbd.org/Loi_Sapin_sur_la_publicit%C3%A9_(fr)) ; la loi Sapin (n° 93-122) encadre le mandat mais ne fixe pas le taux",
+    "date": "2026-11-25"
+  },
   "tva_standard": {
     "valeur": 0.20,
     "unite": "ratio",

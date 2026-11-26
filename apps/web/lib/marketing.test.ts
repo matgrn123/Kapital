@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { chargerParametresV1 } from "@kapital/content";
-import { planComptableV1 } from "@kapital/engine";
-import { COMPTE_MARKETING, confirmationDepense, marqueApresAction } from "./marketing";
+import { coefficientsMarketingDepuisParametres, planComptableV1 } from "@kapital/engine";
+import {
+  ACTIONS_MARKETING,
+  COMPTE_MARKETING,
+  confirmationDepense,
+  estActionMarketing,
+  marqueApresAction,
+} from "./marketing";
 import { PLAN_COMPTABLE } from "./comptes";
 
 const P = chargerParametresV1();
@@ -30,6 +36,24 @@ describe("marqueApresAction", () => {
       });
     }
   }
+});
+
+describe("marqueApresAction avec un aléa (influenceur)", () => {
+  it("applique l'aléa tiré par la route ; sans aléa, l'effet moyen", () => {
+    const c = coefficientsMarketingDepuisParametres(P);
+    const r = c.actions.influenceur_micro;
+    const m = Math.log(1 + 500);
+    const moyen = marqueApresAction({ notoriete: 10, desirabilite: 10 }, "influenceur_micro", 50_000, P);
+    const chanceux = marqueApresAction({ notoriete: 10, desirabilite: 10 }, "influenceur_micro", 50_000, P, 1.3);
+    expect(moyen.notoriete).toBeCloseTo(10 + r.kNotoriete * m, 10);
+    expect(chanceux.notoriete).toBeCloseTo(10 + r.kNotoriete * m * 1.3, 10);
+  });
+
+  it("la liste de l'interface est celle du moteur (dix actions)", () => {
+    expect(ACTIONS_MARKETING).toHaveLength(10);
+    expect(estActionMarketing("influenceur_nano")).toBe(true);
+    expect(estActionMarketing("affichage_tramway")).toBe(false);
+  });
 });
 
 describe("compte marketing", () => {

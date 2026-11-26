@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chargerParametresV1 } from "@kapital/content";
-import { coefficientsMarketingDepuisParametres, prixHtDepuisTtc, centimes } from "@kapital/engine";
+import { ACTIONS_MARKETING, coefficientsMarketingDepuisParametres, prixHtDepuisTtc, centimes } from "@kapital/engine";
 import {
   apercuAtelier,
   apercuCommandeMatiere,
@@ -123,7 +123,7 @@ describe("apercuMarketing", () => {
   const coefficients = coefficientsMarketingDepuisParametres(params);
 
   it("fait monter la notoriété et baisser la désirabilité avec une promotion", () => {
-    const r = apercuMarketing({ action: "promotion", montant: 50000, tresorerie: 100000, marque: { notoriete: 20, desirabilite: 30 }, coefficients });
+    const r = apercuMarketing({ action: "promotion", montant: 50000, tresorerie: 100000, marque: { notoriete: 20, desirabilite: 30 }, coefficients, etape: 1 });
     if (!r.ok) throw new Error(r.message);
     expect(r.apres.notoriete).toBeGreaterThan(20);
     expect(r.apres.desirabilite).toBeLessThan(30);
@@ -132,7 +132,7 @@ describe("apercuMarketing", () => {
   });
 
   it("donne le même effet que la route (k × ln(1 + euros))", () => {
-    const r = apercuMarketing({ action: "publicite", montant: 50000, tresorerie: 100000, marque: { notoriete: 10, desirabilite: 10 }, coefficients });
+    const r = apercuMarketing({ action: "publicite", montant: 50000, tresorerie: 100000, marque: { notoriete: 10, desirabilite: 10 }, coefficients, etape: 1 });
     if (!r.ok) throw new Error(r.message);
     expect(r.apres.notoriete).toBeCloseTo(10 + coefficients.kNotorietePublicite * Math.log(1 + 500), 9);
   });
@@ -145,8 +145,56 @@ describe("apercuMarketing", () => {
   });
 
   it("refuse si la trésorerie ne suffit pas", () => {
-    const r = apercuMarketing({ action: "publicite", montant: 2000, tresorerie: 1000, marque: { notoriete: 0, desirabilite: 0 }, coefficients });
+    const r = apercuMarketing({ action: "publicite", montant: 2000, tresorerie: 1000, marque: { notoriete: 0, desirabilite: 0 }, coefficients, etape: 1 });
     expect(r).toEqual({ ok: false, message: "Trésorerie insuffisante : il te manque 10,00 €." });
+  });
+
+  const marque = { notoriete: 10, desirabilite: 10 };
+  const min = (cle: string) => params[`marketing_montant_min_${cle}`]!.valeur;
+
+  it("refuse un budget sous le minimum de l'action, avec le même message que le serveur", () => {
+    const r = apercuMarketing({ action: "influenceur_micro", montant: min("influenceur_micro") - 1, tresorerie: 10 ** 9, marque, coefficients, etape: 1 });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.message).toMatch(/budget minimum est de 200,00 €/);
+  });
+
+  it("montre la fourchette de l'aléa d'un influenceur, autour de l'effet moyen", () => {
+    const r = apercuMarketing({ action: "influenceur_macro", montant: 200_000, tresorerie: 10 ** 9, marque, coefficients, etape: 1 });
+    if (!r.ok) throw new Error(r.message);
+    const amp = coefficients.actions.influenceur_macro.amplitudeAlea;
+    expect(r.alea).toEqual({ min: 1 - amp, max: 1 + amp });
+    expect(r.apresMin.notoriete).toBeLessThan(r.apres.notoriete);
+    expect(r.apresMax.notoriete).toBeGreaterThan(r.apres.notoriete);
+    expect(r.apresMax.notoriete - 10).toBeCloseTo((r.apres.notoriete - 10) * (1 + amp), 9);
+  });
+
+  it("agence : montre les honoraires, l'écriture reste 623 / 512 pour le montant total", () => {
+    const r = apercuMarketing({ action: "agence_publicite", montant: 400_000, tresorerie: 10 ** 9, marque, coefficients, etape: 1 });
+    if (!r.ok) throw new Error(r.message);
+    expect(r.honoraires).toBe(Math.round(400_000 * params["marketing_honoraires_agence_taux"]!.valeur));
+    expect(r.ecriture).toEqual(ecritureMarketing(400_000));
+  });
+
+  it("réseaux sociaux : nombre d'affichages au coût pour mille des paramètres", () => {
+    const r = apercuMarketing({ action: "reseaux_sociaux", montant: 10_000, tresorerie: 10 ** 9, marque, coefficients, etape: 1 });
+    if (!r.ok) throw new Error(r.message);
+    expect(r.affichages).toBe(Math.floor((10_000 / params["marketing_cpm_reseaux_sociaux"]!.valeur) * 1000));
+  });
+
+  it("métro : refusé avant l'étape prévue", () => {
+    const etape = params["marketing_etape_min_affichage_metro"]!.valeur;
+    const montant = min("affichage_metro");
+    expect(apercuMarketing({ action: "affichage_metro", montant, tresorerie: 10 ** 9, marque, coefficients, etape: etape - 1 }).ok).toBe(false);
+    expect(apercuMarketing({ action: "affichage_metro", montant, tresorerie: 10 ** 9, marque, coefficients, etape }).ok).toBe(true);
+  });
+
+  it("chaque action donne une écriture équilibrée", () => {
+    for (const action of ACTIONS_MARKETING) {
+      const montant = Math.max(coefficients.actions[action].montantMinimum, 12_345);
+      const r = apercuMarketing({ action, montant, tresorerie: 10 ** 9, marque, coefficients, etape: 3 });
+      if (!r.ok) throw new Error(r.message);
+      expect(equilibreEcriture(r.ecriture).equilibree).toBe(true);
+    }
   });
 });
 
@@ -210,11 +258,22 @@ describe("effetsMarketing", () => {
   it("donne l'écart de chaque jauge pour les quatre actions, comme apercuMarketing", () => {
     const marque = { notoriete: 10, desirabilite: 20 };
     const e = effetsMarketing({ montant: 30000, marque, coefficients });
-    const pub = apercuMarketing({ action: "publicite", montant: 30000, tresorerie: 10 ** 9, marque, coefficients });
+    const pub = apercuMarketing({ action: "publicite", montant: 30000, tresorerie: 10 ** 9, marque, coefficients, etape: 1 });
     if (!pub.ok) throw new Error(pub.message);
     expect(e.publicite.notoriete).toBeCloseTo(pub.apres.notoriete - 10);
     expect(e.promotion.desirabilite).toBeLessThan(0);
-    expect(Object.keys(e).sort()).toEqual(["image_marque", "promotion", "publicite", "relations_presse"]);
+    expect(Object.keys(e).sort()).toEqual([...ACTIONS_MARKETING].sort());
+  });
+  it("donne la fourchette de l'aléa pour un influenceur, et signale un budget sous le minimum", () => {
+    const marque = { notoriete: 10, desirabilite: 20 };
+    const e = effetsMarketing({ montant: 30000, marque, coefficients });
+    const f = e.influenceur_micro.fourchette;
+    if (!f) throw new Error("fourchette attendue");
+    expect(f.notoriete[0]).toBeLessThan(e.influenceur_micro.notoriete);
+    expect(f.notoriete[1]).toBeGreaterThan(e.influenceur_micro.notoriete);
+    expect(e.publicite.fourchette).toBeUndefined();
+    expect(e.influenceur_macro.sousMinimum).toBe(true);
+    expect(e.influenceur_nano.sousMinimum).toBeUndefined();
   });
   it("rend zéro partout pour un budget nul", () => {
     const e = effetsMarketing({ montant: 0, marque: { notoriete: 5, desirabilite: 5 }, coefficients });
