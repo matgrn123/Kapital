@@ -26,6 +26,7 @@ import {
 import { simulerPas } from "./pas.js";
 import { simulerMoisEntreprise } from "./simulerMois.js";
 import { configTempsDepuis } from "./temps.js";
+import { eurosTexte } from "../types/euros.js";
 import { postesALaSignature } from "../atelier/effetsPlan.js";
 import { chargerModulesV1 } from "@kapital/content";
 
@@ -691,29 +692,58 @@ describe("simulerPas — vente revendeur au prix HT saisi, plus la TVA", () => {
 
 describe("simulerPas — une dépense passée par une route en cours de mois", () => {
   // Le serveur recharge la trésorerie depuis la base à chaque lot : une écriture passée par une
-  // route (623 / 512) la fait baisser. Mais la clôture repart de cumul.tresorerieDebutMois plus
-  // les mouvements des seuls pas : elle ne la voit pas (agios, découvert, étape, message).
-  // CONNU, NON CORRIGÉ ICI : la correction est dans cloture.ts (hors du périmètre de ce correctif),
-  // signalée dans la PR. Ce test passera au rouge le jour où ce sera corrigé : retirer « .fails ».
-  it.fails("la trésorerie de clôture devrait compter une publicité de 500 € payée par la route", () => {
+  // route (623 / 512) la fait baisser. La clôture part de cette trésorerie courante (celle de
+  // l'entreprise après les pas), et non plus de la trésorerie de début de mois plus les seuls pas :
+  // agios, compteur de découvert, seuil d'étape et message de clôture voient donc la dépense.
+
+  /** Joue un mois pas à pas ; à mi-mois, la « base » rend une trésorerie baissée de `depense`. */
+  function moisAvecDepenseDeRoute(depense: number, depart: Entreprise = entrepriseDeTest()) {
     const params = paramsNeutres();
     const nbPas = configTempsDepuis(params).pasParMois;
-    const depart = entrepriseDeTest();
     let ent = depart;
     let cumul: CumulMois | null = null;
     const ecritures: EcritureComptable[] = [];
     let cloture: ResultatClotureEntreprise | null = null;
     for (let i = 0; i < nbPas; i++) {
-      // À mi-mois, la route publicité passe 623 / 512 : la base rend une trésorerie plus basse.
-      if (i === nbPas / 2) ent = { ...ent, tresorerie: centimes(ent.tresorerie - 50_000) };
+      if (i === nbPas / 2) ent = { ...ent, tresorerie: centimes(ent.tresorerie - depense) };
       const r = simulerPas(ent, cumul, FLUX_VIDE, i === nbPas - 1 ? FIN_VIDE : null, MARKET, params, G, moisJeu(1), i);
       ent = r.entrepriseApres;
       cumul = r.cumul;
       ecritures.push(...r.ecrituresDuPas);
       if (r.cloture) cloture = r.cloture;
     }
-    expect(cloture!.entrepriseApres.tresorerie).toBe(
+    return { depart, ecritures, cloture: cloture! };
+  }
+
+  it("la trésorerie de clôture compte une publicité de 500 € payée par la route", () => {
+    const { depart, ecritures, cloture } = moisAvecDepenseDeRoute(50_000);
+    expect(cloture.entrepriseApres.tresorerie).toBe(
       depart.tresorerie - 50_000 + (soldesParCompte(ecritures)["512"] ?? 0),
+    );
+  });
+
+  it("une publicité qui fait passer la banque sous zéro déclenche agios et compteur de découvert", () => {
+    // 100 000 € de publicité pour 50 000 € en banque : le mois finit à découvert.
+    const { depart, ecritures, cloture } = moisAvecDepenseDeRoute(10_000_000);
+    const fin = depart.tresorerie - 10_000_000 + (soldesParCompte(ecritures)["512"] ?? 0);
+    expect(fin).toBeLessThan(0);
+    expect(cloture.entrepriseApres.tresorerie).toBe(fin);
+
+    const agios = ecritures.find((e) => e.id === "agios_1_ent_a");
+    expect(agios).toBeDefined();
+    const montantAgios = agios!.lignes.find((l) => l.compte === "661")!.montant;
+    // Agios sur le découvert d'avant agios (la trésorerie finale les inclut déjà).
+    expect(montantAgios).toBe(Math.round((Math.abs(fin + montantAgios) * 0.15) / 12));
+    expect(cloture.moisDecouvertConsecutifsApres).toBe(1);
+
+    const message = cloture.explications.find((x) => x.cle === "tresorerie")!.message;
+    expect(message).toContain(eurosTexte(centimes(fin)));
+  });
+
+  it("sans dépense de route, le résultat est inchangé (trésorerie = départ + mouvements 512)", () => {
+    const { depart, ecritures, cloture } = moisAvecDepenseDeRoute(0);
+    expect(cloture.entrepriseApres.tresorerie).toBe(
+      depart.tresorerie + (soldesParCompte(ecritures)["512"] ?? 0),
     );
   });
 });

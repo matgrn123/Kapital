@@ -412,6 +412,37 @@ describe("avancerMondeJusquA — une seule convention de mois", () => {
   });
 });
 
+describe("avancerMondeJusquA — dépense passée par une route en cours de mois", () => {
+  // Une publicité payée par le site (623 / 512) baisse la trésorerie en base entre deux lots.
+  // La clôture doit la voir : agios, compteur de mois à découvert, trésorerie de fin de mois.
+  it("une publicité de 100 000 € payée à mi-mois met la clôture à découvert : agios et compteur", async () => {
+    const s = monde();
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 0.5 * JOUR);
+    s.passerEcritureDeRoute("a", {
+      id: "marketing_test_a",
+      mois: moisJeu(0),
+      libelle: "Publicité",
+      lignes: [
+        { compte: "623", sens: "debit", montant: centimes(10_000_000) },
+        { compte: "512", sens: "credit", montant: centimes(10_000_000) },
+      ],
+    });
+    await avancerMondeJusquA(s, PARAMS, DEBUT + 1 * JOUR);
+
+    const e = s.entreprises.get("a")!;
+    expect(e.pasTraites).toBe(N);
+    let net512 = 0;
+    for (const ec of s.ecrituresDe("a")) {
+      for (const l of ec.lignes) if (l.compte === "512") net512 += l.sens === "debit" ? l.montant : -l.montant;
+    }
+    // Trésorerie = départ + tout le compte 512, publicité comprise ; elle finit sous zéro.
+    expect(e.entreprise.tresorerie).toBe(5_000_000 + net512);
+    expect(e.entreprise.tresorerie).toBeLessThan(0);
+    expect(idsEcritures(s, "a")).toContain("agios_0_a");
+    expect(e.moisDecouvertConsecutifs).toBe(1);
+  });
+});
+
 describe("avancerMondeJusquA — journal d'événements (migration 0041)", () => {
   const livraison = (id: string, instantMs: number) => ({
     type: "matiere" as const,
