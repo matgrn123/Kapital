@@ -82,6 +82,20 @@ export class StockageMemoire implements StockageMonde {
     this.livraisons.set(companyId, liste);
   }
 
+  /**
+   * Écriture passée par une route du site en cours de mois (ex. publicité 623 / 512), hors des
+   * pas : comme le trigger maj_tresorerie (migration 0016), la trésorerie suit le compte 512.
+   */
+  passerEcritureDeRoute(companyId: string, ecriture: EcritureComptable): void {
+    const e = this.enregistrement(companyId);
+    let net512 = 0;
+    for (const l of ecriture.lignes) {
+      if (l.compte === "512") net512 += l.sens === "debit" ? l.montant : -l.montant;
+    }
+    e.entreprise = { ...e.entreprise, tresorerie: centimes(e.entreprise.tresorerie + net512) };
+    this.ecritures.push({ companyId, ecriture: viaJson(ecriture) });
+  }
+
   private enregistrement(companyId: string): EnregistrementEntreprise {
     const e = this.entreprises.get(companyId);
     if (!e) throw new Error(`entreprise inconnue : ${companyId}`);
