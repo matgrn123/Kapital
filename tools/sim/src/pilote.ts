@@ -17,7 +17,7 @@ import {
   coefficientsSalairesDepuisParametres,
   fluxMarque,
   commanderAuGrossiste,
-  configTempsDepuis,
+  debutDuMoisMs,
   coutRevientEstime,
   creerSociete,
   ecritureAchatModules,
@@ -281,20 +281,16 @@ function ajouterStockFini(e: Entreprise, produit: string, quantite: number, vale
   );
 }
 
-function msParMoisJeu(params: Parametres): number {
-  return configTempsDepuis(params).minutesReellesParMoisJeu * 60_000;
-}
-
 /** TP-3 : commande au grossiste local, livrée dans le mois, payée le mois suivant. */
 export function commanderGrossiste(etat: EtatBanc, produit: string, quantite: number): ResultatAction {
   const { id } = produitDuMonde(produit);
-  const debutMoisMs = etat.mois * msParMoisJeu(etat.params);
+  // Le banc commande au début du mois ; la livraison (30 min) tombe dans le même mois.
   const c = commanderAuGrossiste({
     params: etat.params,
     produit: id,
     quantite,
     coutUsineParPiece: centimes(coutUsine(etat.params, produit)),
-    instantCommandeMs: debutMoisMs,
+    instantCommandeMs: debutDuMoisMs(etat.mois),
   });
   const verif = verifierQuantiteCommande({
     quantite,
@@ -318,7 +314,7 @@ export function commanderGrossiste(etat: EtatBanc, produit: string, quantite: nu
       {
         id: idCommande,
         nature: "faconnier",
-        moisLivraison: Math.floor(c.instantLivraisonMs / msParMoisJeu(etat.params)),
+        moisLivraison: c.moisLivraison,
         delaiPaiementMois: GROSSISTE_LOCAL.delaiPaiementMois,
         montantDette: montantFactureFaconnier(quantite, c.prixParPiece, null),
         livraisonMatiere: null,
@@ -349,7 +345,8 @@ export function commanderMatiere(
       catalogue: f.catalogue,
       matiere: matiere as never,
       quantite,
-      moisCommande: moisJeu(etat.mois),
+      // Au début du mois : la livraison (quelques heures) tombe dans le même mois.
+      instantCommandeMs: debutDuMoisMs(etat.mois),
     });
   } catch (err) {
     return refus("commande_refusee", (err as Error).message);

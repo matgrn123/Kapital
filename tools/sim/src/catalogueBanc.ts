@@ -60,7 +60,8 @@ export type FournisseurDuMonde = {
 function fournisseur(
   id: string,
   nom: string,
-  delaiMois: number,
+  /** Délai de livraison en heures réelles (suppliers.delai_heures, migration 0044). */
+  delaiHeures: number,
   fiabilite: number,
   minimumCommande: number,
   delaiPaiementMois: number,
@@ -71,7 +72,7 @@ function fournisseur(
       id: idFournisseur(id),
       nom,
       qualite: 0,
-      delaiMois,
+      delaiHeures,
       fiabilite,
       minimumCommande,
       delaiPaiementMois,
@@ -84,24 +85,24 @@ function fournisseur(
 }
 
 export const FOURNISSEURS: Readonly<Record<string, FournisseurDuMonde>> = {
-  four_fr: fournisseur("four_fr", "Textile France", 1, 0.95, 50, 1, [
+  four_fr: fournisseur("four_fr", "Textile France", 2, 0.95, 50, 1, [
     ["mat_jersey_coton", 500],
     ["mat_popeline", 900],
     ["mat_toile_coton", 600],
     ["mat_fournitures", 60],
   ]),
-  four_pt: fournisseur("four_pt", "Têxteis Porto", 2, 0.9, 100, 1, [
+  four_pt: fournisseur("four_pt", "Têxteis Porto", 4, 0.9, 100, 1, [
     ["mat_jersey_coton", 420],
     ["mat_popeline", 750],
     ["mat_toile_coton", 500],
   ]),
-  four_tr: fournisseur("four_tr", "Istanbul Fabrics", 2, 0.85, 300, 2, [
+  four_tr: fournisseur("four_tr", "Istanbul Fabrics", 6, 0.85, 300, 2, [
     ["mat_jersey_coton", 350],
     ["mat_popeline", 650],
   ]),
 };
 
-/** Grossiste local (0023) : livre le jour même, payé un mois plus tard, minimum 1 pièce. */
+/** Grossiste local (0023) : livre en grossiste_delai_minutes (30 min), payé un mois plus tard, minimum 1 pièce. */
 export const GROSSISTE_LOCAL = {
   id: "gros_local",
   delaiPaiementMois: 1,

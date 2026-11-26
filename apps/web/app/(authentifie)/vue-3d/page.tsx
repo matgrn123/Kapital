@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { chargerBatimentsV1 } from "@kapital/content";
-import { reglesPretV1 } from "@kapital/server";
+import { chargerBatimentsV1, chargerParametresV1 } from "@kapital/content";
+import { delaiGrossisteMinutes } from "@kapital/engine";
+import { ID_GROSSISTE_LOCAL, reglesPretV1 } from "@kapital/server";
 import { Bandeau, EnTete } from "../../../components/ui/formulaire";
 import { Puce } from "../../../components/ui";
+import { texteDuree } from "../../../lib/apercus";
 import { dateHeureLisible, instantDuJeu } from "../../../lib/cadre";
 import { formaterEuros } from "../../../lib/formatage";
 import { libelleGamme } from "../../../lib/lisible";
@@ -16,7 +18,8 @@ import { Village, type FicheActeur } from "./Village";
 // acteurs réels du monde (fournisseurs, façonniers, banque, concurrents). Tous les chiffres
 // viennent de la base ; le plan (lib/vue3d.ts) ne fait que placer les bâtiments.
 
-type Partenaire = { id: string; nom: string; pays: string; delai_mois: number; minimum_commande: number };
+/** `delai_heures` : délai de livraison en heures réelles (migration 0044). */
+type Partenaire = { id: string; nom: string; pays: string; delai_heures: number; minimum_commande: number };
 type Concurrent = { company_id: string; nom: string; gamme: string; pseudo: string; valeur_centimes: number | null };
 
 const pourcent = (x: number) => `${(x * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %`;
@@ -59,8 +62,8 @@ export default async function PageVillage() {
     await Promise.all([
       supabase.from("product_stock").select("quantite_pieces").eq("company_id", entreprise.id),
       supabase.from("employees").select("id").eq("company_id", entreprise.id).eq("statut", "actif"),
-      supabase.from("suppliers").select("id, nom, pays, delai_mois, minimum_commande").order("nom"),
-      supabase.from("faconniers").select("id, nom, pays, delai_mois, minimum_commande").order("nom"),
+      supabase.from("suppliers").select("id, nom, pays, delai_heures, minimum_commande").order("nom"),
+      supabase.from("faconniers").select("id, nom, pays, delai_heures, minimum_commande").order("nom"),
       supabase.from("classement_publique").select("company_id, nom, gamme, pseudo, valeur_centimes"),
       supabase.from("worlds").select("mois_courant, debut_reel").eq("etat", "actif").limit(1).maybeSingle(),
       lireEstrAnnuel(supabase, reglesPretV1().estrDeSecoursAnnuel),
@@ -146,7 +149,7 @@ export default async function PageVillage() {
         description: "Il te vend les tissus et fournitures. Tu le paies, il te livre après son délai.",
         faits: [
           ["Pays", f.pays],
-          ["Délai de livraison", `${Number(f.delai_mois).toLocaleString("fr-FR")} mois`],
+          ["Délai de livraison", texteDuree(Number(f.delai_heures))],
           ["Commande minimum", Number(f.minimum_commande).toLocaleString("fr-FR")],
         ],
         liens: [{ href: "/achats", libelle: "Achats" }],
@@ -161,7 +164,13 @@ export default async function PageVillage() {
         description: "Il fabrique tes pièces à partir de tes matières, contre un prix par pièce.",
         faits: [
           ["Pays", f.pays],
-          ["Délai de fabrication", `${Number(f.delai_mois).toLocaleString("fr-FR")} mois`],
+          [
+            // Le grossiste local est rangé avec les façonniers ; son délai est un paramètre.
+            "Délai de fabrication",
+            texteDuree(
+              f.id === ID_GROSSISTE_LOCAL ? delaiGrossisteMinutes(chargerParametresV1()) / 60 : Number(f.delai_heures),
+            ),
+          ],
           ["Commande minimum", pluriel(Number(f.minimum_commande), "pièce")],
         ],
         liens: [{ href: "/atelier", libelle: "Production" }],

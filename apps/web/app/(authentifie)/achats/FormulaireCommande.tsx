@@ -5,14 +5,17 @@ import { quantiteMaxPayable } from "@kapital/engine";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Bouton, Choix, Curseur, EcritureComptable, Ligne, Note, Refus, Resultat, Succes } from "../../../components/ui";
-import { apercuCommandeMatiere, bornesQuantite, texteDelai } from "../../../lib/apercus";
+import { apercuCommandeMatiere, bornesQuantite, texteDelai, texteLivraison } from "../../../lib/apercus";
+import { heureLisible, versQuand } from "../../../lib/cadre";
+import { useMaintenant } from "../../../lib/useMaintenant";
 import { articleUnite, formaterEuros, prixParUnite, quantiteMatiere, symboleUnite } from "../../../lib/formatage";
 
 type Fournisseur = {
   id: string;
   nom: string;
   pays: string;
-  delai_mois: number;
+  /** Délai de livraison en heures réelles (suppliers.delai_heures). */
+  delai_heures: number;
   minimum_commande: number;
 };
 
@@ -28,6 +31,7 @@ export function FormulaireCommande({
   materials,
   tresorerie,
   params,
+  maintenantMs,
 }: {
   fournisseurs: readonly Fournisseur[];
   catalogue: readonly LigneCatalogue[];
@@ -36,8 +40,11 @@ export function FormulaireCommande({
   /** Trésorerie du joueur : sert à borner le curseur de quantité. */
   tresorerie: number;
   params: Parametres;
+  /** Instant du rendu serveur (ms) : point de départ de l'heure de livraison affichée. */
+  maintenantMs: number;
 }) {
   const router = useRouter();
+  const maintenant = useMaintenant(maintenantMs);
   const [fournisseurId, setFournisseurId] = useState<string>(fournisseurs[0]?.id ?? "");
   const fournisseur = fournisseurs.find((f) => f.id === fournisseurId);
   const matieresPourFourn = useMemo(
@@ -67,16 +74,16 @@ export function FormulaireCommande({
       fournisseur: {
         id: fournisseur.id,
         nom: fournisseur.nom,
-        delaiMois: fournisseur.delai_mois,
+        delaiHeures: Number(fournisseur.delai_heures),
         minimumCommande: fournisseur.minimum_commande,
       },
       matiere: ligne.material_id,
       prixUnitaire: ligne.prix_centimes,
       quantite: quantiteN,
-      moisCourant: 0,
+      instantCommandeMs: maintenant,
       params,
     });
-  }, [fournisseur, ligne, quantiteN, params]);
+  }, [fournisseur, ligne, quantiteN, params, maintenant]);
 
   function choisirFournisseur(id: string) {
     setFournisseurId(id);
@@ -84,11 +91,11 @@ export function FormulaireCommande({
     if (prem) setMaterialId(prem.material_id);
   }
 
-  /** « 4,20 € le mètre · livré en 1 mois » : le moins cher du catalogue de ce fournisseur, et son délai. */
+  /** « 4,20 € le mètre · livré dans 2 h » : le moins cher du catalogue de ce fournisseur, et son délai. */
   function prixLigne(id: string): string {
     const f = fournisseurs.find((x) => x.id === id);
     const lignes = catalogue.filter((l) => l.supplier_id === id);
-    const delai = f ? texteDelai(f.delai_mois) : "";
+    const delai = f ? texteDelai(Number(f.delai_heures)) : "";
     if (lignes.length === 0) return delai;
     const moinsChere = lignes.reduce((a, b) => (b.prix_centimes < a.prix_centimes ? b : a));
     return `${lignes.length > 1 ? "dès " : ""}${prixParUnite(moinsChere.prix_centimes, uniteDe(moinsChere.material_id))} · ${delai}`;
@@ -125,7 +132,9 @@ export function FormulaireCommande({
         setErreur(data.error ?? `Commande impossible (erreur ${reponse.status}).`);
         return;
       }
-      setOk(`Commande passée : ${quantiteMatiere(quantiteN, uniteMat, nomMat)} chez ${fournisseur.nom}.`);
+      setOk(
+        `Commande passée : ${quantiteMatiere(quantiteN, uniteMat, nomMat)} chez ${fournisseur.nom}. Livraison ${versQuand(apercu.instantLivraisonMs, Date.now())}.`,
+      );
       router.refresh();
     } catch {
       setErreur("Impossible de joindre le serveur. Vérifie ta connexion et réessaie.");
@@ -194,7 +203,11 @@ export function FormulaireCommande({
               valeur={`${formaterEuros(ligne.prix_centimes)} €`}
               detail={`${articleUnite(uniteMat)}, figé à la commande`}
             />
-            <Resultat libelle="Livraison" valeur={`${apercu.delaiMois} mois`} detail="délai du fournisseur" />
+            <Resultat
+              libelle="Livraison"
+              valeur={`vers ${heureLisible(apercu.instantLivraisonMs)}`}
+              detail={texteLivraison(apercu.instantLivraisonMs, maintenant)}
+            />
           </div>
           <Ligne libelle="Sortie de trésorerie aujourd'hui">0,00 €</Ligne>
           <Note>

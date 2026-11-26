@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { chargerParametresV1 } from "@kapital/content";
-import { configTempsDepuis, verifierQuantiteCommande } from "@kapital/engine";
+import { livraisonApresHeures, verifierQuantiteCommande } from "@kapital/engine";
 import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
@@ -28,7 +27,7 @@ export async function POST(request: Request) {
   const [fournisseurR, catR] = await Promise.all([
     ctx.supabaseAdmin
       .from("suppliers")
-      .select("id, delai_mois, minimum_commande")
+      .select("id, delai_heures, minimum_commande")
       .eq("id", body.supplierId)
       .maybeSingle(),
     ctx.supabaseAdmin
@@ -39,7 +38,7 @@ export async function POST(request: Request) {
       .maybeSingle(),
   ]);
   const fournisseur = fournisseurR.data as
-    | { id: string; delai_mois: number; minimum_commande: number }
+    | { id: string; delai_heures: number; minimum_commande: number }
     | null;
   const catalogue = catR.data as { prix_centimes: number } | null;
   if (!fournisseur) {
@@ -62,10 +61,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: verif.message, code: verif.code }, { status: 400 });
   }
 
-  // Durée réelle d'un mois de jeu : paramètre temps_minutes_reelles_par_mois_jeu.
-  const msParMoisJeu = configTempsDepuis(chargerParametresV1()).minutesReellesParMoisJeu * 60_000;
+  // Délai en heures réelles (suppliers.delai_heures) : le moteur calcule l'instant et le mois
+  // de livraison en heure du jeu ; la base garde l'instant réel (heure du jeu + debut_reel).
   const maintenant = new Date();
-  const livraison = new Date(maintenant.getTime() + fournisseur.delai_mois * msParMoisJeu);
+  const commande = livraisonApresHeures(maintenant.getTime() - ctx.debutReelMs, Number(fournisseur.delai_heures));
+  const livraison = new Date(ctx.debutReelMs + commande.instantLivraisonMs);
 
   const { error } = await ctx.supabaseAdmin.from("purchase_orders").insert({
     company_id: ctx.companyId,
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     instant_commande: maintenant.toISOString(),
     instant_livraison_prevue: livraison.toISOString(),
     mois_jeu_commande: ctx.moisCourant,
-    mois_jeu_livraison: ctx.moisCourant + fournisseur.delai_mois,
+    mois_jeu_livraison: commande.moisLivraison,
   });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

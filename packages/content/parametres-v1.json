@@ -455,6 +455,12 @@
     "source": "docs/cahier-des-charges-v1.md section 4 (échéance de prêt tous les 30 jours = toutes les 24 h réelles)",
     "date": "2026-11-24"
   },
+  "grossiste_delai_minutes": {
+    "valeur": 30,
+    "unite": "minutes_reelles",
+    "source": "décision de Mathieu du 26/11/2026 (horloge réelle : le grossiste local livre en 30 minutes réelles)",
+    "date": "2026-11-26"
+  },
   "calendrier_mois_debut_collection_pe": {
     "valeur": 2,
     "unite": "mois_calendaire_1_a_12",

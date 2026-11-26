@@ -3,8 +3,8 @@ import { chargerParametresV1 } from "@kapital/content";
 import {
   besoinMatiere,
   centimes,
-  configTempsDepuis,
   idMatiere,
+  livraisonApresHeures,
   parametreObligatoire,
   verifierQuantiteCommande,
 } from "@kapital/engine";
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
   const [facR, catR] = await Promise.all([
     ctx.supabaseAdmin
       .from("faconniers")
-      .select("id, delai_mois, minimum_commande, fournit_matiere")
+      .select("id, delai_heures, minimum_commande, fournit_matiere")
       .eq("id", body.faconnierId)
       .maybeSingle(),
     ctx.supabaseAdmin
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       .maybeSingle(),
   ]);
   const fac = facR.data as
-    | { id: string; delai_mois: number; minimum_commande: number; fournit_matiere: boolean }
+    | { id: string; delai_heures: number; minimum_commande: number; fournit_matiere: boolean }
     | null;
   const catalogue = catR.data as { prix_par_piece_centimes: number } | null;
   const params = chargerParametresV1();
@@ -151,10 +151,11 @@ export async function POST(request: Request) {
     }
   }
 
-  // Durée réelle d'un mois de jeu : paramètre temps_minutes_reelles_par_mois_jeu.
-  const msParMoisJeu = configTempsDepuis(params).minutesReellesParMoisJeu * 60_000;
+  // Délai en heures réelles (faconniers.delai_heures) : le moteur calcule l'instant et le mois
+  // de livraison en heure du jeu ; la base garde l'instant réel (heure du jeu + debut_reel).
   const maintenant = new Date();
-  const livraison = new Date(maintenant.getTime() + fac.delai_mois * msParMoisJeu);
+  const ordre = livraisonApresHeures(maintenant.getTime() - ctx.debutReelMs, Number(fac.delai_heures));
+  const livraison = new Date(ctx.debutReelMs + ordre.instantLivraisonMs);
   const { error } = await ctx.supabaseAdmin.from("production_orders").insert({
     company_id: ctx.companyId,
     product_id: body.productId,
@@ -165,7 +166,7 @@ export async function POST(request: Request) {
     instant_commande: maintenant.toISOString(),
     instant_livraison_prevue: livraison.toISOString(),
     mois_jeu_commande: ctx.moisCourant,
-    mois_jeu_livraison: ctx.moisCourant + fac.delai_mois,
+    mois_jeu_livraison: ordre.moisLivraison,
   });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

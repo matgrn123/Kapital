@@ -11,8 +11,8 @@ import {
   idEntreprise,
   idFournisseur,
   idMatiere,
-  moisJeu,
 } from "../types/primitifs.js";
+import { indexDuMois } from "../moteur/temps.js";
 import {
   commandesAArriver,
   ErreurCommande,
@@ -29,12 +29,20 @@ const FOUR_PT = idFournisseur("four_pt");
 const JERSEY = idMatiere("mat_jersey_coton");
 const POPELINE = idMatiere("mat_popeline");
 
+const HEURE = 3_600_000;
+const NOVEMBRE_2026 = indexDuMois(2026, 11);
+const DECEMBRE_2026 = indexDuMois(2026, 12);
+/** Jeudi 26 novembre 2026, 10 h 21 à Paris (UTC + 1). */
+const JEU_26_NOV_10H21 = Date.UTC(2026, 10, 26, 9, 21);
+/** Lundi 30 novembre 2026, 21 h à Paris : 3 h avant la fin du mois. */
+const LUN_30_NOV_21H = Date.UTC(2026, 10, 30, 20, 0);
+
 function fournisseurFr(): Fournisseur {
   return {
     id: FOUR_FR,
     nom: "Fournisseur France",
     qualite: 80,
-    delaiMois: 1,
+    delaiHeures: 2,
     fiabilite: 0.95,
     minimumCommande: 50,
     delaiPaiementMois: 1,
@@ -46,7 +54,7 @@ function fournisseurPt(): Fournisseur {
     id: FOUR_PT,
     nom: "Fournisseur Portugal",
     qualite: 75,
-    delaiMois: 2,
+    delaiHeures: 4,
     fiabilite: 0.9,
     minimumCommande: 75,
     delaiPaiementMois: 1,
@@ -81,7 +89,7 @@ describe("prixChezFournisseur", () => {
 });
 
 describe("passerCommande — critère T05 : bon mois, bon prix", () => {
-  it("critère officiel : commande au mois 0 chez fournisseur délai 2 arrive au mois 2", () => {
+  it("critère officiel : commande à 10 h 21 chez le fournisseur portugais (4 h) livrée à 14 h 21, le même mois", () => {
     const c = passerCommande({
       id: "cmd_1",
       entreprise: ENT,
@@ -89,9 +97,26 @@ describe("passerCommande — critère T05 : bon mois, bon prix", () => {
       catalogue: cataloguePt(),
       matiere: JERSEY,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: JEU_26_NOV_10H21,
     });
-    expect(c.moisLivraisonPrevu).toBe(2);
+    expect(c.instantCommandeMs).toBe(JEU_26_NOV_10H21);
+    expect(c.instantLivraisonPrevuMs).toBe(JEU_26_NOV_10H21 + 4 * HEURE);
+    expect(c.moisCommande).toBe(NOVEMBRE_2026);
+    expect(c.moisLivraisonPrevu).toBe(NOVEMBRE_2026);
+  });
+
+  it("refuse un délai de livraison négatif", () => {
+    expect(() =>
+      passerCommande({
+        id: "cmd_delai",
+        entreprise: ENT,
+        fournisseur: { ...fournisseurFr(), delaiHeures: -1 },
+        catalogue: catalogueFr(),
+        matiere: JERSEY,
+        quantite: 100,
+        instantCommandeMs: JEU_26_NOV_10H21,
+      }),
+    ).toThrow(ErreurCommande);
   });
 
   it("critère officiel : le prix est figé à la commande, pas à la livraison", () => {
@@ -102,7 +127,7 @@ describe("passerCommande — critère T05 : bon mois, bon prix", () => {
       catalogue: catalogueFr(500),
       matiere: JERSEY,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: JEU_26_NOV_10H21,
     });
     expect(c.prixUnitaire).toBe(500);
 
@@ -120,7 +145,7 @@ describe("passerCommande — critère T05 : bon mois, bon prix", () => {
         catalogue: catalogueFr(),
         matiere: JERSEY,
         quantite: 20,
-        moisCommande: moisJeu(0),
+        instantCommandeMs: JEU_26_NOV_10H21,
       }),
     ).toThrow(ErreurCommande);
   });
@@ -134,7 +159,7 @@ describe("passerCommande — critère T05 : bon mois, bon prix", () => {
         catalogue: catalogueFr(),
         matiere: JERSEY,
         quantite: 0,
-        moisCommande: moisJeu(0),
+        instantCommandeMs: JEU_26_NOV_10H21,
       }),
     ).toThrow(/positive/);
   });
@@ -148,7 +173,7 @@ describe("passerCommande — critère T05 : bon mois, bon prix", () => {
         catalogue: cataloguePt(),
         matiere: POPELINE,
         quantite: 100,
-        moisCommande: moisJeu(0),
+        instantCommandeMs: JEU_26_NOV_10H21,
       }),
     ).toThrow(/ne vend pas/);
   });
@@ -162,7 +187,7 @@ describe("passerCommande — critère T05 : bon mois, bon prix", () => {
         catalogue: cataloguePt(),
         matiere: JERSEY,
         quantite: 100,
-        moisCommande: moisJeu(0),
+        instantCommandeMs: JEU_26_NOV_10H21,
       }),
     ).toThrow(/inconsistant/);
   });
@@ -175,16 +200,19 @@ describe("passerCommande — critère T05 : bon mois, bon prix", () => {
       catalogue: catalogueFr(),
       matiere: JERSEY,
       quantite: 100,
-      moisCommande: moisJeu(3),
+      instantCommandeMs: LUN_30_NOV_21H,
     });
     expect(c.statut).toBe("en_cours");
-    expect(c.moisCommande).toBe(3);
-    expect(c.moisLivraisonPrevu).toBe(4);
+    // Commandée le 30 novembre à 21 h, 2 h de délai : livrée à 23 h, encore en novembre.
+    expect(c.moisCommande).toBe(NOVEMBRE_2026);
+    expect(c.moisLivraisonPrevu).toBe(NOVEMBRE_2026);
   });
 });
 
 describe("commandesAArriver", () => {
-  it("ne retourne que les commandes dont la livraison est le mois courant", () => {
+  it("ne retourne que les commandes dont la livraison tombe dans le mois courant", () => {
+    // Commandées le 30 novembre à 21 h : la française (2 h) arrive à 23 h, en novembre ;
+    // la portugaise (4 h) le 1er décembre à 1 h, en décembre.
     const c1 = passerCommande({
       id: "a",
       entreprise: ENT,
@@ -192,7 +220,7 @@ describe("commandesAArriver", () => {
       catalogue: catalogueFr(),
       matiere: JERSEY,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: LUN_30_NOV_21H,
     });
     const c2 = passerCommande({
       id: "b",
@@ -201,17 +229,13 @@ describe("commandesAArriver", () => {
       catalogue: cataloguePt(),
       matiere: JERSEY,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: LUN_30_NOV_21H,
     });
     const toutes = [c1, c2];
 
-    expect(commandesAArriver(toutes, moisJeu(1)).map((c) => c.id)).toEqual([
-      "a",
-    ]);
-    expect(commandesAArriver(toutes, moisJeu(2)).map((c) => c.id)).toEqual([
-      "b",
-    ]);
-    expect(commandesAArriver(toutes, moisJeu(3))).toHaveLength(0);
+    expect(commandesAArriver(toutes, NOVEMBRE_2026).map((c) => c.id)).toEqual(["a"]);
+    expect(commandesAArriver(toutes, DECEMBRE_2026).map((c) => c.id)).toEqual(["b"]);
+    expect(commandesAArriver(toutes, indexDuMois(2027, 1))).toHaveLength(0);
   });
 
   it("ignore les commandes déjà livrées", () => {
@@ -222,10 +246,10 @@ describe("commandesAArriver", () => {
       catalogue: catalogueFr(),
       matiere: JERSEY,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: JEU_26_NOV_10H21,
     });
     const livree = { ...c, statut: "livree" as const };
-    expect(commandesAArriver([livree], moisJeu(1))).toHaveLength(0);
+    expect(commandesAArriver([livree], NOVEMBRE_2026)).toHaveLength(0);
   });
 });
 
@@ -238,7 +262,7 @@ describe("livrer — écriture comptable", () => {
       catalogue: catalogueFr(500),
       matiere: JERSEY,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: JEU_26_NOV_10H21,
     });
 
     const { grandLivre, commande } = livrer(planComptableV1(), c);
@@ -259,7 +283,7 @@ describe("livrer — écriture comptable", () => {
       catalogue: catalogueFr(),
       matiere: JERSEY,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: JEU_26_NOV_10H21,
     });
     const { grandLivre, commande } = livrer(planComptableV1(), c);
     expect(() => livrer(grandLivre, commande)).toThrow(/déjà livrée/);
@@ -267,7 +291,7 @@ describe("livrer — écriture comptable", () => {
 });
 
 describe("scénario deux fournisseurs : France et Portugal", () => {
-  it("chacun arrive à son mois, à son prix figé", () => {
+  it("chacun arrive après son délai en heures, à son prix figé", () => {
     const cFr = passerCommande({
       id: "fr",
       entreprise: ENT,
@@ -275,7 +299,7 @@ describe("scénario deux fournisseurs : France et Portugal", () => {
       catalogue: catalogueFr(500),
       matiere: JERSEY,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: JEU_26_NOV_10H21,
     });
     const cPt = passerCommande({
       id: "pt",
@@ -284,12 +308,12 @@ describe("scénario deux fournisseurs : France et Portugal", () => {
       catalogue: cataloguePt(400),
       matiere: JERSEY,
       quantite: 100,
-      moisCommande: moisJeu(0),
+      instantCommandeMs: JEU_26_NOV_10H21,
     });
 
-    expect(cFr.moisLivraisonPrevu).toBe(1);
+    expect(cFr.instantLivraisonPrevuMs).toBe(JEU_26_NOV_10H21 + 2 * HEURE);
     expect(cFr.prixUnitaire).toBe(500);
-    expect(cPt.moisLivraisonPrevu).toBe(2);
+    expect(cPt.instantLivraisonPrevuMs).toBe(JEU_26_NOV_10H21 + 4 * HEURE);
     expect(cPt.prixUnitaire).toBe(400);
 
     let gl = planComptableV1();

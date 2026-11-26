@@ -1,7 +1,7 @@
 import { chargerParametresV1 } from "@kapital/content";
 import { describe, expect, it } from "vitest";
 import { enEquilibre, enregistrer, planComptableV1 } from "../comptabilite/index.js";
-import { configTempsDepuis, pasAbsoluDepuisInstantReel } from "../moteur/temps.js";
+import { configTempsDepuis, indexDuMois, pasAbsoluDepuisInstantReel } from "../moteur/temps.js";
 import { centimes, idProduit, moisJeu } from "../types/primitifs.js";
 import {
   commanderAuGrossiste,
@@ -60,11 +60,20 @@ describe("grossiste local", () => {
     expect(prixGrossiste(COUT_USINE, PARAMS)).toBeGreaterThan(COUT_USINE);
   });
 
-  it("livre le jour même : 48 minutes réelles, déduites des paramètres du temps", () => {
-    expect(delaiGrossisteMinutes(PARAMS)).toBe(48);
+  it("livre en 30 minutes réelles : paramètre grossiste_delai_minutes, jamais en dur", () => {
+    expect(delaiGrossisteMinutes(PARAMS)).toBe(PARAMS["grossiste_delai_minutes"]!.valeur);
+    expect(delaiGrossisteMinutes(PARAMS)).toBe(30);
   });
 
-  it("commande : total = quantité × prix, livraison 48 minutes plus tard", () => {
+  it("refuse un délai du grossiste négatif ou absent", () => {
+    const sans = { ...PARAMS };
+    delete sans["grossiste_delai_minutes"];
+    expect(() => delaiGrossisteMinutes(sans)).toThrow(ErreurDemarrage);
+    const negatif = { ...PARAMS, grossiste_delai_minutes: { ...PARAMS["grossiste_delai_minutes"]!, valeur: -1 } };
+    expect(() => delaiGrossisteMinutes(negatif)).toThrow(ErreurDemarrage);
+  });
+
+  it("commande : total = quantité × prix, livraison 30 minutes plus tard", () => {
     const maintenantMs = Date.UTC(2026, 10, 24, 10, 0, 0);
     const c = commanderAuGrossiste({
       params: PARAMS,
@@ -75,10 +84,22 @@ describe("grossiste local", () => {
     });
     expect(c.prixParPiece).toBe(prixGrossiste(COUT_USINE, PARAMS));
     expect(c.total).toBe(50 * c.prixParPiece);
-    expect(c.instantLivraisonMs - maintenantMs).toBe(48 * 60_000);
+    expect(c.instantLivraisonMs - maintenantMs).toBe(30 * 60_000);
+    expect(c.moisLivraison).toBe(indexDuMois(2026, 11));
   });
 
-  it("la livraison tombe au 48e pas d'une horloge à pas d'une minute", () => {
+  it("commandé le 30 novembre à 23 h 45 (Paris) : livré le 1er décembre, mois de décembre", () => {
+    const c = commanderAuGrossiste({
+      params: PARAMS,
+      produit: PRODUIT,
+      quantite: 5,
+      coutUsineParPiece: COUT_USINE,
+      instantCommandeMs: Date.UTC(2026, 10, 30, 22, 45),
+    });
+    expect(c.moisLivraison).toBe(indexDuMois(2026, 12));
+  });
+
+  it("la livraison tombe au 30e pas d'une horloge à pas d'une minute", () => {
     const config = configTempsDepuis(PARAMS);
     const debutMs = Date.UTC(2026, 10, 1, 0, 0, 0);
     const commandeMs = debutMs + 100 * 60_000;
@@ -91,7 +112,7 @@ describe("grossiste local", () => {
     });
     const pasCommande = pasAbsoluDepuisInstantReel(config, debutMs, commandeMs);
     const pasLivraison = pasAbsoluDepuisInstantReel(config, debutMs, c.instantLivraisonMs);
-    expect(pasLivraison - pasCommande).toBe(48);
+    expect(pasLivraison - pasCommande).toBe(30);
   });
 
   it("refuse une quantité nulle, négative ou non entière", () => {

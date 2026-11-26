@@ -1,7 +1,7 @@
 import { enregistrer, type GrandLivre } from "../comptabilite/index.js";
+import { moisDeLInstantMs } from "../moteur/temps.js";
 import {
   centimes,
-  moisJeu,
   type Centimes,
   type IdEntreprise,
   type IdMatiere,
@@ -13,6 +13,7 @@ import {
   type CommandeMatiere,
   type Fournisseur,
 } from "./types.js";
+import { livraisonApresHeures } from "./delais.js";
 
 export function prixChezFournisseur(
   catalogue: CatalogueFournisseur,
@@ -31,7 +32,8 @@ export type EntreesPasserCommande = {
   readonly catalogue: CatalogueFournisseur;
   readonly matiere: IdMatiere;
   readonly quantite: number;
-  readonly moisCommande: MoisJeu;
+  /** Instant de la commande, en heure du jeu (ms). */
+  readonly instantCommandeMs: number;
 };
 
 export function passerCommande(e: EntreesPasserCommande): CommandeMatiere {
@@ -56,6 +58,15 @@ export function passerCommande(e: EntreesPasserCommande): CommandeMatiere {
       `Commande ${e.id} : le fournisseur ${e.fournisseur.id} ne vend pas la matière ${e.matiere}.`,
     );
   }
+  if (!Number.isFinite(e.fournisseur.delaiHeures) || e.fournisseur.delaiHeures < 0) {
+    throw new ErreurCommande(
+      `Commande ${e.id} : délai de livraison invalide chez ${e.fournisseur.id} (${e.fournisseur.delaiHeures} h).`,
+    );
+  }
+  if (!Number.isFinite(e.instantCommandeMs)) {
+    throw new ErreurCommande(`Commande ${e.id} : instant de commande invalide (${e.instantCommandeMs}).`);
+  }
+  const livraison = livraisonApresHeures(e.instantCommandeMs, e.fournisseur.delaiHeures);
 
   return {
     id: e.id,
@@ -64,8 +75,10 @@ export function passerCommande(e: EntreesPasserCommande): CommandeMatiere {
     matiere: e.matiere,
     quantite: e.quantite,
     prixUnitaire: prix,
-    moisCommande: e.moisCommande,
-    moisLivraisonPrevu: moisJeu(e.moisCommande + e.fournisseur.delaiMois),
+    instantCommandeMs: e.instantCommandeMs,
+    instantLivraisonPrevuMs: livraison.instantLivraisonMs,
+    moisCommande: moisDeLInstantMs(e.instantCommandeMs),
+    moisLivraisonPrevu: livraison.moisLivraison,
     statut: "en_cours",
   };
 }

@@ -11,6 +11,8 @@ import {
   effetsMarketing,
   ecritureMarketing,
   texteDelai,
+  texteDuree,
+  texteLivraison,
 } from "./apercus";
 import { equilibreEcriture } from "../components/ui/calculs";
 
@@ -50,14 +52,22 @@ describe("apercuVente", () => {
   });
 });
 
-const fournisseur = { id: "four_a", nom: "Filature A", delaiMois: 2, minimumCommande: 50 };
+const fournisseur = { id: "four_a", nom: "Filature A", delaiHeures: 2, minimumCommande: 50 };
+const HEURE = 3_600_000;
+/** Jeudi 26 novembre 2026, 10 h 21 à Paris (UTC + 1). */
+const JEU_26_NOV_10H21 = Date.UTC(2026, 10, 26, 9, 21);
+const NOVEMBRE_2026 = 2026 * 12 + 10;
 
 describe("apercuCommandeMatiere", () => {
   it("donne l'écriture que le moteur passera à la livraison (31 / 401)", () => {
-    const r = apercuCommandeMatiere({ fournisseur, matiere: "mat_jersey", prixUnitaire: 450, quantite: 100, moisCourant: 4, params });
+    const r = apercuCommandeMatiere({
+      fournisseur, matiere: "mat_jersey", prixUnitaire: 450, quantite: 100, instantCommandeMs: JEU_26_NOV_10H21, params,
+    });
     if (!r.ok) throw new Error(r.message);
     expect(r.total).toBe(45000);
-    expect(r.moisLivraison).toBe(6);
+    expect(r.delaiHeures).toBe(2);
+    expect(r.instantLivraisonMs).toBe(JEU_26_NOV_10H21 + 2 * HEURE);
+    expect(r.moisLivraison).toBe(NOVEMBRE_2026);
     expect(r.ecritureLivraison).toEqual([
       { compte: "31", debit: 45000 },
       { compte: "401", credit: 45000 },
@@ -65,19 +75,22 @@ describe("apercuCommandeMatiere", () => {
   });
 
   it("refuse sous le minimum avec un message clair", () => {
-    const r = apercuCommandeMatiere({ fournisseur, matiere: "m", prixUnitaire: 450, quantite: 10, moisCourant: 0, params });
+    const r = apercuCommandeMatiere({ fournisseur, matiere: "m", prixUnitaire: 450, quantite: 10, instantCommandeMs: JEU_26_NOV_10H21, params });
     expect(r).toEqual({ ok: false, message: "Filature A n'accepte pas moins de 50 unités par commande." });
   });
 });
 
 describe("apercuFaconnier", () => {
-  const faconnier = { id: "fac_pt", nom: "Atelier Porto", pays: "Portugal", delaiMois: 1, minimumCommande: 75 };
+  const faconnier = { id: "fac_pt", nom: "Atelier Porto", pays: "Portugal", delaiHeures: 6, minimumCommande: 75 };
 
   it("donne l'écriture de livraison du moteur (35 / 401) et la marge par pièce", () => {
-    const r = apercuFaconnier({ faconnier, produit: "prod_tshirt", prixParPiece: 800, quantite: 100, moisCourant: 2, prixVenteTtc: 2500, params });
+    const r = apercuFaconnier({
+      faconnier, produit: "prod_tshirt", prixParPiece: 800, quantite: 100, instantCommandeMs: JEU_26_NOV_10H21, prixVenteTtc: 2500, params,
+    });
     if (!r.ok) throw new Error(r.message);
     expect(r.total).toBe(80000);
-    expect(r.moisLivraison).toBe(3);
+    expect(r.instantLivraisonMs).toBe(JEU_26_NOV_10H21 + 6 * HEURE);
+    expect(r.moisLivraison).toBe(NOVEMBRE_2026);
     expect(r.ecritureLivraison).toEqual([
       { compte: "35", debit: 80000 },
       { compte: "401", credit: 80000 },
@@ -92,7 +105,7 @@ describe("apercuFaconnier", () => {
       produit: "prod_tshirt",
       prixParPiece: 800,
       quantite: 100,
-      moisCourant: 2,
+      instantCommandeMs: JEU_26_NOV_10H21,
       prixVenteTtc: 2500,
       params,
       matiere: { consommationParPiece: 0.8, fournituresParPiece: 60, stock: { quantite: 1000, valeurTotale: 350000 } },
@@ -110,14 +123,14 @@ describe("apercuFaconnier", () => {
 
   it("refuse si ta matière en stock ne suffit pas, comme la route", () => {
     const r = apercuFaconnier({
-      faconnier, produit: "prod_tshirt", prixParPiece: 800, quantite: 100, moisCourant: 2, prixVenteTtc: 2500, params,
+      faconnier, produit: "prod_tshirt", prixParPiece: 800, quantite: 100, instantCommandeMs: JEU_26_NOV_10H21, prixVenteTtc: 2500, params,
       matiere: { consommationParPiece: 0.8, fournituresParPiece: 60, stock: { quantite: 10, valeurTotale: 3500 } },
     });
     expect(r.ok).toBe(false);
   });
 
   it("refuse sous le minimum du façonnier", () => {
-    const r = apercuFaconnier({ faconnier, produit: "p", prixParPiece: 800, quantite: 10, moisCourant: 0, prixVenteTtc: null, params });
+    const r = apercuFaconnier({ faconnier, produit: "p", prixParPiece: 800, quantite: 10, instantCommandeMs: JEU_26_NOV_10H21, prixVenteTtc: null, params });
     expect(r.ok).toBe(false);
   });
 });
@@ -202,9 +215,30 @@ describe("apercuMarketing", () => {
 });
 
 describe("texteDelai", () => {
-  it("annonce le délai en vrais mois (l'horloge du jeu est l'horloge réelle)", () => {
-    expect(texteDelai(2)).toBe("livré en 2 mois");
-    expect(texteDelai(1)).toBe("livré en 1 mois");
+  it("annonce le délai en heures réelles (l'horloge du jeu est l'horloge réelle)", () => {
+    expect(texteDelai(2)).toBe("livré dans 2 h");
+    expect(texteDelai(8)).toBe("livré dans 8 h");
+    expect(texteDelai(0.5)).toBe("livré dans 30 min");
+  });
+});
+
+describe("texteDuree", () => {
+  it("écrit la durée d'un délai sans « dans »", () => {
+    expect(texteDuree(6)).toBe("6 h");
+    expect(texteDuree(0.5)).toBe("30 min");
+    expect(texteDuree(1.5)).toBe("1 h 30");
+  });
+});
+
+describe("texteLivraison", () => {
+  it("« livré vers 12 h 21 (dans 2 h) » pour une livraison le jour même", () => {
+    expect(texteLivraison(JEU_26_NOV_10H21 + 2 * HEURE, JEU_26_NOV_10H21)).toBe("livré vers 12 h 21 (dans 2 h)");
+  });
+
+  it("donne le jour quand la livraison tombe le lendemain", () => {
+    // Commande à 22 h, façonnier turc (8 h) : vendredi 27 novembre à 6 h.
+    const commande = Date.UTC(2026, 10, 26, 21, 0);
+    expect(texteLivraison(commande + 8 * HEURE, commande)).toBe("livré vers ven. 27 nov., 6 h 00 (dans 8 h)");
   });
 });
 

@@ -4,7 +4,7 @@ import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
 
 export const runtime = "nodejs";
 
-// TP-3 : le grossiste local livre le jour même, plus cher que l'usine.
+// TP-3 : le grossiste local livre en 30 minutes réelles, plus cher que l'usine.
 // Le prix et le délai sont calculés côté serveur à partir des paramètres ;
 // le navigateur n'envoie que le produit et la quantité.
 export async function POST(request: Request) {
@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       quantite,
       moisCourant: ctx.moisCourant,
       maintenant: new Date(),
+      debutReelMs: ctx.debutReelMs,
       tresorerieCentimes: ctx.companyTresorerie,
     });
     return NextResponse.json({ ok: true, ...r });

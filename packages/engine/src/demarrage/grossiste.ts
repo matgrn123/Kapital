@@ -1,8 +1,7 @@
 import type { Parametres } from "@kapital/content";
-import { centimes, type Centimes, type IdProduit } from "../types/primitifs.js";
+import { livraisonApresMinutes } from "../achats/delais.js";
+import { centimes, type Centimes, type IdProduit, type MoisJeu } from "../types/primitifs.js";
 import { ErreurDemarrage } from "./erreurs.js";
-
-const MS_PAR_MINUTE = 60_000;
 
 function lire(params: Parametres, cle: string): number {
   const p = params[cle];
@@ -22,16 +21,15 @@ export function prixGrossiste(coutUsineParPiece: Centimes, params: Parametres): 
 }
 
 /**
- * Le grossiste livre « le jour même » : un jour de jeu, soit 1/30 de mois de jeu.
- * Déduit des paramètres du temps (1440 minutes par mois de jeu, 30 jours par mois).
+ * Le grossiste local livre en 30 minutes réelles (paramètre `grossiste_delai_minutes`,
+ * décision de Mathieu du 26 novembre 2026) : l'horloge du jeu est l'horloge réelle.
  */
 export function delaiGrossisteMinutes(params: Parametres): number {
-  const parMois = lire(params, "temps_minutes_reelles_par_mois_jeu");
-  const jours = lire(params, "temps_jours_par_mois_jeu");
-  if (parMois <= 0 || jours <= 0) {
-    throw new ErreurDemarrage("Les paramètres du temps doivent être positifs.");
+  const minutes = lire(params, "grossiste_delai_minutes");
+  if (!Number.isFinite(minutes) || minutes < 0) {
+    throw new ErreurDemarrage(`grossiste_delai_minutes doit être positif ou nul, reçu ${minutes}.`);
   }
-  return parMois / jours;
+  return minutes;
 }
 
 export type EntreesCommandeGrossiste = {
@@ -47,7 +45,10 @@ export type CommandeGrossiste = {
   readonly quantite: number;
   readonly prixParPiece: Centimes;
   readonly total: Centimes;
+  /** Instant de livraison, en heure du jeu (ms). */
   readonly instantLivraisonMs: number;
+  /** Mois de jeu de la livraison (celui de son instant). */
+  readonly moisLivraison: MoisJeu;
 };
 
 export function commanderAuGrossiste(e: EntreesCommandeGrossiste): CommandeGrossiste {
@@ -57,11 +58,13 @@ export function commanderAuGrossiste(e: EntreesCommandeGrossiste): CommandeGross
     );
   }
   const prixParPiece = prixGrossiste(e.coutUsineParPiece, e.params);
+  const livraison = livraisonApresMinutes(e.instantCommandeMs, delaiGrossisteMinutes(e.params));
   return {
     produit: e.produit,
     quantite: e.quantite,
     prixParPiece,
     total: centimes(e.quantite * prixParPiece),
-    instantLivraisonMs: e.instantCommandeMs + delaiGrossisteMinutes(e.params) * MS_PAR_MINUTE,
+    instantLivraisonMs: livraison.instantLivraisonMs,
+    moisLivraison: livraison.moisLivraison,
   };
 }

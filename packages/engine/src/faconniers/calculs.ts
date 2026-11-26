@@ -1,7 +1,8 @@
 import { enregistrer, type GrandLivre } from "../comptabilite/index.js";
+import { livraisonApresHeures } from "../achats/delais.js";
+import { moisDeLInstantMs } from "../moteur/temps.js";
 import {
   centimes,
-  moisJeu,
   type Centimes,
   type IdEntreprise,
   type IdProduit,
@@ -29,7 +30,8 @@ export type EntreesOrdreFaconnier = {
   readonly faconnier: Faconnier;
   readonly produit: IdProduit;
   readonly quantite: number;
-  readonly moisCommande: MoisJeu;
+  /** Instant de la commande, en heure du jeu (ms). */
+  readonly instantCommandeMs: number;
 };
 
 export function passerOrdreFaconnier(
@@ -51,6 +53,15 @@ export function passerOrdreFaconnier(
       `Ordre ${e.id} : le façonnier ${e.faconnier.id} ne fabrique pas le produit ${e.produit}.`,
     );
   }
+  if (!Number.isFinite(e.faconnier.delaiHeures) || e.faconnier.delaiHeures < 0) {
+    throw new ErreurFaconnier(
+      `Ordre ${e.id} : délai de livraison invalide chez ${e.faconnier.id} (${e.faconnier.delaiHeures} h).`,
+    );
+  }
+  if (!Number.isFinite(e.instantCommandeMs)) {
+    throw new ErreurFaconnier(`Ordre ${e.id} : instant de commande invalide (${e.instantCommandeMs}).`);
+  }
+  const livraison = livraisonApresHeures(e.instantCommandeMs, e.faconnier.delaiHeures);
   return {
     id: e.id,
     entreprise: e.entreprise,
@@ -58,8 +69,10 @@ export function passerOrdreFaconnier(
     produit: e.produit,
     quantite: e.quantite,
     prixFaconParPiece: prix,
-    moisCommande: e.moisCommande,
-    moisLivraisonPrevu: moisJeu(e.moisCommande + e.faconnier.delaiMois),
+    instantCommandeMs: e.instantCommandeMs,
+    instantLivraisonPrevuMs: livraison.instantLivraisonMs,
+    moisCommande: moisDeLInstantMs(e.instantCommandeMs),
+    moisLivraisonPrevu: livraison.moisLivraison,
     statut: "en_cours",
   };
 }
