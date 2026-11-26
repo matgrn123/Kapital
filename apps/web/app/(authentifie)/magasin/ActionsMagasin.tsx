@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Bouton, CLASSE_SAISIE, Champ, EcritureComptable, Ligne, Message, Note, Options, Puce } from "../../../components/ui";
 import { lireEuros } from "../../../lib/apercu-lot4";
-import { enMois, libelleMois } from "../../../lib/cadre";
+import { versQuand } from "../../../lib/cadre";
 import { formaterEuros } from "../../../lib/formatage";
 import { appelerAction } from "../_partage/reponses";
 import type { OffreEmplacement } from "./donnees";
@@ -16,11 +16,14 @@ const nombre = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits:
 export function ChoixEmplacement({
   offres,
   tresorerie,
+  maintenantMs,
   peutOuvrir,
   ventesMaxParVendeur,
 }: {
   offres: readonly OffreEmplacement[];
   tresorerie: number;
+  /** Instant du calcul des offres (serveur) : l'heure d'ouverture s'affiche par rapport à lui. */
+  maintenantMs: number;
   /** Étape 3 atteinte (ou déblocage de développement) : le serveur accepte la signature. */
   peutOuvrir: boolean;
   ventesMaxParVendeur: number;
@@ -47,7 +50,12 @@ export function ChoixEmplacement({
     const r = await appelerAction("/api/actions/ouvrir-boutique", { batimentId: a.batimentId });
     setEnCours(false);
     if (!r.ok) return setErreur(r.message);
-    setSucces(`Bail signé. Les travaux commencent : la boutique ouvrira ${enMois(a.moisOuverture)}.`);
+    const ouvertureLe = typeof r.data.ouvertureLe === "string" ? r.data.ouvertureLe : null;
+    setSucces(
+      ouvertureLe
+        ? `Bail signé. Les travaux commencent : la boutique ouvrira ${versQuand(ouvertureLe, Date.now())}.`
+        : "Bail signé. Les travaux commencent.",
+    );
     router.refresh();
   }
 
@@ -79,8 +87,8 @@ export function ChoixEmplacement({
           <Ligne libelle="Trésorerie après la signature" ton={a.tresorerieSuffisante ? undefined : "critique"}>
             {euros(tresorerie - a.totalALaSignature)}
           </Ligne>
-          <Ligne libelle="Ouverture après les travaux">
-            {libelleMois(a.moisOuverture)} ({a.dureeTravauxMois} mois de travaux)
+          <Ligne libelle={`Ouverture après ${nombre(a.dureeTravauxHeures)} h de travaux`}>
+            {versQuand(a.ouvertureMs, maintenantMs)}
           </Ligne>
         </div>
         <div className="flex flex-col">

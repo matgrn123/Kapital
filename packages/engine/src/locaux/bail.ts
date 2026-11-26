@@ -110,7 +110,11 @@ export function ecrituresMensuellesBail(
   return ecritures;
 }
 
-/** Le congé fixe le dernier mois du bail : mois du congé + préavis. */
+/**
+ * Le congé fixe le dernier mois du bail : mois du congé + préavis (bail_preavis_mois). Avec
+ * un mois de préavis (horloge réelle, lot T3), un congé donné en novembre rend le local à la
+ * fin de décembre : le loyer reste payé en fin de mois, jusqu'à ce dernier mois compris.
+ */
 export function donnerConge(bail: Bail, moisConge: MoisJeu, preavisMois: number): Bail {
   if (bail.moisFin !== null) {
     throw new ErreurBail(`Un congé est déjà donné : le bail prend fin au mois ${bail.moisFin}.`);

@@ -188,7 +188,7 @@ async function avancerEntreprise(
       const position = positionDuPasAbsolu(config, pasCible);
       let cumul: CumulMois | null = null;
       if (position.indexDansMois > 0) {
-        const etat = await stockage.chargerEtat(e.id, position.mois);
+        const etat = await stockage.chargerEtat(e.id, position.mois, ctx.debutReelMs);
         cumul = cumulDemarrantAuPas(
           moisJeu(position.mois), // une écriture porte le mois de jeu où elle a lieu
           etat.entreprise.tresorerie,
@@ -244,7 +244,7 @@ async function traiterLot(
   const dernierIndexDuMois = position.pasDansLeMois - 1;
   const cloture = indexDernier === dernierIndexDuMois;
 
-  const etat = await stockage.chargerEtat(companyId, moisEnCours);
+  const etat = await stockage.chargerEtat(companyId, moisEnCours, debutReelMs);
   let cumul = etat.cumul;
   // Un état en avance sur ce lot : un autre traitement simultané est passé entre deux lots
   // (les lots d'une journée rendent ce croisement possible au milieu d'un rattrapage).
@@ -343,6 +343,7 @@ async function traiterLot(
     commandesMatiereLivrees: livraisons.matiere.map((l) => l.id),
     ordresFaconnierLivres: livraisons.faconniers.map((l) => l.id),
     cumul,
+    finDuLotMs,
   } satisfies ResultatLotAEnregistrer);
 
   // Après le pas, jamais avant : un pas refusé (déjà traité, panne) n'écrit rien au journal.

@@ -58,6 +58,8 @@ export class StockageMemoire implements StockageMonde {
   /** Fait « attendre » chaque chargement, pour entrecroiser deux traitements simultanés. */
   cederLaMain = false;
   nbAppliquerPas = 0;
+  /** T3 : fin de chaque lot enregistré (instant réel), transmise à la base pour les plans d'aménagement. */
+  readonly finsDeLots: number[] = [];
   /** Journal : événements enregistrés, dans l'ordre ; une clé n'existe qu'une fois par société. */
   readonly evenements: { companyId: string; evenement: EvenementJournal }[] = [];
   /** Pannes simulées de l'enregistrement du journal. */
@@ -175,6 +177,7 @@ export class StockageMemoire implements StockageMonde {
     lot: ResultatLotAEnregistrer,
   ): Promise<void> {
     this.nbAppliquerPas += 1;
+    if (lot.finDuLotMs !== undefined) this.finsDeLots.push(lot.finDuLotMs);
     const e = this.enregistrement(companyId);
     // --- à partir d'ici, comme la fonction Postgres : verrou, contrôle du compteur, tout ou rien
     if (e.pasTraites !== pasAttendu) {

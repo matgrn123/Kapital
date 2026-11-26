@@ -78,7 +78,8 @@ export async function chargerSituationStock(supabase: SupabaseClient, companyId:
       supabase.from("products").select("id, nom").order("nom"),
       supabase.from("product_stock").select("product_id, quantite_pieces").eq("company_id", companyId),
       supabase.from("stock_boutique").select("product_id, quantite_pieces").eq("company_id", companyId),
-      supabase.from("points_de_vente").select("mois_ouverture").eq("company_id", companyId).eq("statut", "actif"),
+      // « * » : ouverture_le (migration 0045) est lu quand la colonne existe.
+      supabase.from("points_de_vente").select("*").eq("company_id", companyId).eq("statut", "actif"),
       supabase.from("production_orders").select("product_id, quantite").eq("company_id", companyId).eq("statut", "en_cours"),
       lignesDeVente(supabase, companyId, Math.max(0, moisCourant - 1)),
     ]);
@@ -99,8 +100,11 @@ export async function chargerSituationStock(supabase: SupabaseClient, companyId:
       cree_le: string | null;
     }>
   ).sort((a, b) => ordreNom.indexOf(a.product_id) - ordreNom.indexOf(b.product_id));
-  const boutiqueOuverte = ((boutiques ?? []) as Array<{ mois_ouverture: number }>).some(
-    (b) => Number(b.mois_ouverture) <= moisCourant,
+  // T3 : une boutique ouvre à l'instant de la fin des travaux (ouverture_le, instant réel) ;
+  // une boutique d'avant 0045 ouvre au mois mois_ouverture.
+  const maintenant = Date.now();
+  const boutiqueOuverte = ((boutiques ?? []) as Array<{ mois_ouverture: number; ouverture_le?: string | null }>).some(
+    (b) => (b.ouverture_le ? Date.parse(b.ouverture_le) <= maintenant : Number(b.mois_ouverture) <= moisCourant),
   );
 
   const lignes = lignesStock({

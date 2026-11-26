@@ -21,7 +21,8 @@ describe("paramètres du bail", () => {
   it("lit le dépôt (en mois de loyer) et le préavis dans les paramètres sourcés", () => {
     const p = parametresBailDepuis(PARAMS);
     expect(p.depotMoisDeLoyer).toBe(1);
-    expect(p.preavisMois).toBe(6);
+    // Horloge réelle (T3) : préavis d'un mois, sortie à la fin du mois qui suit le congé.
+    expect(p.preavisMois).toBe(1);
     expect(p.machinesALaSignature).toBe(2);
   });
 
@@ -79,11 +80,18 @@ describe("congé et fin de bail", () => {
     params: PARAMS,
   });
 
-  it("le congé donné au mois 10 avec 6 mois de préavis met fin au bail au mois 16", () => {
-    const apres = donnerConge(bail, moisJeu(10), parametresBailDepuis(PARAMS).preavisMois);
+  it("le congé donné en novembre 2026 avec 1 mois de préavis rend le local fin décembre 2026", () => {
+    const novembre = moisJeu(2026 * 12 + 10);
+    const apres = donnerConge(bail, novembre, parametresBailDepuis(PARAMS).preavisMois);
+    // Dernier mois du bail : décembre (dernier loyer payé et dépôt rendu à sa clôture).
+    expect(apres.moisFin).toBe(novembre + 1);
+    expect(bailTermineAu(apres, novembre)).toBe(false);
+    expect(bailTermineAu(apres, moisJeu(novembre + 1))).toBe(true);
+  });
+
+  it("un préavis plus long (paramètre) recule d'autant la fin du bail", () => {
+    const apres = donnerConge(bail, moisJeu(10), 6);
     expect(apres.moisFin).toBe(16);
-    expect(bailTermineAu(apres, moisJeu(15))).toBe(false);
-    expect(bailTermineAu(apres, moisJeu(16))).toBe(true);
   });
 
   it("un bail sans congé ne se termine jamais", () => {

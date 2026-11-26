@@ -13,7 +13,17 @@ const PARAMS = chargerParametresV1();
 const CATALOGUE = chargerBatimentsV1();
 
 describe("offres d'emplacements (écran Magasin)", () => {
-  const offres = offresEmplacements({ catalogue: CATALOGUE, params: PARAMS, mois: 30, tresorerie: 3_000_000, margeParPiece: 2_000 });
+  // Signature simulée le jeudi 26 novembre 2026 à 10 h 21, heure de Paris.
+  const NOVEMBRE_2026 = 2026 * 12 + 10;
+  const MAINTENANT = Date.UTC(2026, 10, 26, 9, 21);
+  const offres = offresEmplacements({
+    catalogue: CATALOGUE,
+    params: PARAMS,
+    mois: NOVEMBRE_2026,
+    instantMs: MAINTENANT,
+    tresorerie: 3_000_000,
+    margeParPiece: 2_000,
+  });
 
   it("une offre par emplacement boutique du catalogue, chiffres du moteur", () => {
     const boutiques = CATALOGUE.filter((b) => b.categorie === "boutique");
@@ -22,7 +32,10 @@ describe("offres d'emplacements (écran Magasin)", () => {
     // Dépôt = 3 mois de loyer (paramètre), travaux = surface × coût au m² (paramètre).
     expect(quartier.apercu.depotGarantie).toBe(76_500 * PARAMS["boutique_depot_garantie_mois_de_loyer"]!.valeur);
     expect(quartier.apercu.travaux).toBe(45 * PARAMS["boutique_travaux_amenagement_centimes_par_m2"]!.valeur);
-    expect(quartier.apercu.moisOuverture).toBe(30 + PARAMS["boutique_travaux_duree_mois"]!.valeur);
+    // T3 : 24 h de travaux (paramètre) : ouverture le lendemain à la même heure, en novembre.
+    expect(quartier.apercu.dureeTravauxHeures).toBe(PARAMS["boutique_travaux_duree_heures"]!.valeur);
+    expect(quartier.apercu.ouvertureMs).toBe(MAINTENANT + PARAMS["boutique_travaux_duree_heures"]!.valeur * 3_600_000);
+    expect(quartier.apercu.moisOuverture).toBe(NOVEMBRE_2026);
   });
 
   it("l'écriture de signature est équilibrée et sort dépôt + travaux de la banque", () => {
