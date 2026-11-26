@@ -14,7 +14,7 @@ import {
   SurTitre,
 } from "../../../components/ui";
 import { formaterDateHeure, formaterEuros } from "../../../lib/formatage";
-import { libelleGamme, libelleLisible } from "../../../lib/lisible";
+import { libelleGamme, libelleLisible, nomLisibleSociete } from "../../../lib/lisible";
 import { chargerProgressionMissions } from "../../../lib/missions";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import {
@@ -26,6 +26,8 @@ import {
   type LigneGrandLivre,
 } from "../../../lib/tableau";
 import { CarteEtape } from "./CarteEtape";
+import { produitsEnStockBas } from "../../../lib/stock";
+import { chargerSituationStock } from "../stock/donnees";
 import { CarteBilanMois } from "./CarteBilanMois";
 import { CartePendantAbsence } from "./CartePendantAbsence";
 import { MarquerVu } from "../journal/MarquerVu";
@@ -61,6 +63,7 @@ export default async function PageJeu() {
   const entreprise = entreprises?.[0];
   if (!entreprise) return null;
 
+  const situationStock = chargerSituationStock(supabase, entreprise.id);
   // Journal : tout ce qui est lu à partir d'ici est « vu » jusqu'à cet instant. Lectures lancées
   // en même temps que celles du tableau de bord, attendues plus bas ; une lecture en échec
   // (journal pas encore installé) masque seulement les cartes du journal.
@@ -123,6 +126,7 @@ export default async function PageJeu() {
     stockPieces,
     moisDecouvert: Number(entreprise.mois_decouvert_consecutifs ?? 0),
     aUnProduit,
+    stocksBas: produitsEnStockBas((await situationStock).lignes),
   });
   const notoriete = marque.data?.notoriete ?? null;
   const desirabilite = marque.data?.desirabilite ?? null;
@@ -369,7 +373,7 @@ export default async function PageJeu() {
             </div>
             {premier ? (
               <>
-                <h4 className="text-base font-bold">{premier.nom} en tête du classement</h4>
+                <h4 className="text-base font-bold">{nomLisibleSociete(premier.nom)} en tête du classement</h4>
                 <p className="mb-2.5 text-[0.84rem] text-muted">
                   Valeur de l&apos;entreprise : {euros(premier.valeur_centimes)}, sur {rangs.length} sociétés en lice.
                 </p>

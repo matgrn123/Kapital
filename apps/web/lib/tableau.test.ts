@@ -124,6 +124,31 @@ describe("alertes", () => {
 
   it("dit que tout va bien quand rien n'est à signaler", () => {
     expect(alertes(base)).toEqual([{ ton: "bon", texte: "Rien à signaler : trésorerie positive, stock et ventes en cours." }]);
+    expect(alertes({ ...base, stocksBas: [] })).toHaveLength(1);
+  });
+
+  it("signale un stock bas avec ses jours restants, vers l'écran Stock", () => {
+    const r = alertes({ ...base, stocksBas: [{ nom: "T-shirt", jours: 6.7 }] });
+    expect(r).toEqual([
+      { ton: "alerte", texte: "Stock bas : T-shirt (6 jours). Réapprovisionne avant la rupture.", lien: "/stock" },
+    ]);
+  });
+
+  it("regroupe plusieurs produits et nomme la rupture d'un seul produit", () => {
+    const r = alertes({
+      ...base,
+      stocksBas: [
+        { nom: "Chemise", jours: 0 },
+        { nom: "T-shirt", jours: 0.2 },
+      ],
+    });
+    expect(r[0]!.texte).toBe("Stock bas : Chemise (rupture), T-shirt (moins d'un jour). Réapprovisionne avant la rupture.");
+  });
+
+  it("ne double pas l'alerte « plus de stock » quand tout le stock est à 0", () => {
+    const r = alertes({ ...base, stockPieces: 0, stocksBas: [{ nom: "T-shirt", jours: 0 }] });
+    expect(r.filter((a) => a.lien === "/stock")).toHaveLength(0);
+    expect(r[0]!.texte).toContain("Plus de stock");
   });
 });
 

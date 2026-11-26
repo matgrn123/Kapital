@@ -148,6 +148,13 @@ export function dernieresEcritures(lignes: readonly LigneGrandLivre[], nombre: n
 
 export type Alerte = { readonly ton: "bon" | "alerte" | "critique"; readonly texte: string; readonly lien?: string };
 
+function joursRestants(jours: number): string {
+  if (!(jours > 0)) return "rupture";
+  if (jours < 1) return "moins d'un jour";
+  const n = Math.floor(jours);
+  return `${n} jour${n > 1 ? "s" : ""}`;
+}
+
 /** Ce que le tableau de bord signale, du plus grave au moins grave. */
 export function alertes(e: {
   tresorerie: number;
@@ -155,6 +162,8 @@ export function alertes(e: {
   stockPieces: number;
   moisDecouvert: number;
   aUnProduit: boolean;
+  /** Produits en rupture ou sous le seuil « stock bas » (lib/stock.ts › produitsEnStockBas). */
+  stocksBas?: ReadonlyArray<{ readonly nom: string; readonly jours: number }>;
 }): Alerte[] {
   const r: Alerte[] = [];
   if (e.tresorerie < 0) {
@@ -172,6 +181,10 @@ export function alertes(e: {
     return r;
   }
   if (e.stockPieces === 0) r.push({ ton: "alerte", texte: "Plus de stock à vendre : commande une production.", lien: "/atelier" });
+  else if (e.stocksBas && e.stocksBas.length > 0) {
+    const produits = e.stocksBas.map((p) => `${p.nom} (${joursRestants(p.jours)})`).join(", ");
+    r.push({ ton: "alerte", texte: `Stock bas : ${produits}. Réapprovisionne avant la rupture.`, lien: "/stock" });
+  }
   if (e.caMois <= 0) r.push({ ton: "alerte", texte: "Pas encore de vente ce mois-ci.", lien: "/produits" });
   if (r.length === 0) r.push({ ton: "bon", texte: "Rien à signaler : trésorerie positive, stock et ventes en cours." });
   return r;

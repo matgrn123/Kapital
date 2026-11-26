@@ -2,7 +2,7 @@
 
 import type { Parametres } from "@kapital/content";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Bouton, EcritureComptable } from "../../../components/ui";
 import { Choix, Curseur, Ligne, Note, Refus, Resultat, Succes, Vide } from "../../../components/ui";
@@ -109,7 +109,11 @@ export function FormulaireProduction({
 }) {
   const router = useRouter();
   const tauxChute = params["taux_chute_matiere_defaut"]?.valeur ?? 0;
-  const [productId, setProductId] = useState<string>(produits[0]?.id ?? "");
+  // « Réapprovisionner » (écran Stock) arrive ici avec ?produit=… : ce produit est présélectionné.
+  const produitDemande = useSearchParams().get("produit");
+  const [productId, setProductId] = useState<string>(
+    produits.find((p) => p.id === produitDemande)?.id ?? produits[0]?.id ?? "",
+  );
   const [lieu, setLieu] = useState<string>(aUnAtelier ? "atelier" : (faconniers[0]?.id ?? ""));
   const [quantiteN, setQuantiteN] = useState<number>(faconniers[0]?.minimum_commande ?? 1);
   const [enCours, setEnCours] = useState(false);
@@ -325,11 +329,13 @@ export function FormulaireProduction({
       </div>
 
       <Curseur
-        libelle="Quantité (pièces)"
+        libelle="Quantité"
         valeur={quantiteBornee}
         min={bornes.min}
         max={bornes.max}
         onChange={setQuantiteN}
+        saisie="nombre"
+        unite="pièces"
         aide={
           lieu === "atelier"
             ? rienPossible

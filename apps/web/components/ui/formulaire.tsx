@@ -6,8 +6,9 @@
 
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { phraseCondition } from "../../app/(authentifie)/_partage/reponses";
+import { lireSaisie, texteSaisie, type ModeSaisie } from "../../lib/saisie";
 import type { VerrouAffiche } from "../../app/(authentifie)/_partage/verrou";
 import { pointsCourbe } from "./calculs";
 
@@ -59,7 +60,11 @@ export function Champ({ libelle, aide, children }: { libelle: ReactNode; aide?: 
   );
 }
 
-/** Curseur (input range) avec sa valeur affichée en direct. */
+/**
+ * Curseur (input range) avec sa valeur affichée en direct. Avec `saisie`, la valeur
+ * devient une petite case où l'on tape le chiffre exact (« 29,90 ») : elle est ramenée
+ * dans `bornesSaisie` (par défaut celles du curseur).
+ */
 export function Curseur({
   libelle,
   valeur,
@@ -69,6 +74,9 @@ export function Curseur({
   onChange,
   affichage,
   aide,
+  saisie,
+  unite,
+  bornesSaisie,
 }: {
   libelle: ReactNode;
   valeur: number;
@@ -79,7 +87,29 @@ export function Curseur({
   /** Texte de la valeur ; par défaut le nombre lui-même. */
   affichage?: ReactNode;
   aide?: ReactNode;
+  /** Saisie directe : « euros » (valeur en centimes) ou « nombre » (entier). */
+  saisie?: ModeSaisie;
+  /** Unité écrite après la case de saisie (« € » par défaut en euros, « m », « pièces »). */
+  unite?: string;
+  /** Bornes de la saisie directe, si elles diffèrent de celles du curseur. */
+  bornesSaisie?: { min: number; max: number };
 }) {
+  if (saisie) {
+    return (
+      <CurseurAvecSaisie
+        libelle={libelle}
+        valeur={valeur}
+        min={min}
+        max={max}
+        pas={pas}
+        onChange={onChange}
+        aide={aide}
+        mode={saisie}
+        unite={unite ?? (saisie === "euros" ? "€" : "")}
+        bornes={bornesSaisie ?? { min, max }}
+      />
+    );
+  }
   return (
     <label className="flex min-w-0 flex-col gap-[5px] text-[0.84rem] font-semibold">
       <span className="flex items-baseline justify-between gap-2">
@@ -97,6 +127,96 @@ export function Curseur({
       />
       {aide && <span className="text-[0.76rem] font-normal text-muted">{aide}</span>}
     </label>
+  );
+}
+
+/** Curseur doublé d'une case de saisie : le curseur pour explorer, la case pour le chiffre exact. */
+function CurseurAvecSaisie({
+  libelle,
+  valeur,
+  min,
+  max,
+  pas,
+  onChange,
+  aide,
+  mode,
+  unite,
+  bornes,
+}: {
+  libelle: ReactNode;
+  valeur: number;
+  min: number;
+  max: number;
+  pas: number;
+  onChange: (v: number) => void;
+  aide?: ReactNode;
+  mode: ModeSaisie;
+  unite: string;
+  bornes: { min: number; max: number };
+}) {
+  const id = useId();
+  // Texte en cours de frappe ; null quand la case montre simplement la valeur du curseur.
+  const [texte, setTexte] = useState<string | null>(null);
+  const lu = texte === null ? null : lireSaisie(texte, mode, bornes);
+  const illisible = texte !== null && texte.trim() !== "" && lu === null;
+  const borne = (v: number) => (mode === "euros" ? `${texteSaisie(v, mode)} €` : `${texteSaisie(v, mode)}${unite ? ` ${unite}` : ""}`);
+
+  let message: ReactNode = aide;
+  let ton = "text-muted";
+  if (illisible) {
+    message = mode === "euros" ? "Tape un montant en euros, par exemple 29,90." : "Tape un nombre entier, par exemple 300.";
+    ton = "text-bad";
+  } else if (lu?.ramenee) {
+    message = `Ramené à ${borne(lu.valeur)} : de ${borne(bornes.min)} à ${borne(bornes.max)}.`;
+    ton = "text-thread";
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col gap-[5px] text-[0.84rem] font-semibold">
+      <span className="flex items-center justify-between gap-2">
+        <span id={`${id}-libelle`}>{libelle}</span>
+        <span className="flex shrink-0 items-center gap-1">
+          <input
+            type="text"
+            inputMode={mode === "euros" ? "decimal" : "numeric"}
+            aria-labelledby={`${id}-libelle`}
+            aria-invalid={illisible || undefined}
+            aria-describedby={message ? `${id}-aide` : undefined}
+            value={texte ?? texteSaisie(valeur, mode)}
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => {
+              setTexte(e.target.value);
+              const r = lireSaisie(e.target.value, mode, bornes);
+              if (r) onChange(r.valeur);
+            }}
+            onBlur={() => setTexte(null)}
+            className={classes(
+              "w-[6.5rem] rounded-lg border bg-surface px-2 py-1 text-right font-display text-[1.05rem] font-extrabold tabular-nums text-ink outline-none focus:border-accent",
+              illisible ? "border-bad" : "border-line",
+            )}
+          />
+          {unite && <span className="font-display text-[1.05rem] font-extrabold">{unite}</span>}
+        </span>
+      </span>
+      <input
+        type="range"
+        aria-labelledby={`${id}-libelle`}
+        className="w-full accent-[var(--accent)]"
+        min={min}
+        max={max}
+        step={pas}
+        value={valeur}
+        onChange={(e) => {
+          setTexte(null);
+          onChange(Number(e.target.value));
+        }}
+      />
+      {message && (
+        <span id={`${id}-aide`} className={classes("text-[0.76rem] font-normal", ton)}>
+          {message}
+        </span>
+      )}
+    </div>
   );
 }
 

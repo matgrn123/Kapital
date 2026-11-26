@@ -17,7 +17,7 @@ import {
 } from "../../../components/ui";
 import { apercuVente } from "../../../lib/apercus";
 import { formaterEuros } from "../../../lib/formatage";
-import { bornesPrix } from "../../../lib/vente";
+import { bornesPrix, PAS_PRIX_CENTIMES } from "../../../lib/vente";
 
 type LignePrix = {
   id: string;
@@ -60,10 +60,10 @@ export function FormulairePrix({
   const tauxTva = params["tva_standard"]?.valeur ?? 0;
   // Bornes figées au chargement : le curseur ne doit pas fuir sous le doigt.
   const [bornesTtc] = useState(() =>
-    bornesPrix({ coutRevient, prixActuel: lignePrix.prix_vente_directe_centimes, tauxTva }),
+    bornesPrix({ coutRevient, prixActuel: lignePrix.prix_vente_directe_centimes, tauxTva, pas: PAS_PRIX_CENTIMES }),
   );
   const [bornesHt] = useState(() =>
-    bornesPrix({ coutRevient, prixActuel: lignePrix.prix_revendeur_centimes, tauxTva: 0 }),
+    bornesPrix({ coutRevient, prixActuel: lignePrix.prix_revendeur_centimes, tauxTva: 0, pas: PAS_PRIX_CENTIMES }),
   );
   const apercu = useMemo(
     () =>
@@ -130,9 +130,9 @@ export function FormulairePrix({
         valeur={pDirecte}
         min={bornesTtc.min}
         max={bornesTtc.max}
-        pas={10}
+        pas={PAS_PRIX_CENTIMES}
         onChange={setDirecte}
-        affichage={`${formaterEuros(pDirecte)} €`}
+        saisie="euros"
         aide={
           apercu.ok
             ? `Marge par pièce ${formaterEuros(apercu.margeDirecte)} € (${pourcent(apercu.tauxMargeDirecte)}), retours compris`
@@ -145,9 +145,9 @@ export function FormulairePrix({
           valeur={pRevendeur}
           min={bornesHt.min}
           max={bornesHt.max}
-          pas={10}
+          pas={PAS_PRIX_CENTIMES}
           onChange={setRevendeur}
-          affichage={`${formaterEuros(pRevendeur)} €`}
+          saisie="euros"
           aide="Ce que te paie une boutique."
         />
         <Curseur
@@ -209,7 +209,8 @@ export function FormulairePrix({
   );
 }
 
-export type ProduitAAjouter = { id: string; nom: string; detail: string; prix: string | null };
+/** `prix` : coût annoncé en premier (série de lancement ou façonnier) ; `ensuite` : le coût d'après, à part. */
+export type ProduitAAjouter = { id: string; nom: string; detail: string; prix: string | null; ensuite?: string | null };
 
 /** Tuiles des produits que tu peux ajouter ; un seul bouton pour celui choisi. */
 export function AjouterProduit({ produits, premier }: { produits: ProduitAAjouter[]; premier: boolean }) {
@@ -220,7 +221,17 @@ export function AjouterProduit({ produits, premier }: { produits: ProduitAAjoute
         libelle="Produit à ajouter"
         valeur={choisi}
         onChange={setChoisi}
-        options={produits.map((p) => ({ id: p.id, titre: p.nom, detail: p.detail, prix: p.prix ?? undefined }))}
+        options={produits.map((p) => ({
+          id: p.id,
+          titre: p.nom,
+          detail: p.detail,
+          prix: p.prix ? (
+            <>
+              {p.prix}
+              {p.ensuite && <span className="block font-normal text-muted">{p.ensuite}</span>}
+            </>
+          ) : undefined,
+        }))}
       />
       {choisi && <AjouterProduitBouton productId={choisi} premier={premier} />}
     </div>

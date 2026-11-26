@@ -2,6 +2,7 @@ import { chargerParametresV1 } from "@kapital/content";
 import { Carte, EncadreNotion, EnTete, Puce, Tableau, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { formaterEuros, formaterDateHeure } from "../../../lib/formatage";
+import { quantiteMatiere, symboleUnite } from "../../../lib/formatage";
 import { FormulaireCommande } from "./FormulaireCommande";
 
 type Fournisseur = {
@@ -45,7 +46,7 @@ export default async function PageAchats() {
         .eq("company_id", entreprise.id)
         .eq("statut", "en_cours")
         .order("instant_livraison_prevue", { ascending: true }),
-      supabase.from("materials").select("id, nom"),
+      supabase.from("materials").select("id, nom, unite"),
       supabase.from("material_stock").select("material_id, quantite").eq("company_id", entreprise.id),
     ]);
 
@@ -53,6 +54,8 @@ export default async function PageAchats() {
   const fournisseursTab = (fournisseurs ?? []) as Fournisseur[];
   const enCours = (commandes ?? []) as Commande[];
   const materialsMap = new Map<string, string>((materials ?? []).map((m) => [m.id as string, m.nom as string]));
+  // Unité de chaque matière (« metre », « lot ») : une quantité se lit toujours avec elle.
+  const unites = new Map<string, string>((materials ?? []).map((m) => [m.id as string, String(m.unite ?? "metre")]));
   const stocksTab = ((stocks ?? []) as Array<{ material_id: string; quantite: number }>).filter((s) => Number(s.quantite) > 0);
 
   return (
@@ -68,7 +71,7 @@ export default async function PageAchats() {
             <FormulaireCommande
               fournisseurs={fournisseursTab}
               catalogue={(catalogue ?? []) as LigneCatalogue[]}
-              materials={Array.from(materialsMap.entries()).map(([id, nom]) => ({ id, nom }))}
+              materials={Array.from(materialsMap.entries()).map(([id, nom]) => ({ id, nom, unite: unites.get(id) ?? "metre" }))}
               tresorerie={Number(entreprise.tresorerie_centimes ?? 0)}
               params={params}
             />
@@ -91,7 +94,9 @@ export default async function PageAchats() {
                   <tr key={c.id}>
                     <td>{fournisseursTab.find((x) => x.id === c.supplier_id)?.nom ?? "Fournisseur"}</td>
                     <td>{materialsMap.get(c.material_id) ?? "Matière"}</td>
-                    <td className="text-right tabular-nums">{Number(c.quantite).toLocaleString("fr-FR")}</td>
+                    <td className="text-right tabular-nums">
+                      {Number(c.quantite).toLocaleString("fr-FR")} {symboleUnite(unites.get(c.material_id) ?? "metre", Number(c.quantite))}
+                    </td>
                     <td className="text-right tabular-nums">
                       {formaterEuros(Math.round(c.prix_unitaire_centimes * Number(c.quantite)))} €
                     </td>
@@ -109,7 +114,7 @@ export default async function PageAchats() {
               <div className="flex flex-wrap gap-2">
                 {stocksTab.map((s) => (
                   <Puce key={s.material_id}>
-                    {materialsMap.get(s.material_id) ?? "Matière"} : {Number(s.quantite).toLocaleString("fr-FR")}
+                    {quantiteMatiere(Number(s.quantite), unites.get(s.material_id) ?? "metre", materialsMap.get(s.material_id) ?? "matière")}
                   </Puce>
                 ))}
               </div>
