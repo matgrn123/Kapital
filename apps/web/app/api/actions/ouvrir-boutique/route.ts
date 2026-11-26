@@ -10,7 +10,6 @@ import {
 import { verifierDeblocageEtape } from "@kapital/server";
 import { chargerContexte, estErreurAction } from "../../../../lib/api-helpers";
 import { fonctionAbsente } from "../../../../lib/rpc";
-import { instantDuJeu } from "../../../../lib/cadre";
 
 export const runtime = "nodejs";
 
@@ -69,13 +68,7 @@ export async function POST(request: Request) {
   // Heure du jeu de la signature (en production, l'heure réelle ; en recette, l'outil
   // « avancer le temps » met le jeu en avance) : elle fixe le mois d'ouverture.
   const maintenant = Date.now();
-  const { data: monde } = await ctx.supabaseAdmin
-    .from("worlds")
-    .select("debut_reel")
-    .eq("etat", "actif")
-    .limit(1)
-    .maybeSingle();
-  const signatureJeu = instantDuJeu(maintenant, (monde as { debut_reel?: string | null } | null)?.debut_reel ?? null);
+  const signatureJeu = maintenant - ctx.debutReelMs;
   const apercu = apercuOuvertureBoutique({
     batiment,
     params,
