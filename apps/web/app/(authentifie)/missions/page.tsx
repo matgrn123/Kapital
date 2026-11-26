@@ -3,7 +3,7 @@ import { DEFINITIONS_MISSIONS, ordonnerClassement, type EtatMission } from "@kap
 import { BoutonLien, Carte, EncadreNotion, EnTete, Jauge, Puce, TableauRang, Vide } from "../../../components/ui";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import { nomLisibleSociete } from "../../../lib/lisible";
-import { chargerProgressionMissions } from "../../../lib/missions";
+import { chargerProgressionMissions, texteAvancement } from "../../../lib/missions";
 import { dateHeureLisible } from "../../../lib/cadre";
 import { formaterEuros } from "../../../lib/formatage";
 
@@ -84,12 +84,6 @@ export default async function PageMissions() {
           const etat: EtatMission = p?.etat ?? "a_faire";
           const actuel = p?.actuel ?? 0;
           const cible = p?.cible ?? 0;
-          const format =
-            d.id === "mission3"
-              ? (v: number) => `${formaterEuros(v)} €`
-              : d.id === "mission4"
-                ? (v: number) => `${v} mois`
-                : (v: number) => String(v);
           const agir = OU_AGIR[d.id];
           return (
             <Carte
@@ -106,7 +100,7 @@ export default async function PageMissions() {
                   valeur={etat === "validee" ? Math.max(actuel, cible) : actuel}
                   max={cible > 0 ? cible : 1}
                   ton={etat === "validee" ? "bon" : "accent"}
-                  texte={cible > 0 ? `${format(actuel)} / ${format(cible)}` : etat === "validee" ? "Fait" : "Pas encore"}
+                  texte={cible > 0 ? texteAvancement(d.id, actuel, cible) : etat === "validee" ? "Fait" : "Pas encore"}
                 />
                 <details className="group">
                   <summary className="cursor-pointer text-[0.84rem] font-semibold text-accent">

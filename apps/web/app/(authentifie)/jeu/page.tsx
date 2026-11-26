@@ -14,9 +14,8 @@ import {
   SurTitre,
 } from "../../../components/ui";
 import { dateHeureLisible, libelleMois, libelleMoisCourt, titreMois } from "../../../lib/cadre";
-import { formaterEuros } from "../../../lib/formatage";
 import { libelleGamme, libelleLisible, nomLisibleSociete } from "../../../lib/lisible";
-import { chargerProgressionMissions } from "../../../lib/missions";
+import { chargerProgressionMissions, texteAvancement } from "../../../lib/missions";
 import { creerClientServeur } from "../../../lib/supabase/server";
 import {
   alertes,
@@ -408,11 +407,7 @@ export default async function PageJeu() {
                     libelle="Avancement"
                     valeur={missionEnCours.actuel}
                     max={missionEnCours.cible}
-                    texte={
-                      defMission.id === "mission3"
-                        ? `${formaterEuros(missionEnCours.actuel)} € / ${formaterEuros(missionEnCours.cible)} €`
-                        : `${missionEnCours.actuel} / ${missionEnCours.cible}`
-                    }
+                    texte={texteAvancement(defMission.id, missionEnCours.actuel, missionEnCours.cible)}
                   />
                 )}
                 <div className="mt-2">

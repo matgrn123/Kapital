@@ -3,17 +3,14 @@ import { chargerParametresV1, type Parametres } from "@kapital/content";
 import { enregistrerEvenementsSupabase, evenementMissionValidee } from "@kapital/server";
 import {
   DEFINITIONS_MISSIONS,
-  configTempsDepuis,
   evaluerMissions,
-  horlogeDepuis,
   metriquesDepuisGrandLivre,
-  type ComplementsMissions,
+  reglesMissionsDepuis,
   type LigneGrandLivreMission,
   type MetriquesMissions,
   type ProgressionMission,
 } from "@kapital/engine";
-
-export type { ComplementsMissions };
+import { formaterEuros } from "./formatage";
 
 function clientAdmin(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -30,25 +27,59 @@ type LigneProgressionDb = {
   validee_le: string | null;
 };
 
-/** Métriques des missions depuis les lignes de ledger_entries (règle du moteur, partagée avec le banc). */
-export function calculerMetriques(
-  ecritures: readonly LigneGrandLivreMission[],
-  moisJeuCreation: number,
-  moisJeuCourant: number,
-  complements: ComplementsMissions = {},
-): MetriquesMissions {
-  return metriquesDepuisGrandLivre(ecritures, moisJeuCreation, moisJeuCourant, complements);
+/** Une ligne de ledger_entries telle que lue en base (cree_le : instant réel de l'écriture). */
+export type LigneLedgerDb = Omit<LigneGrandLivreMission, "instant_ms"> & { cree_le?: string | null };
+
+/**
+ * Heure du jeu (ms) d'un instant réel lu en base : instant réel moins l'origine de l'horloge
+ * (worlds.debut_reel ; en production le 1er janvier 1970, les deux se confondent). null si la
+ * date manque ou est illisible.
+ */
+export function heureDuJeuMs(iso: string | null | undefined, debutReelMs: number): number | null {
+  const ms = iso ? Date.parse(iso) : Number.NaN;
+  return Number.isFinite(ms) ? ms - debutReelMs : null;
 }
 
 /**
- * Mois de jeu où la société a été créée, lu sur l'horloge commune (début du monde + date de
- * création). Sans l'une des deux dates, 0 : la société est comptée comme née au début du monde.
+ * Métriques des missions depuis les lignes lues en base (règle du moteur, partagée avec le banc).
+ * Horloge réelle : chaque écriture est datée par son cree_le, la société par companies.cree_le,
+ * chaque boutique par la signature de son bail (points_de_vente.cree_le). Fonction pure : l'instant
+ * présent est fourni par l'appelant.
  */
-export function moisDeCreation(params: Parametres, debutMondeIso: string | null, creeLeIso: string | null): number {
-  const debut = debutMondeIso ? Date.parse(debutMondeIso) : Number.NaN;
-  const cree = creeLeIso ? Date.parse(creeLeIso) : Number.NaN;
-  if (!Number.isFinite(debut) || !Number.isFinite(cree) || cree < debut) return 0;
-  return horlogeDepuis(configTempsDepuis(params), debut, cree).moisEnCours;
+export function metriquesDepuisLignesDb(a: {
+  params: Parametres;
+  lignes: readonly LigneLedgerDb[];
+  debutReelIso: string | null;
+  creeLeSociete: string | null;
+  maintenantMs: number;
+  boutiques?: readonly { cree_le: string | null }[];
+  localEnregistre?: boolean;
+}): MetriquesMissions {
+  const debutReelMs = heureDuJeuMs(a.debutReelIso, 0) ?? 0;
+  const maintenant = a.maintenantMs - debutReelMs;
+  const ecritures: LigneGrandLivreMission[] = a.lignes.map(({ cree_le, ...l }) => {
+    const instant = heureDuJeuMs(cree_le, debutReelMs);
+    return instant === null ? l : { ...l, instant_ms: instant };
+  });
+  const boutiques = (a.boutiques ?? []).flatMap((b) => {
+    const signee = heureDuJeuMs(b.cree_le, debutReelMs);
+    return signee === null ? [] : [{ signee_le_ms: signee }];
+  });
+  return metriquesDepuisGrandLivre(ecritures, {
+    // Sans date de création, la société est comptée comme née à l'instant (rien n'est encore tenu).
+    creationMs: heureDuJeuMs(a.creeLeSociete, debutReelMs) ?? maintenant,
+    maintenantMs: maintenant,
+    regles: reglesMissionsDepuis(a.params),
+    boutiques,
+    localEnregistre: a.localEnregistre ?? false,
+  });
+}
+
+/** Texte de la jauge d'une mission : « 3 / 7 jours », « 120,00 € / 240,00 € », « 12 / 50 ». */
+export function texteAvancement(id: string, actuel: number, cible: number): string {
+  if (id === "mission3") return `${formaterEuros(actuel)} € / ${formaterEuros(cible)} €`;
+  if (id === "mission2" || id === "mission4") return `${actuel} / ${cible} jour${cible > 1 ? "s" : ""}`;
+  return `${actuel} / ${cible}`;
 }
 
 export async function chargerProgressionMissions(
@@ -58,7 +89,7 @@ export async function chargerProgressionMissions(
   const [compta, monde, lignesMiss, societe, boutiques, locaux] = await Promise.all([
     supabase
       .from("ledger_entries")
-      .select("ecriture_id, mois_jeu, libelle, compte, sens, montant_centimes")
+      .select("ecriture_id, mois_jeu, libelle, compte, sens, montant_centimes, cree_le")
       .eq("company_id", companyId),
     supabase.from("worlds").select("mois_courant, debut_reel").limit(1).maybeSingle(),
     supabase
@@ -66,26 +97,20 @@ export async function chargerProgressionMissions(
       .select("mission_id, etat, actuel, cible, validee_le")
       .eq("company_id", companyId),
     supabase.from("companies").select("cree_le").eq("id", companyId).maybeSingle(),
-    supabase.from("points_de_vente").select("mois_signature, mois_ouverture").eq("company_id", companyId),
+    supabase.from("points_de_vente").select("cree_le").eq("company_id", companyId),
     supabase.from("workshops").select("id").eq("company_id", companyId).limit(1),
   ]);
 
-  const ecritures = (compta.data ?? []) as LigneGrandLivreMission[];
   const moisCourant = (monde.data?.mois_courant as number | undefined) ?? 0;
   const lignes = (lignesMiss.data ?? []) as LigneProgressionDb[];
 
-  // Le mois de création compte pour « Tenir six mois » : une société créée au mois 10
-  // n'a pas tenu six mois parce que le monde, lui, en a dix.
-  const moisCreation = moisDeCreation(
-    chargerParametresV1(),
-    (monde.data?.debut_reel as string | null | undefined) ?? null,
-    (societe.data?.cree_le as string | null | undefined) ?? null,
-  );
-  const metriques = calculerMetriques(ecritures, moisCreation, moisCourant, {
-    boutiques: ((boutiques.data ?? []) as { mois_signature: number; mois_ouverture: number }[]).map((b) => ({
-      mois_signature: Number(b.mois_signature),
-      mois_ouverture: Number(b.mois_ouverture),
-    })),
+  const metriques = metriquesDepuisLignesDb({
+    params: chargerParametresV1(),
+    lignes: (compta.data ?? []) as LigneLedgerDb[],
+    debutReelIso: (monde.data?.debut_reel as string | null | undefined) ?? null,
+    creeLeSociete: (societe.data?.cree_le as string | null | undefined) ?? null,
+    maintenantMs: Date.now(),
+    boutiques: (boutiques.data ?? []) as { cree_le: string | null }[],
     localEnregistre: (locaux.data ?? []).length > 0,
   });
   const progressions = evaluerMissions(metriques);

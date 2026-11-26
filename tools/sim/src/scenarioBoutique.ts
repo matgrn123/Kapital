@@ -2,10 +2,13 @@ import { chargerBatimentsV1, chargerParametresV1, type Parametres } from "@kapit
 import {
   apercuOuvertureBoutique,
   centimes,
+  debutDuMoisMs,
   etapeRequisePour,
   evaluerMissions,
+  finDuMoisMs,
   metriquesDepuisGrandLivre,
   moisJeu,
+  reglesMissionsDepuis,
   type ActionMarketing,
   type ProgressionMission,
 } from "@kapital/engine";
@@ -118,11 +121,15 @@ export function missionsDuBanc(etat: EtatBanc): readonly ProgressionMission[] {
       montant_centimes: l.montant,
     })),
   );
+  // Le banc avance par mois entiers : ses écritures n'ont pas d'instant, le moteur les date du
+  // dernier instant de leur mois ; la boutique est signée à ce même instant (lot T7 : à affiner).
   return evaluerMissions(
-    metriquesDepuisGrandLivre(lignes, 0, etat.mois, {
+    metriquesDepuisGrandLivre(lignes, {
+      creationMs: debutDuMoisMs(0),
+      maintenantMs: debutDuMoisMs(etat.mois),
+      regles: reglesMissionsDepuis(etat.params),
       boutiques: (etat.entreprise.pointsDeVente ?? []).map((p) => ({
-        mois_signature: p.moisSignature,
-        mois_ouverture: p.moisOuverture,
+        signee_le_ms: finDuMoisMs(p.moisSignature) - 1,
       })),
       localEnregistre: etat.entreprise.ateliers.length > 0,
     }),
